@@ -313,7 +313,7 @@ This guide ships as a living resource. The roadmap below is what's planned for t
 ### Q1 2027 (6–12 months out)
 
 - ✅ **Renewal-assessment guide** for those who took DP-800 in 2026 and need to renew — see [`certification/resources/renewal-guide.md`](./certification/resources/renewal-guide.md)
-- ✅ **Companion guide for related exams** (DP-700 Fabric Data Engineer, AI-102 AI Engineer — with retirement warning) — see [`certification/resources/companion-exams.md`](./certification/resources/companion-exams.md)
+- ✅ **Companion guide for related exams** (DP-700 Fabric Data Engineer — active, July 2026 blueprint; AI-102 AI Engineer — retired June 30, 2026, succeeded by AI-103 Azure AI Apps and Agents Developer Associate) — see [`certification/resources/companion-exams.md`](./certification/resources/companion-exams.md)
 - ✅ **Adaptive practice questions** — JSON-driven question bank with difficulty tagging — live at [kengio.github.io/dp-800-study-guide](https://kengio.github.io/dp-800-study-guide/) and sourced from [`practice/`](./practice/README.md) (160 questions across 3 banks)
 
 Legend: ✅ done · 🔄 in progress / next up · ⏸ deferred until upstream GA · ⏳ planned · 🌱 ideas being explored
@@ -398,7 +398,7 @@ dp-800-study-guide/
 - [SQL Server documentation](https://learn.microsoft.com/en-us/sql/?view=sql-server-ver17)
 - [SQL Server 2025 — announcement](https://www.microsoft.com/en-us/sql-server/blog/2025/05/19/announcing-sql-server-2025-preview-the-ai-ready-enterprise-database-from-ground-to-cloud/)
 - [Azure SQL documentation](https://learn.microsoft.com/en-us/azure/azure-sql/)
-- [SQL database in Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/database/sql/)
+- [SQL database in Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/database/sql/overview)
 - [VECTOR data type](https://learn.microsoft.com/en-us/sql/t-sql/data-types/vector-data-type)
 - [VECTOR_DISTANCE](https://learn.microsoft.com/en-us/sql/t-sql/functions/vector-distance-transact-sql)
 - [VECTOR_SEARCH](https://learn.microsoft.com/en-us/sql/t-sql/functions/vector-search-transact-sql)
@@ -429,7 +429,7 @@ dp-800-study-guide/
 - [Microsoft Learn — DP-800 learning path](https://learn.microsoft.com/en-us/training/courses/dp-800t00)
 - [Microsoft Q&A](https://learn.microsoft.com/en-us/answers/products/)
 - [SQL Server Tech Community](https://techcommunity.microsoft.com/category/sql-server/blog/sqlserver)
-- [Microsoft Fabric Blog](https://blog.fabric.microsoft.com/)
+- [Microsoft Fabric Blog](https://www.microsoft.com/en-us/microsoft-fabric/blog/)
 - [Azure SQL Dev Corner](https://devblogs.microsoft.com/azure-sql/)
 - [Data Exposed (video series)](https://learn.microsoft.com/en-us/shows/data-exposed/)
 - [Exam Readiness Zone](https://learn.microsoft.com/en-us/shows/exam-readiness-zone/)
