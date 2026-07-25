@@ -144,7 +144,7 @@ WITH (STATE = ON);
 
 | Type                  | Applies To             | Blocks                                |
 | :-------------------- | :--------------------- | :------------------------------------ |
-| `FILTER`              | SELECT, UPDATE, DELETE | ==Invisible rows (not an error)==     |
+| `FILTER`              | SELECT, UPDATE, DELETE | `Invisible rows (not an error)`     |
 | `BLOCK AFTER INSERT`  | INSERT                 | Inserts that would be invisible       |
 | `BLOCK AFTER UPDATE`  | UPDATE                 | Updates that result in invisible rows |
 | `BLOCK BEFORE UPDATE` | UPDATE                 | Updates on currently invisible rows   |
@@ -194,7 +194,7 @@ SELECT * FROM sys.security_predicates;
 | **Prevents inference** | No | Yes |
 | **Implementation** | Column attribute | Inline TVF + security policy |
 | **Impact on performance** | Minimal | Small overhead per query |
-| **Best for** | Data display protection | ==Multi-tenant isolation== |
+| **Best for** | Data display protection | `Multi-tenant isolation` |
 
 ---
 

@@ -26,7 +26,7 @@ against a small product catalogue.
 > - Create a `Products` table with a `VECTOR(1536)` column and insert 12 sample rows
 > - Build a DiskANN vector index with `CREATE VECTOR INDEX ... WITH (METRIC = 'cosine', TYPE = 'diskann')`
 > - Run ANN queries with `SELECT TOP (N) ... WITH APPROXIMATE` and ENN queries without it, then compare the two result sets
-> - Reproduce the DiskANN ==metric-mismatch== silent-fallback gotcha — the exam's favourite vector trap
+> - Reproduce the DiskANN `metric-mismatch` silent-fallback gotcha — the exam's favourite vector trap
 
 > [!tip] What you'll do
 >

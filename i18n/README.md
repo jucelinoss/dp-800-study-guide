@@ -17,17 +17,19 @@ See [`TRANSLATING.md`](../TRANSLATING.md) for the conventions, suggested priorit
 
 <!-- Locales land here as they are PR'd. -->
 
-*No locales yet — be the first to translate. Open an issue titled `i18n: <locale name>` to coordinate.*
+- **Português Brasileiro (pt-BR)** — [README.md](./pt-BR/README.md)
 
 ## Locale structure
 
-Each locale is a self-contained mirror of the English `certification/` tree:
+Each locale is a self-contained mirror of the English `certification/` and `practice/labs/` trees:
 
 ```text
 i18n/<locale>/
 ├── README.md             # locale landing — what's translated, by whom, last sync
-└── certification/        # mirror of the top-level certification/ tree
-    └── ...               # only the files actually translated need to exist
+├── certification/        # mirror of the top-level certification/ tree
+│   └── ...               # only the files actually translated need to exist
+└── practice/labs/        # mirror of the SQL lab suite
+    └── ...
 ```
 
 A locale does not need to be complete to be merged. A single translated file is a real contribution.

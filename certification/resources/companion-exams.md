@@ -15,7 +15,7 @@ tags:
 > [!abstract]
 >
 > - **Microsoft Certified: Fabric Data Engineer Associate (DP-700)** — natural next step for SQL/data folks; shares CI/CD, RLS, DDM, security, T-SQL transformations
-> - **Microsoft Certified: Azure AI Apps and Agents Developer Associate (AI-103)** — natural next step for AI-focused folks; shares RAG, Azure OpenAI, vector concepts, prompt engineering. AI-102 **retired June 30, 2026** and was succeeded by [AI-103](https://learn.microsoft.com/en-us/credentials/certifications/azure-ai-apps-and-agents-developer-associate/) — live and schedulable now (==currently in beta== — expect delayed scoring and evolving question content until it exits beta), [skills measured as of April 16, 2026](https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/ai-103)
+> - **Microsoft Certified: Azure AI Apps and Agents Developer Associate (AI-103)** — natural next step for AI-focused folks; shares RAG, Azure OpenAI, vector concepts, prompt engineering. AI-102 **retired June 30, 2026** and was succeeded by [AI-103](https://learn.microsoft.com/en-us/credentials/certifications/azure-ai-apps-and-agents-developer-associate/) — live and schedulable now (`currently in beta` — expect delayed scoring and evolving question content until it exits beta), [skills measured as of April 16, 2026](https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/ai-103)
 > - **DP-800 prep gives you a meaningful head start** on both — this guide maps the overlapping content so you know what's review vs. genuinely new
 
 > [!tip] How to use this guide

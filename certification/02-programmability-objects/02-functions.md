@@ -123,7 +123,7 @@ END;
 | Aspect | Scalar | Inline TVF | Multi-Statement TVF |
 | :--- | :--- | :--- | :--- |
 | Returns | Single value | Table (single SELECT) | Table (multiple statements) |
-| Optimizer inlining | No | ==**Yes**== | No |
+| Optimizer inlining | No | `**Yes**` | No |
 | Parallelism | Blocked | Allowed | Limited |
 | `SCHEMABINDING` | Supported | Supported | Supported |
 | Multiple statements | Yes | No | Yes |
@@ -225,7 +225,7 @@ A function is **deterministic** if it always returns the same result given the s
 | Category | Examples |
 | :--- | :--- |
 | Deterministic | `LEN`, `DATEADD`, `ROUND`, `UPPER`, `ABS` |
-| Non-deterministic | ==`GETDATE`, `NEWID`, `RAND`, `@@ROWCOUNT`== |
+| Non-deterministic | ``GETDATE`, `NEWID`, `RAND`, `@@ROWCOUNT`` |
 
 **Why it matters:**
 
@@ -284,7 +284,7 @@ END;
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| Slow query with scalar function | Row-by-row execution, no parallelism | ==Rewrite as inline TVF or inline the logic== |
+| Slow query with scalar function | Row-by-row execution, no parallelism | `Rewrite as inline TVF or inline the logic` |
 | mTVF performance poor | No statistics on table variable | Upgrade to SQL 2019+ (table variable deferred compilation) or use `OPTION (RECOMPILE)` |
 | Cannot create index on computed column | Function not deterministic or missing SCHEMABINDING | Add `WITH SCHEMABINDING` and ensure all referenced objects use two-part names |
 | CROSS APPLY returns fewer rows than expected | Using CROSS APPLY instead of OUTER APPLY | Switch to OUTER APPLY to preserve rows where the TVF returns no results |
@@ -330,8 +330,11 @@ END;
 A query joining a Customers table with a multi-statement TVF on CustomerID runs slowly and shows a poor estimated row count in the execution plan. What is the PRIMARY cause?
 
 A. Multi-statement TVFs always force a table scan on the base table
+
 B. The optimizer cannot see inside multi-statement TVFs and uses a fixed row count estimate
+
 C. Multi-statement TVFs cannot be joined — CROSS APPLY must be used instead
+
 D. The TVF is missing a clustered index on its return table variable
 
 > [!success]- Answer

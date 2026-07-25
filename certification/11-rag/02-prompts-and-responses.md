@@ -412,7 +412,7 @@ END;
 | `HTTP 400 Bad Request` | Prompt too long or malformed JSON | Check token count; validate JSON payload; escape special chars |
 | JSON parse error on response | Response is not valid JSON | Check `$.response.status.http.code` first; may be an HTML error page |
 | `QUOTENAME` returns NULL for inputs > 128 chars | `QUOTENAME` accepts `nvarchar(128)` — returns NULL (not a truncated value) for longer input | For long strings, use `REPLACE(@text, '"', '\"')` instead |
-| Inconsistent responses | Temperature > 0 | ==Set `"temperature": 0` for factual/deterministic output== |
+| Inconsistent responses | Temperature > 0 | `Set `"temperature": 0` for factual/deterministic output` |
 
 ---
 

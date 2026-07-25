@@ -18,3 +18,21 @@ Thumbs.db
 
 # Transient release-notes artifact (used as gh release --notes-file source)
 RELEASE_NOTES.md
+
+# Build outputs & local temp files
+dist/
+output/
+nul
+.agents/
+.gemini/
+
+# Compressed archives & binary files
+*.rar
+*.zip
+
+# Temporary audit notes & ad-hoc prompts
+*AUDITORIA_*.md
+PROMPT_*.md
+
+
+/scripts/__pycache__

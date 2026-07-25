@@ -45,7 +45,7 @@ Database configuration choices — service tier, compatibility level, memory gra
 | :--- | :--- | :--- |
 | **General Purpose** | Most business workloads | Remote storage, auto-pause option |
 | **Business Critical** | Low latency, In-Memory OLTP | Local SSD, built-in HA replica |
-| **Hyperscale** | Very large databases (up to 100 TB) | ==Rapid scaling, distributed architecture== |
+| **Hyperscale** | Very large databases (up to 100 TB) | `Rapid scaling, distributed architecture` |
 
 **Serverless (General Purpose only):** Auto-pause when idle, auto-scale compute — good for intermittent workloads:
 
@@ -245,7 +245,7 @@ OPTION(MIN_GRANT_PERCENT = 10);
 | `OPERATION_MODE` | READ_WRITE collects data; READ_ONLY stops collection | READ_WRITE |
 | `MAX_STORAGE_SIZE_MB` | Max disk space for Query Store data | 1024–2048 MB |
 | `INTERVAL_LENGTH_MINUTES` | Aggregation window for runtime stats | 60 minutes |
-| `QUERY_CAPTURE_MODE` | ALL, AUTO (significant queries), CUSTOM, NONE | ==AUTO== |
+| `QUERY_CAPTURE_MODE` | ALL, AUTO (significant queries), CUSTOM, NONE | `AUTO` |
 | `SIZE_BASED_CLEANUP_MODE` | Auto-purge oldest data when near capacity | AUTO |
 
 ```sql
@@ -379,8 +379,11 @@ OPTION(USE HINT('ENABLE_QUERY_OPTIMIZER_HOTFIXES'));
 After upgrading an Azure SQL Database compatibility level from 130 to 150, several queries start using suboptimal plans. What is the RECOMMENDED approach to investigate and fix this?
 
 A. Revert the compatibility level to 130 permanently
+
 B. Use Query Store to identify regressed queries and force the previous plans
+
 C. Disable parallelism with MAXDOP 1 for all queries
+
 D. Increase the cost threshold for parallelism to 100
 
 > [!success]- Answer

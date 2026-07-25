@@ -55,7 +55,7 @@ ALTER DATABASE SCOPED CONFIGURATION FOR SECONDARY SET MAXDOP = 4;
 
 | Setting | Default | Exam Relevance |
 | :--- | :--- | :--- |
-| ==`MAXDOP`== | 0 (unlimited) | Parallelism control |
+| ``MAXDOP`` | 0 (unlimited) | Parallelism control |
 | `LEGACY_CARDINALITY_ESTIMATION` | OFF | Use new CE by default |
 | `PARAMETER_SNIFFING` | ON | Disable for ad-hoc workloads |
 | `QUERY_OPTIMIZER_HOTFIXES` | OFF | Enable for latest optimizer fixes |
@@ -192,7 +192,7 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED;  -- default
 | READ COMMITTED | No | Yes | Yes | Shared (released after read) |
 | REPEATABLE READ | No | No | Yes | Shared (held to end of txn) |
 | SERIALIZABLE | No | No | No | Range locks |
-| ==SNAPSHOT== | No | No | No | Row versioning (no locks) |
+| `SNAPSHOT` | No | No | No | Row versioning (no locks) |
 | READ COMMITTED SNAPSHOT | No | Yes | Yes | Row versioning |
 
 ```sql
@@ -354,7 +354,7 @@ sqlpackage /Action:DeployReport \
 | Use case | CI/CD deployment | Backup / migration |
 | Action: create | Extract | Export |
 | Action: apply | Publish | Import |
-| Incremental | ==Yes (diff-based)== | No (full replace) |
+| Incremental | `Yes (diff-based)` | No (full replace) |
 
 > [!tip] Exam Tip
 > DACPAC = schema only, incremental deployment (Extract + Publish). BACPAC = schema + data, full replacement (Export + Import). The exam frequently tests which action to use for CI/CD vs migration scenarios.
@@ -420,7 +420,7 @@ SELECT * FROM cdc.fn_cdc_get_net_changes_dbo_Orders(
 | 1 | Delete |
 | 2 | Insert |
 | 3 | Update (before) |
-| 4 | ==Update (after)== |
+| 4 | `Update (after)` |
 
 > [!warning] Common Mistake
 > CDC operation code 3 is the "before" image of an update and code 4 is the "after" image. Using fn_cdc_get_net_changes only returns codes 1, 2, and 4 (no before-image rows).

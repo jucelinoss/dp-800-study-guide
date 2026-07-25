@@ -33,7 +33,7 @@ Encryption, masking, row-level security, permissions, and auditing for Azure SQL
 | Data encrypted at rest | Yes | Yes | Yes |
 | Data encrypted in transit | No (use TLS) | Yes | No |
 | Data encrypted in memory | No | Yes | No |
-| Server can see plaintext | Yes | ==No== | Yes |
+| Server can see plaintext | Yes | `No` | Yes |
 | Performance impact | Low | Medium | Medium |
 | Key management | Service-managed or BYOK | Column master key (client-side) | Symmetric/asymmetric keys |
 
@@ -111,7 +111,7 @@ CREATE TABLE dbo.Patients (
 
 | Type | Equality search | Range search | Sorting | GROUP BY |
 | :--- | :--- | :--- | :--- | :--- |
-| ==Deterministic== | Yes | No | No | Yes |
+| `Deterministic` | Yes | No | No | Yes |
 | Randomized | No | No | No | No |
 
 > [!tip] Exam Tip
@@ -212,7 +212,7 @@ EXEC sp_set_session_context @key = N'TenantID', @value = 42;
 
 | Predicate | Effect |
 | :--- | :--- |
-| FILTER | ==Silently filters rows from SELECT, UPDATE, DELETE== |
+| FILTER | `Silently filters rows from SELECT, UPDATE, DELETE` |
 | BLOCK AFTER INSERT | Prevents inserting rows that fail predicate |
 | BLOCK AFTER UPDATE | Prevents updating rows to values that fail predicate |
 | BLOCK BEFORE UPDATE | Prevents updating rows that currently fail predicate |
@@ -277,7 +277,7 @@ GRANT EXECUTE ON SCHEMA::dbo TO [AppUser];
 | Role | Permissions |
 | :--- | :--- |
 | `db_owner` | Full control |
-| ==`db_datareader`== | SELECT on all tables/views |
+| ``db_datareader`` | SELECT on all tables/views |
 | `db_datawriter` | INSERT, UPDATE, DELETE on all tables |
 | `db_ddladmin` | DDL statements (CREATE, ALTER, DROP) |
 | `db_securityadmin` | Manage role membership and permissions |

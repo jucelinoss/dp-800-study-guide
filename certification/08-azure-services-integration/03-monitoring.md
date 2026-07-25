@@ -65,7 +65,7 @@ Azure SQL exposes these metrics via Azure Monitor (viewable in Metrics blade):
 | `storage_percent` | Database size vs max | > 85% |
 | `connection_successful` | Successful connections/sec | Monitor for drops |
 | `connection_failed` | Failed connections/sec | > 0 is concerning |
-| `deadlock` | Deadlocks/sec | ==> 0 requires investigation== |
+| `deadlock` | Deadlocks/sec | `> 0 requires investigation` |
 | `workers_percent` | Worker threads used | > 80% |
 | `sessions_percent` | Sessions used vs max | > 80% |
 
@@ -330,7 +330,7 @@ AzureDiagnostics
 
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
-| No data in Log Analytics | Diagnostic settings not enabled | ==Enable diagnostic settings and wait 15 minutes for data to flow== |
+| No data in Log Analytics | Diagnostic settings not enabled | `Enable diagnostic settings and wait 15 minutes for data to flow` |
 | QPI shows no data | Query Store disabled or in READ_ONLY | Enable Query Store: `ALTER DATABASE ... SET QUERY_STORE = ON` |
 | KQL returns 0 rows | Wrong category name or time range | Check category spelling; expand time range |
 | Metrics blade empty | Data not yet available | Metrics have ~1 minute latency; logs have ~5 minute latency |

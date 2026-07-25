@@ -39,7 +39,7 @@ When you use AI tools, your code and context are sent to the AI model provider:
 |:---|:---|:---|
 | **Code/schema exposure** | Table names, column names, business logic sent in prompts | Enable enterprise data protection; review what's shared |
 | **Credential leakage** | Connection strings or API keys in code files | Use environment variables; scan repos with secret detection |
-| **PII in prompts** | Sample data containing personal information in context | ==Use synthetic data for development; avoid real data in prompts== |
+| **PII in prompts** | Sample data containing personal information in context | `Use synthetic data for development; avoid real data in prompts` |
 | **Intellectual property** | Proprietary business logic sent to external model | Review organizational AI use policies |
 
 ### Prompt Injection
@@ -126,7 +126,7 @@ Microsoft defines six Responsible AI principles. When applying AI coding tools t
 |:---|:---|:---|
 | **Fairness** | AI systems treat all people equitably | Avoid AI-generated queries that filter or score data in ways that create biased outcomes (e.g., loan eligibility by ZIP code) |
 | **Reliability & Safety** | AI behaves as intended, even in unexpected conditions | Validate AI-generated SQL thoroughly; test edge cases; never auto-execute in production |
-| **Privacy & Security** | Protect personal data; resist attacks | ==Classify sensitive columns before AI sessions; use Managed Identity; restrict schema context shared with AI tools== |
+| **Privacy & Security** | Protect personal data; resist attacks | `Classify sensitive columns before AI sessions; use Managed Identity; restrict schema context shared with AI tools` |
 | **Inclusiveness** | AI should benefit all people | Ensure AI-assisted features work across user roles; don't design AI queries that exclude accessibility needs |
 | **Transparency** | AI systems should be understandable | Document which code was AI-generated; tag AI-generated queries in comments or audit logs |
 | **Accountability** | People are responsible for AI systems | Establish code review gates for AI-generated SQL; maintain audit trails for AI tool usage |
@@ -298,7 +298,7 @@ Before executing any AI-generated SQL in production:
 |:---|:---|
 | Parameterized queries | No string concatenation of user-supplied values into SQL |
 | Least privilege | Procedure runs under a low-privilege login; no `sysadmin` or `db_owner` needed |
-| Object name validation | ==Dynamic object names validated against an allowlist or `QUOTENAME()` used== |
+| Object name validation | `Dynamic object names validated against an allowlist or `QUOTENAME()` used` |
 | No hardcoded credentials | No passwords, API keys, or connection strings in code |
 | `EXECUTE AS` scope | If used, principal is scoped to minimum required permissions |
 | Schema binding | Functions/views use `WITH SCHEMABINDING` where appropriate |
@@ -395,8 +395,11 @@ GO
 A developer uses GitHub Copilot to generate a stored procedure that queries customer data. Which action BEST reduces the risk of the AI tool suggesting code that exposes sensitive PII?
 
 A. Disable GitHub Copilot for all database projects
+
 B. Classify sensitive columns using data masking before Copilot session
+
 C. Review the generated code manually before execution
+
 D. Use EXECUTE AS OWNER in all generated procedures
 
 > [!success]- Answer

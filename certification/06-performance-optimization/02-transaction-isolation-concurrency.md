@@ -44,7 +44,7 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED;  -- default
 | `READ COMMITTED` (default) | No | Yes | Yes | Yes |
 | `REPEATABLE READ` | No | No | Yes | Yes |
 | `SERIALIZABLE` | No | No | No | Yes (most) |
-| `SNAPSHOT` | No | No | No | ==**No**== |
+| `SNAPSHOT` | No | No | No | `**No**` |
 | `READ COMMITTED SNAPSHOT` (RCSI) | No | Yes | Yes | **No** |
 
 **Read phenomena:**
@@ -67,6 +67,25 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED;  -- default
 ## RCSI vs Snapshot Isolation
 
 Both use row versioning (tempdb version store) but differ in scope:
+
+```mermaid
+flowchart TD
+    subgraph PESSIMISTIC ["1. Traditional Pattern (Pessimistic Locking)"]
+        direction TB
+        W1["Writer executes UPDATE<br/>(Acquires Exclusive Lock - X)"]
+        R1["Reader executes SELECT<br/>(Requires Shared Lock - S)"]
+        R1 -. "BLOCKED! Waits for Exclusive Lock X release" .-> W1
+    end
+
+    subgraph RCSI ["2. RCSI (Optimistic Tempdb Row Versioning)"]
+        direction TB
+        W2["Writer executes UPDATE<br/>(Copies old row version to Tempdb Version Store)"]
+        R2["Reader executes SELECT<br/>(Reads consistent row version from Tempdb lock-free)"]
+        W2 ===|Zero Blocking! Readers do not block Writers| R2
+    end
+```
+
+![Read Committed Snapshot Isolation Architecture](../../../dist/images/rcsi_snapshot_isolation_architecture.png)
 
 | Aspect | RCSI | Snapshot Isolation |
 | :--- | :--- | :--- |
@@ -104,7 +123,7 @@ COMMIT;
 | :--- | :--- | :--- |
 | Shared | S | Other S locks |
 | Update | U | S locks |
-| Exclusive | X | ==**Nothing**== |
+| Exclusive | X | `**Nothing**` |
 | Intent Shared | IS | IS, S, IX, SIX, U |
 | Intent Exclusive | IX | IS, IX |
 
@@ -230,7 +249,7 @@ ALTER DATABASE MyDB SET READ_COMMITTED_SNAPSHOT ON;
 | Consistency | Statement-level | Transaction-level |
 | Overhead | Lower | Higher (longer txns hold more versions) |
 | Blocking | Eliminated for readers | Eliminated for readers |
-| Write conflicts | No detection | ==Detected (update conflict error)== |
+| Write conflicts | No detection | `Detected (update conflict error)` |
 
 **When to choose:**
 
@@ -365,8 +384,11 @@ CROSS APPLY XmlData.nodes('//RingBufferTarget/event[@name="xml_deadlock_report"]
 An application reads a customer record, applies business logic for 5 seconds, then updates the record. Other users occasionally overwrite the same record during those 5 seconds. Which concurrency mechanism detects this conflict with MINIMAL blocking?
 
 A. Pessimistic locking with UPDLOCK hint during the initial read
+
 B. ROWVERSION-based optimistic concurrency check on UPDATE
+
 C. Serializable isolation level for the entire transaction
+
 D. Enable RCSI and retry on deadlock
 
 > [!success]- Answer

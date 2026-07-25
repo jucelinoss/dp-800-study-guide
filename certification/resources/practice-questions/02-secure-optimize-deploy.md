@@ -20,8 +20,11 @@ Domain 2 covers 35–40% of the DP-800 exam.
 A security team requires that a `CreditCardNumber` column be encrypted using Always Encrypted. The application must be able to search for records by exact credit card number using a WHERE clause. Which encryption type must be used?
 
 A. RANDOMIZED
+
 B. DETERMINISTIC
+
 C. AES_256_GCM
+
 D. RANDOMIZED with enclave support
 
 > [!success]- Answer
@@ -40,8 +43,11 @@ D. RANDOMIZED with enclave support
 A developer is adding Always Encrypted to a `MedicalNotes nvarchar(max)` column that stores free-text notes and will never be queried with an equality filter. Which encryption type should they choose and why?
 
 A. DETERMINISTIC — because it is always more secure
+
 B. RANDOMIZED — because it provides stronger security and the column doesn't need filtering
+
 C. DETERMINISTIC — because it is required for nvarchar(max) columns
+
 D. RANDOMIZED — because it is the only type that supports large columns
 
 > [!success]- Answer
@@ -60,8 +66,11 @@ D. RANDOMIZED — because it is the only type that supports large columns
 A DBA adds a Dynamic Data Masking rule to an `Email nvarchar(256)` column using `MASKED WITH (FUNCTION = 'default()')`. A user without UNMASK permission queries the table. What will they see for a stored value of `alice@contoso.com`?
 
 A. `alice@contoso.com`
+
 B. `xxxx@xxxx.com`
+
 C. `XXXX`
+
 D. `aXXX@XXXX.com`
 
 > [!success]- Answer
@@ -80,8 +89,11 @@ D. `aXXX@XXXX.com`
 A reporting user named `ReportUser` needs to see unmasked values in the `PhoneNumber` column, but the column has DDM applied. Other users should continue to see masked values. What is the correct approach?
 
 A. Add `ReportUser` to the `db_datareader` role
+
 B. Grant `ReportUser` the `UNMASK` permission
+
 C. Remove the mask from the column and use a view with masking logic
+
 D. Grant `ReportUser` `SELECT` permission on the column
 
 > [!success]- Answer
@@ -100,8 +112,11 @@ D. Grant `ReportUser` `SELECT` permission on the column
 A developer implements Row-Level Security on a `dbo.Orders` table. Salespeople should only see their own orders in SELECT queries, but they should also be prevented from inserting orders for other salespeople. Which predicates must be configured?
 
 A. One FILTER predicate only
+
 B. One BLOCK predicate only
+
 C. One FILTER predicate and one BLOCK predicate with AFTER INSERT operation
+
 D. Two FILTER predicates — one for SELECT and one for INSERT
 
 > [!success]- Answer
@@ -121,8 +136,11 @@ D. Two FILTER predicates — one for SELECT and one for INSERT
 An application uses a single SQL login for all connections (connection pooling). RLS must enforce that each end user only sees their own rows. The application sets the current user's ID in `SESSION_CONTEXT(N'UserId')` before executing queries. Which approach correctly uses this in an RLS predicate function?
 
 A. `WHERE SalesRepId = USER_NAME()`
+
 B. `WHERE SalesRepId = CAST(SESSION_CONTEXT(N'UserId') AS int)`
+
 C. `WHERE SalesRepId = SYSTEM_USER`
+
 D. `WHERE SalesRepId = SUSER_SNAME()`
 
 > [!success]- Answer
@@ -141,8 +159,11 @@ D. `WHERE SalesRepId = SUSER_SNAME()`
 User `DataAnalyst` is a member of the `Analysts` role, which has been granted `SELECT` on `dbo.SensitiveData`. An administrator also explicitly `DENY`s `SELECT` on `dbo.SensitiveData` to `DataAnalyst` directly. What happens when `DataAnalyst` queries the table?
 
 A. The GRANT from the role takes precedence; the query succeeds
+
 B. The DENY takes precedence; the query fails
+
 C. The most recently applied permission takes precedence
+
 D. Both permissions cancel out; the user has no access
 
 > [!success]- Answer
@@ -161,8 +182,11 @@ D. Both permissions cancel out; the user has no access
 A developer is configuring an application deployed to Azure App Service to connect to Azure SQL Database using Managed Identity (no password). Which connection string property specifies Managed Identity authentication?
 
 A. `Integrated Security=True`
+
 B. `Authentication=Active Directory Password`
+
 C. `Authentication=Active Directory Managed Identity`
+
 D. `Trusted_Connection=Yes`
 
 > [!success]- Answer
@@ -181,8 +205,11 @@ D. `Trusted_Connection=Yes`
 A DBA needs to create a database user for an Azure App Service's system-assigned managed identity in Azure SQL Database. Which T-SQL syntax is correct?
 
 A. `CREATE USER [MyAppService] WITH PASSWORD = 'managed_identity'`
+
 B. `CREATE USER [MyAppService] FROM EXTERNAL PROVIDER`
+
 C. `CREATE LOGIN [MyAppService] FROM EXTERNAL PROVIDER`
+
 D. `CREATE USER [MyAppService] FOR LOGIN [MyAppService]`
 
 > [!success]- Answer
@@ -201,8 +228,11 @@ D. `CREATE USER [MyAppService] FOR LOGIN [MyAppService]`
 A compliance officer requires that all successful and failed login attempts to Azure SQL Database be captured in the audit log. Which audit action group should be configured?
 
 A. `BATCH_COMPLETED_GROUP`
+
 B. `SUCCESSFUL_DATABASE_AUTHENTICATION_GROUP`
+
 C. `DATABASE_LOGOUT_GROUP`
+
 D. `SUCCESSFUL_LOGIN_GROUP` combined with `FAILED_LOGIN_GROUP`
 
 > [!success]- Answer
@@ -222,8 +252,11 @@ D. `SUCCESSFUL_LOGIN_GROUP` combined with `FAILED_LOGIN_GROUP`
 A developer observes that under Read Committed Snapshot Isolation (RCSI), readers don't block writers. A colleague suggests using Snapshot Isolation instead. What is the key difference between RCSI and Snapshot Isolation?
 
 A. RCSI provides statement-level consistency; Snapshot Isolation provides transaction-level consistency
+
 B. RCSI stores versions in tempdb; Snapshot Isolation stores versions in the data files
+
 C. Snapshot Isolation prevents all blocking; RCSI still causes some reader-writer blocking
+
 D. RCSI requires `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` per session; Snapshot Isolation is the default
 
 > [!success]- Answer
@@ -243,8 +276,11 @@ D. RCSI requires `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` per session; Snapsho
 A DBA suspects a long-running query is blocking other sessions. Which DMV should they query first to identify the blocking chain?
 
 A. `sys.dm_exec_query_stats`
+
 B. `sys.dm_exec_requests`
+
 C. `sys.dm_os_wait_stats`
+
 D. `sys.dm_tran_active_transactions`
 
 > [!success]- Answer
@@ -265,8 +301,11 @@ D. `sys.dm_tran_active_transactions`
 An application reports occasional errors with message "Transaction (Process ID XX) was deadlocked on lock resources with another process and has been chosen as the deadlock victim." What error number does this correspond to, and what is the recommended application-level response?
 
 A. Error 1205; retry the transaction after a short delay
+
 B. Error 1205; terminate the application and alert the DBA
+
 C. Error 8621; retry the transaction immediately
+
 D. Error 1205; increase the lock timeout setting
 
 > [!success]- Answer
@@ -285,8 +324,11 @@ D. Error 1205; increase the lock timeout setting
 A developer adds a non-clustered index on `dbo.Orders(OrderDate)` to speed up a query that filters by date and also selects `CustomerName`, `TotalAmount`, and `Status`. The plan still shows a Key Lookup operator. What does this indicate?
 
 A. The non-clustered index is not being used
+
 B. SQL Server must go back to the clustered index to retrieve columns not in the non-clustered index
+
 C. The query is using a hash join instead of a merge join
+
 D. The non-clustered index has too many levels of B-tree
 
 > [!success]- Answer
@@ -305,8 +347,11 @@ D. The non-clustered index has too many levels of B-tree
 A developer notices that a critical query's performance degraded after a statistics update changed its execution plan. They use Query Store to identify the previously good plan. What action should they take to restore performance without rolling back statistics?
 
 A. Rebuild the index on the table
+
 B. Use `sp_recompile` to force the query to recompile
+
 C. Use Query Store to force the previously good plan
+
 D. Update statistics manually to restore the old plan
 
 > [!success]- Answer
@@ -325,8 +370,11 @@ D. Update statistics manually to restore the old plan
 A team is migrating their SQL Database Project to the SDK-style format. What is the key advantage of SDK-style projects over the legacy `.sqlproj` format?
 
 A. SDK-style projects support a wider range of T-SQL syntax
+
 B. SDK-style projects use MSBuild and support cross-platform builds and NuGet references
+
 C. SDK-style projects produce larger dacpac files with more metadata
+
 D. SDK-style projects eliminate the need for sqlpackage
 
 > [!success]- Answer
@@ -350,8 +398,11 @@ D. SDK-style projects eliminate the need for sqlpackage
 A developer is configuring Data API Builder (DAB) for a public REST API. The `products` entity must allow anonymous GET requests but require authentication for POST. Which configuration section correctly expresses this?
 
 A. Set `authentication.provider` to `Anonymous` globally
+
 B. Configure the entity's `permissions` with `role: anonymous` allowing `read` and `role: authenticated` allowing `create`
+
 C. Set the entity's `rest.enabled: false` and use a custom API
+
 D. Configure `permissions` with `role: anonymous` allowing all CRUD operations
 
 > [!success]- Answer
@@ -375,8 +426,11 @@ D. Configure `permissions` with `role: anonymous` allowing all CRUD operations
 A downstream application needs to know which rows in `dbo.Inventory` changed since its last sync, but it only needs to know *that* they changed and their current values — not *what* the old values were. Which change capture method is more appropriate and why?
 
 A. CDC — because it captures full before/after images of every change
+
 B. Change Tracking — because it is lightweight, records which rows changed, and the application can query current values directly
+
 C. CDC — because Change Tracking doesn't support DELETE operations
+
 D. Change Tracking — because CDC requires a separate database
 
 > [!success]- Answer
@@ -394,13 +448,16 @@ D. Change Tracking — because CDC requires a separate database
 
 An audit log is being sent to a Log Analytics workspace from Azure SQL Database. A security analyst needs to find all failed login attempts from a specific IP address in the last 7 days. Which KQL query is most appropriate?
 
-A. `AzureDiagnostics | where Category == 'SQLSecurityAuditEvents' | where action_name_s == 'FAILED_LOGIN' | where client_ip_s == '10.0.0.1'`
-B. `SecurityEvent | where EventID == 4625 | where IpAddress == '10.0.0.1'`
+A. `AzureDiagnostics | where Category ` 'SQLSecurityAuditEvents' | where action_name_s ` 'FAILED_LOGIN' | where client_ip_s == '10.0.0.1'`
+
+B. `SecurityEvent | where EventID ` 4625 | where IpAddress ` '10.0.0.1'`
+
 C. `AzureActivity | where OperationName == 'Login Failed'`
-D. `AzureDiagnostics | where ResourceProvider == 'MICROSOFT.SQL' | where succeeded_s == 'false'`
+
+D. `AzureDiagnostics | where ResourceProvider ` 'MICROSOFT.SQL' | where succeeded_s ` 'false'`
 
 > [!success]- Answer
-> **A. `AzureDiagnostics | where Category == 'SQLSecurityAuditEvents' | where action_name_s == 'FAILED_LOGIN' | where client_ip_s == '10.0.0.1'`**
+> **A. `AzureDiagnostics | where Category ` 'SQLSecurityAuditEvents' | where action_name_s ` 'FAILED_LOGIN' | where client_ip_s == '10.0.0.1'`**
 >
 > Azure SQL Database audit logs sent to Log Analytics appear in the `AzureDiagnostics` table with `Category = 'SQLSecurityAuditEvents'`. Fields include `action_name_s` (the audit action), `client_ip_s`, `database_principal_name_s`, and `event_time_t`.
 >
@@ -415,8 +472,11 @@ D. `AzureDiagnostics | where ResourceProvider == 'MICROSOFT.SQL' | where succeed
 A CI/CD pipeline in Azure DevOps needs to retrieve a connection string stored in Azure Key Vault during deployment. The pipeline runs on a Microsoft-hosted agent. What is the recommended approach?
 
 A. Store the connection string as a pipeline variable and reference it with `$(ConnectionString)`
+
 B. Hardcode the connection string in the YAML pipeline file
+
 C. Link the Key Vault to an Azure DevOps variable group using a service connection with appropriate permissions
+
 D. Use the Azure CLI task to call `az keyvault secret show` and echo the value
 
 > [!success]- Answer
@@ -439,8 +499,11 @@ D. Use the Azure CLI task to call `az keyvault secret show` and echo the value
 A DBA needs to grant the user `ReportReader` read-only access to all tables in a database. Which single command achieves this?
 
 A. `ALTER ROLE db_datareader ADD MEMBER [ReportReader]`
+
 B. `GRANT SELECT TO [ReportReader]`
+
 C. `EXEC sp_addrolemember 'reader', 'ReportReader'`
+
 D. `CREATE ROLE [ReportReader] AS db_datareader`
 
 > [!success]- Answer
@@ -457,8 +520,11 @@ D. `CREATE ROLE [ReportReader] AS db_datareader`
 A new Azure SQL Database is provisioned. The team asks whether Transparent Data Encryption (TDE) needs to be explicitly enabled to encrypt data at rest. What is the default behavior?
 
 A. TDE must be enabled with `ALTER DATABASE ... SET ENCRYPTION ON`
+
 B. TDE is enabled **by default** for all new Azure SQL databases — encryption at rest is automatic
+
 C. TDE requires Azure Key Vault setup before it can be turned on
+
 D. TDE is only available on Premium tier and above
 
 > [!success]- Answer

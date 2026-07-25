@@ -310,7 +310,7 @@ Model deployments are managed through Azure OpenAI Studio (or the Azure Portal):
 | `Dimension mismatch` | Embedding model returns different dims than VECTOR column | Match VECTOR(n) to the model's actual output dimensions |
 | `Rate limit exceeded` | Too many API calls/minute | Implement batching; increase Azure OpenAI quota |
 | `PREDICT syntax error` | Wrong column alias (`input_text` required for embeddings) | Use `input_text` as the alias for embedding input column |
-| `Permission denied on PREDICT` | User lacks EXECUTE on external model | ==`GRANT EXECUTE ON EXTERNAL MODEL model_name TO role`== |
+| `Permission denied on PREDICT` | User lacks EXECUTE on external model | ``GRANT EXECUTE ON EXTERNAL MODEL model_name TO role`` |
 
 ---
 
@@ -355,8 +355,11 @@ Model deployments are managed through Azure OpenAI Studio (or the Azure Portal):
 A database has an EXTERNAL MODEL configured for Azure OpenAI text-embedding-3-small. A user in the ReportingRole can query document tables but gets "permission denied" when calling PREDICT. What permission is needed?
 
 A. SELECT permission on sys.external_models
+
 B. EXECUTE permission on the EXTERNAL MODEL
+
 C. ALTER ANY EXTERNAL MODEL permission
+
 D. db_owner role membership
 
 > [!success]- Answer

@@ -140,7 +140,7 @@ GO
 | Function | Returns |
 | :--- | :--- |
 | `ERROR_NUMBER()` | SQL error number |
-| `ERROR_MESSAGE()` | ==Error description== |
+| `ERROR_MESSAGE()` | `Error description` |
 | `ERROR_SEVERITY()` | Severity level (1-25) |
 | `ERROR_STATE()` | Error state |
 | `ERROR_LINE()` | Line number where error occurred |
@@ -277,7 +277,7 @@ SQL Server compiles a query plan on the first execution and caches it for reuse.
 | :--- | :--- | :--- |
 | `OPTION(RECOMPILE)` | Recompile this query every execution | High — no plan reuse |
 | `OPTIMIZE FOR (value)` | Compile plan for a specific value | Low — one plan, may not fit all |
-| `OPTIMIZE FOR UNKNOWN` | ==Use average statistics, not sniffed value== | Low — balanced plan |
+| `OPTIMIZE FOR UNKNOWN` | `Use average statistics, not sniffed value` | Low — balanced plan |
 | Local variable trick | Assign param to local var before use | Low — breaks sniffing, less sharing |
 | `WITH RECOMPILE` on proc | Recompile entire procedure every call | High — use sparingly |
 
@@ -313,7 +313,7 @@ OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN));
 | Parameter sniffing | Cached plan optimized for first parameter value | Use `OPTION (RECOMPILE)` or `OPTIMIZE FOR` |
 | Nested transaction issues | Committing a savepoint vs outer transaction | Track `@@TRANCOUNT`; use `SAVE TRANSACTION` for nested |
 | `SET NOCOUNT ON` missing | Verbose row count messages sent to client | Always add `SET NOCOUNT ON` in procedures |
-| SQL injection via dynamic SQL | User input concatenated into query string | ==Use `sp_executesql` with parameters; `QUOTENAME` for object names== |
+| SQL injection via dynamic SQL | User input concatenated into query string | `Use `sp_executesql` with parameters; `QUOTENAME` for object names` |
 | Natively compiled proc errors | Using unsupported T-SQL features | Check In-Memory OLTP supported surface area docs |
 
 ---
@@ -357,8 +357,11 @@ OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN));
 A stored procedure that searches orders by CustomerID performs well for most customers but is very slow for one high-volume customer. The plan was created for a low-volume customer. Which is the BEST fix?
 
 A. Add WITH RECOMPILE to the procedure definition
+
 B. Use OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN)) on the query
+
 C. Rebuild all indexes on the Orders table
+
 D. Use EXEC instead of sp_executesql
 
 > [!success]- Answer

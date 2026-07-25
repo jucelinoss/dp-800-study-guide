@@ -162,6 +162,33 @@ Standard Always Encrypted has a significant limitation: encrypted columns suppor
 
 A secure enclave is an isolated computation environment inside the database server where encrypted data can be processed without exposing plaintext to the broader database engine or DBAs.
 
+```mermaid
+flowchart LR
+    subgraph CLIENT ["1. CLIENT APPLICATION & DRIVER"]
+        direction TB
+        APP["App / Driver SQL"]
+        AKV[("Azure Key Vault<br/>(Column Master Key - CMK)")]
+        APP -->|Fetches CMK| AKV
+    end
+
+    subgraph ENGINE ["2. SQL SERVER ENGINE"]
+        direction TB
+        STORAGE[("Encrypted Tables<br/>(Ciphertext)")]
+    end
+
+    subgraph ENCLAVE ["3. SECURE ENCLAVE (VBS Sandbox)"]
+        direction TB
+        MEM["Protected Memory Sandbox<br/>(Decrypts CEK & processes BETWEEN / LIKE)"]
+    end
+
+    CLIENT -->|Submits authorized query| ENGINE
+    ENGINE -->|Delegates data to enclave| ENCLAVE
+    ENCLAVE -->|Returns filtered IDs| ENGINE
+    ENGINE -->|Returns ciphertext results| CLIENT
+```
+
+![Always Encrypted with Secure Enclaves Architecture](../../../dist/images/always_encrypted_secure_enclaves.png)
+
 Azure SQL Database uses **VBS (Virtualization Based Security)** enclaves.
 
 ### Supported Operations in Secure Enclaves
@@ -328,7 +355,7 @@ CLOSE SYMMETRIC KEY MySymKey;
 | Cannot query encrypted column | Wrong encryption type or no CMK access | Use DETERMINISTIC for searchable; grant CMK access to app |
 | TDE backup restore fails | Certificate not in target server | Backup and restore the TDE certificate first |
 | Always Encrypted driver error | Driver doesn't support Always Encrypted | Use SqlClient with `Column Encryption Setting=enabled` |
-| Range query fails on encrypted column | No secure enclave configured | ==Enable enclave-enabled CEK and configure attestation== |
+| Range query fails on encrypted column | No secure enclave configured | `Enable enclave-enabled CEK and configure attestation` |
 | Key rotation fails mid-process | Both CMK values must coexist during rotation | Complete rotation before removing old CMK |
 
 ---
@@ -372,8 +399,11 @@ CLOSE SYMMETRIC KEY MySymKey;
 A compliance requirement states that encrypted patient records must be searchable by date range (BETWEEN) without exposing plaintext to the database engine. Which Always Encrypted configuration satisfies this?
 
 A. Deterministic encryption with a standard Column Encryption Key
+
 B. Randomized encryption with a standard Column Encryption Key
+
 C. Randomized encryption with an enclave-enabled Column Encryption Key
+
 D. TDE with customer-managed keys in Azure Key Vault
 
 > [!success]- Answer

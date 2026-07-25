@@ -15,7 +15,7 @@ Each table includes an exam tip callout highlighting the decision pattern most l
 > [!abstract] TL;DR
 >
 > - 17 side-by-side comparison tables organized into 7 categories aligned to exam domains
-> - Each table highlights the key distinguishing feature with ==highlight== markers
+> - Each table highlights the key distinguishing feature with `highlight` markers
 > - Scroll to the Quick Decision Matrix at the bottom for rapid keyword-to-answer lookup
 
 ## Table of Contents
@@ -55,7 +55,7 @@ Each table includes an exam tip callout highlighting the decision pattern most l
 | Feature | DECIMAL(p,s) | NUMERIC(p,s) | FLOAT(n) |
 |---------|-------------|-------------|---------|
 | **Synonym** | Alias for NUMERIC | Alias for DECIMAL | — |
-| **Precision** | Exact, user-defined | Exact, user-defined | ==Approximate== |
+| **Precision** | Exact, user-defined | Exact, user-defined | `Approximate` |
 | **Storage** | 5–17 bytes (by precision) | 5–17 bytes | 4 or 8 bytes |
 | **Rounding** | No silent rounding | No silent rounding | Silent rounding |
 | **Use for** | Money, calculations | Money, calculations | Scientific data |
@@ -73,7 +73,7 @@ Each table includes an exam tip callout highlighting the decision pattern most l
 | **Storage** | 8 bytes | 6–8 bytes | 3 bytes | 3–5 bytes |
 | **ISO 8601** | No | Yes | Yes | Yes |
 | **Fractional seconds** | 3 digits | 0–7 digits | None | 0–7 digits |
-| **Recommended** | ==Legacy only== | ==Yes — use this== | Date-only values | Time-only values |
+| **Recommended** | `Legacy only` | `Yes — use this` | Date-only values | Time-only values |
 
 > [!tip] Exam Tip
 > Always prefer DATETIME2 over DATETIME for new columns — wider range, higher precision, smaller storage, and ISO-compliant. GETUTCDATE() returns DATETIME; SYSDATETIME() returns DATETIME2.
@@ -87,7 +87,7 @@ Each table includes an exam tip callout highlighting the decision pattern most l
 | **Max length** | 8,000 / MAX (2 GB) | 4,000 / MAX (2 GB) | 8,000 | 4,000 |
 | **International chars** | No (depends on collation) | Yes | No | Yes |
 | **Padding** | No | No | Right-padded with spaces | Right-padded with spaces |
-| **Recommended** | ASCII-only, storage-sensitive | ==All new columns== | Fixed-length codes | Fixed-length Unicode |
+| **Recommended** | ASCII-only, storage-sensitive | `All new columns` | Fixed-length codes | Fixed-length Unicode |
 
 > [!tip] Exam Tip
 > Use NVARCHAR for all user-facing string columns (names, emails, descriptions) — Azure SQL databases may use non-Latin characters. CHAR/NCHAR are only appropriate for truly fixed-length data like country codes ('US', 'GB').
@@ -109,7 +109,7 @@ Index selection is a frequent exam topic. Know the physical storage model and wo
 | **Compression** | Row / page compression optional | Row / page compression optional | Built-in high compression (10x typical) |
 | **Updateable** | Yes — standard DML | Yes — standard DML | Yes — delta store buffers updates |
 | **Key size limit** | 900 bytes (16 columns) | 1700 bytes (16 key columns) | N/A — no key concept |
-| **Execution mode** | Row mode | Row mode | ==Batch mode== (significant perf gain) |
+| **Execution mode** | Row mode | Row mode | `Batch mode` (significant perf gain) |
 
 > [!tip] Exam Tip
 > Columnstore indexes use batch mode execution by default, which is a major performance advantage for analytical queries. If the scenario involves aggregations on millions of rows, columnstore is almost always the answer.
@@ -126,7 +126,7 @@ Understanding the optimizer differences between these two function types is crit
 | **Cardinality estimation** | Accurate (based on underlying tables) | Fixed estimate (100 rows in legacy CE) |
 | **Plan caching** | Integrated into outer query plan | Separate plan; may cause poor joins |
 | **Statistics** | Uses base table statistics | No statistics on table variable |
-| **Performance** | ==Generally better — enables predicate pushdown== | ==Generally worse — no predicate pushdown== |
+| **Performance** | `Generally better — enables predicate pushdown` | `Generally worse — no predicate pushdown` |
 | **Parallelism** | Supported | Not supported (serial execution) |
 | **Use when** | Parameterized view, reusable query logic | Complex procedural logic requiring multiple statements |
 
@@ -161,7 +161,7 @@ Both track history, but for fundamentally different reasons. Temporal is for aud
 |---------|----------|--------|
 | **Purpose** | Track data changes over time (audit, time travel) | Provide tamper-evident, cryptographically verifiable history |
 | **History type** | History table with period columns | Ledger history table + database digest |
-| **Tamper evidence** | ==No — history can be altered by DBAs== | ==Yes — SHA-256 hash chain; external digest verification== |
+| **Tamper evidence** | `No — history can be altered by DBAs` | `Yes — SHA-256 hash chain; external digest verification` |
 | **Query history** | `FOR SYSTEM_TIME AS OF / BETWEEN / FROM...TO` | Standard queries on ledger view; verification via digest |
 | **DML operations** | INSERT, UPDATE, DELETE tracked automatically | INSERT, UPDATE, DELETE tracked; append-only allows INSERT only |
 | **Schema changes** | Supported | Limited — append-only tables cannot drop columns |
@@ -200,8 +200,8 @@ SQL Server offers multiple encryption layers. The exam tests whether you can pic
 |---------|-----|-----------------|--------------------------------|
 | **Protects against** | Unauthorized access to data files on disk | Unauthorized access by DBAs and cloud operators | Unauthorized access to specific column values |
 | **Encryption scope** | Entire database (all files, backups, tempdb) | Selected columns only | Selected columns only |
-| **Key location** | Server (database master key in master DB) | ==Client-side (column master key never on server)== | Server (symmetric key in database) |
-| **Transparent to queries** | ==Yes — apps need no changes== | ==No — requires enabled client driver== | No — must call ENCRYPTBYKEY / DECRYPTBYKEY |
+| **Key location** | Server (database master key in master DB) | `Client-side (column master key never on server)` | Server (symmetric key in database) |
+| **Transparent to queries** | `Yes — apps need no changes` | `No — requires enabled client driver` | No — must call ENCRYPTBYKEY / DECRYPTBYKEY |
 | **Supported query operations** | All | Equality only (deterministic); none (randomized) | None on ciphertext directly |
 | **Performance impact** | Low (page-level encrypt/decrypt) | Moderate (client-side crypto) | Moderate (per-value encrypt/decrypt calls) |
 | **Requires app changes** | No | Yes (driver parameter) | Yes (T-SQL function calls) |
@@ -236,7 +236,7 @@ Always Encrypted supports two encryption types. The choice depends on whether yo
 | Feature | Deterministic | Randomized |
 |---------|--------------|-----------|
 | **Same input produces same output** | Yes — identical plaintext → identical ciphertext | No — identical plaintext → different ciphertext each time |
-| **Equality search** | ==Supported (`WHERE col = @param`)== | ==Not supported== |
+| **Equality search** | ==Supported (`WHERE col = @param`)` | `Not supported== |
 | **Range queries** | Not supported | Not supported (use secure enclaves) |
 | **GROUP BY / DISTINCT** | Supported | Not supported |
 | **Joins on encrypted columns** | Supported (both columns must use same key) | Not supported |
@@ -383,12 +383,12 @@ Isolation levels are tested heavily. Focus on blocking behavior, consistency gua
 | Feature | Read Committed | RCSI | Snapshot |
 |---------|--------------|------|---------|
 | **Readers block writers** | No | No | No |
-| **Writers block readers** | ==Yes== | ==No== | ==No== |
+| **Writers block readers** | `Yes` | `No` | `No` |
 | **Writers block writers** | Yes | Yes | Yes (or conflict error) |
 | **Consistency** | Statement-level | Statement-level | Transaction-level |
 | **Version store** | Not used | tempdb version store | tempdb version store |
 | **Enable method** | Default | `ALTER DATABASE SET READ_COMMITTED_SNAPSHOT ON` | `ALTER DATABASE SET ALLOW_SNAPSHOT_ISOLATION ON` + per-transaction `SET` |
-| **Application changes** | None | ==None (replaces Read Committed transparently)== | Yes — must set isolation level per transaction |
+| **Application changes** | None | `None (replaces Read Committed transparently)` | Yes — must set isolation level per transaction |
 | **Write conflicts** | Lock-based blocking | Lock-based blocking | Error 3960 if row changed after transaction start |
 | **tempdb overhead** | None | Moderate | Moderate (row versions held for snapshot duration) |
 
@@ -408,7 +408,7 @@ Two VNet integration options for Azure SQL Database with different security and 
 | **Public IP** | Traffic stays on Azure backbone but server retains public IP | Server gets a private IP in your VNet |
 | **VNet routing** | Adds optimal route to Azure service | Traffic routed entirely through private network |
 | **Cross-region** | Same region only | Works across regions and on-premises via VPN/ExpressRoute |
-| **On-premises access** | ==Not available== | ==Available via VPN Gateway or ExpressRoute== |
+| **On-premises access** | `Not available` | `Available via VPN Gateway or ExpressRoute` |
 | **Cost** | Free | Per-hour charge + data processing charge |
 | **DNS** | No special DNS needed | Requires Private DNS Zone or custom DNS |
 | **NSG support** | Yes | Yes — standard NSG rules on the private endpoint NIC |
@@ -445,9 +445,9 @@ Vector search in Azure SQL Database supports both exact and approximate methods.
 
 | Feature | ENN (Exact) | ANN (Approximate) |
 |---------|------------|-----------------|
-| **Accuracy** | ==100% — guaranteed nearest neighbors== | High but not guaranteed — may miss true nearest |
+| **Accuracy** | `100% — guaranteed nearest neighbors` | High but not guaranteed — may miss true nearest |
 | **Speed** | Slow on large datasets — O(n) brute-force scan | Fast — sub-linear via index |
-| **Index required** | No | ==Yes (DiskANN index)== |
+| **Index required** | No | `Yes (DiskANN index)` |
 | **Function** | `VECTOR_DISTANCE()` without vector index | `VECTOR_SEARCH()` with DiskANN index |
 | **Distance metrics** | Cosine, dot product, Euclidean | Cosine, dot product, Euclidean |
 | **Scalability** | Degrades linearly with dataset size | Scales to millions/billions of vectors |

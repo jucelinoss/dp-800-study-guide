@@ -41,7 +41,7 @@ SQL Server Audit captures database activity events and writes them to a file, Wi
 
 | Mode | Behavior When Queue Full |
 | :--- | :--- |
-| Synchronous (`QUEUE_DELAY = 0`) | ==Blocks the session until the event is written== |
+| Synchronous (`QUEUE_DELAY = 0`) | `Blocks the session until the event is written` |
 | Asynchronous (`QUEUE_DELAY > 0`) | Drops events if the queue fills; `ON_FAILURE` controls what happens |
 
 `ON_FAILURE = CONTINUE` — allows the operation to proceed even if auditing fails (less secure, more available).
@@ -175,7 +175,7 @@ Important audit action groups for the DP-800 exam:
 
 | Action Group | What It Captures |
 | :--- | :--- |
-| `BATCH_COMPLETED_GROUP` | ==All T-SQL batches completed (incl. SELECT with full SQL text)== |
+| `BATCH_COMPLETED_GROUP` | `All T-SQL batches completed (incl. SELECT with full SQL text)` |
 | `DATABASE_OBJECT_ACCESS_GROUP` | Access to database objects |
 | `DATABASE_OBJECT_PERMISSION_CHANGE_GROUP` | Permission changes on objects |
 | `DATABASE_ROLE_MEMBER_CHANGE_GROUP` | Role membership changes |
@@ -205,7 +205,7 @@ Use `sys.fn_get_audit_file` to read on-premises audit files. Key columns returne
 | `server_principal_name` | Login that performed the action |
 | `database_name` | Database where the action occurred |
 | `object_name` | Table, view, or procedure accessed |
-| `statement` | ==Full SQL text of the batch== |
+| `statement` | `Full SQL text of the batch` |
 
 ```sql
 -- Read audit log files
@@ -334,8 +334,11 @@ ORDER BY ValidFrom;
 A security requirement mandates capturing all SELECT statements on the Salaries table including the exact SQL text. Which audit action group captures this?
 
 A. DATABASE_OBJECT_ACCESS_GROUP
+
 B. SCHEMA_OBJECT_ACCESS_GROUP
+
 C. BATCH_COMPLETED_GROUP
+
 D. FAILED_DATABASE_AUTHENTICATION_GROUP
 
 > [!success]- Answer

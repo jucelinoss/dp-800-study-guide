@@ -93,7 +93,7 @@ FROM OPENJSON(@json, '$.tags');
 | :--- | :--- |
 | 0 | null |
 | 1 | string |
-| 2 | ==number== |
+| 2 | `number` |
 | 3 | true/false |
 | 4 | array |
 | 5 | object |
@@ -249,7 +249,7 @@ WHERE ISJSON(Tags, ARRAY) = 1          -- must be a JSON array
 | `$.a.b` | Nested property |
 | `$.array[0]` | First element of array |
 | `$.array[*]` | All array elements (OPENJSON) |
-| `lax $.missing` | ==NULL if missing (default)== |
+| `lax $.missing` | `NULL if missing (default)` |
 | `strict $.missing` | Error if missing |
 
 Path mode defaults to `lax` in all JSON functions. Prefix with `strict` to
@@ -357,7 +357,7 @@ SELECT JSON_OBJECT(
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| `JSON_VALUE` returns NULL | Path not found (lax mode) | ==Verify path; use `strict` to get an error instead== |
+| `JSON_VALUE` returns NULL | Path not found (lax mode) | `Verify path; use `strict` to get an error instead` |
 | `JSON_QUERY` returns NULL on scalar | Scalar values need `JSON_VALUE` | Use `JSON_VALUE` for strings/numbers, `JSON_QUERY` for objects/arrays |
 | `FOR JSON` produces unexpected nesting | Column naming causes auto-nesting | Use explicit aliases or `FOR JSON PATH` with dot notation |
 | `CROSS APPLY OPENJSON` returns no rows | Nested column not declared `AS JSON` | Add `AS JSON` flag to the nested array column in the outer `WITH` clause |
@@ -394,8 +394,11 @@ SELECT JSON_OBJECT(
 A query uses `JSON_VALUE(col, '$.address.city')` but some rows have no `address` property. What is returned for those rows by default?
 
 A. An empty string ''
+
 B. NULL
+
 C. An error is raised
+
 D. The string 'null'
 
 > [!success]- Answer

@@ -223,7 +223,7 @@ SELECT REPLACE(REPLACE(REPLACE('(555)-123', '(', ''), ')', ''), '-', '');
 | `%` | Any string (0+ chars) | `'S%'` matches Smith, SQL |
 | `_` | Any single character | `'S_ith'` matches Smith |
 | `[abc]` | Any single char in set | `'[SB]mith'` matches Smith, Bmith |
-| `[a-z]` | Any char in range | ==`'[A-Z]%'` matches uppercase start== |
+| `[a-z]` | Any char in range | ``'[A-Z]%'` matches uppercase start` |
 | `[^abc]` | Any char NOT in set | `'[^0-9]%'` not starting with digit |
 
 Use the `ESCAPE` clause to treat `%`, `_`, or `[` as literal characters. Use `COLLATE` to control case sensitivity independently of the column's default collation.
@@ -271,7 +271,7 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS;  
 | Extract numbers from text | `REGEXP_SUBSTR` |
 | Clean/normalize data | `REGEXP_REPLACE` |
 | Typo detection | `EDIT_DISTANCE` (absolute count) |
-| Similarity scoring (%) | ==`EDIT_DISTANCE_SIMILARITY`== |
+| Similarity scoring (%) | ``EDIT_DISTANCE_SIMILARITY`` |
 | Person name matching | `JARO_WINKLER_DISTANCE` |
 | Short identifier matching | `JARO_WINKLER_DISTANCE` |
 | Phonetic name matching | `SOUNDEX` / `DIFFERENCE` |
@@ -297,7 +297,7 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS;  
 | Slow fuzzy join | Cross-join of large tables | Filter to candidate pairs first using cheaper predicates |
 | Unexpected REGEXP_LIKE result | Case sensitivity | Use `i` flag for case-insensitive: `REGEXP_LIKE(col, pattern, 'i')` |
 | SOUNDEX returns wrong matches | Non-English names | Use `EDIT_DISTANCE` or `JARO_WINKLER_DISTANCE` instead |
-| LIKE scan instead of seek | Leading wildcard `'%text%'` | ==Use full-text search (`CONTAINS`) for substring searches on large tables== |
+| LIKE scan instead of seek | Leading wildcard `'%text%'` | `Use full-text search (`CONTAINS`) for substring searches on large tables` |
 
 ---
 
@@ -342,8 +342,11 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS;  
 A query uses `WHERE Name LIKE '%Smith%'` on a table with 1 million rows. The query is slow. Which alternative provides similar results while being more index-friendly?
 
 A. Use SOUNDEX(Name) = SOUNDEX('Smith')
+
 B. Use CHARINDEX('Smith', Name) > 0
+
 C. Create a full-text index and use CONTAINS(Name, '"Smith*"')
+
 D. Use TRANSLATE(Name, 'Smith', '     ') IS NULL
 
 > [!success]- Answer

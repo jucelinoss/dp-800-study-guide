@@ -337,7 +337,7 @@ END CATCH;
 | Honors SET XACT_ABORT | Yes | Only severity >= 11 |
 | Requires msg_id in sys.messages | No | Yes (with msg_id form) |
 | Terminates batch | Yes (when used without params in CATCH) | Only severity >= 20 |
-| Recommended for new code | ==Yes== | No |
+| Recommended for new code | `Yes` | No |
 
 > [!warning] Common Mistake
 > THROW without parameters re-raises the current error only inside a CATCH block. Using THROW outside CATCH without parameters causes a syntax error — use THROW with explicit msg_id, message, and state instead.
@@ -420,7 +420,7 @@ SELECT name, compatibility_level FROM sys.databases;
 | `CHARINDEX()` | `CHARINDEX('ll', 'hello')` | 3 |
 | `REPLACE()` | `REPLACE('hello', 'l', 'r')` | `herro` |
 | `TRANSLATE()` | `TRANSLATE('2+3', '+-', '  ')` | `2 3` |
-| ==`STRING_AGG()`== | `STRING_AGG(Name, ', ')` | Comma-delimited |
+| ``STRING_AGG()`` | `STRING_AGG(Name, ', ')` | Comma-delimited |
 | `STRING_SPLIT()` | `STRING_SPLIT('a,b,c', ',')` | 3 rows |
 | `TRIM()` | `TRIM('  hi  ')` | `hi` |
 | `FORMAT()` | `FORMAT(1234.5, 'C', 'en-US')` | `$1,234.50` |
@@ -437,7 +437,7 @@ SELECT name, compatibility_level FROM sys.databases;
 | :--- | :--- | :--- |
 | `GETDATE()` | Local server time | `DATETIME` |
 | `GETUTCDATE()` | UTC time | `DATETIME` |
-| ==`SYSUTCDATETIME()`== | UTC time | `DATETIME2(7)` — preferred |
+| ``SYSUTCDATETIME()`` | UTC time | `DATETIME2(7)` — preferred |
 | `DATEADD()` | `DATEADD(DAY, 7, @d)` | Add interval |
 | `DATEDIFF()` | `DATEDIFF(DAY, @start, @end)` | Returns INT |
 | `DATEDIFF_BIG()` | Same, returns BIGINT | For large ranges |

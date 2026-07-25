@@ -111,7 +111,7 @@ hotfix/fix-sproc                               ●──→ (cherry-pick to main
 
 | Branch | Purpose | Deploys To |
 | :--- | :--- | :--- |
-| `main` | ==Production-ready code== | Production |
+| `main` | `Production-ready code` | Production |
 | `release/x.y` | Release stabilization | Staging/UAT |
 | `feature/*` | New tables, columns, procedures | Dev environment |
 | `hotfix/*` | Emergency production fixes | Production (via main) |
@@ -256,7 +256,7 @@ CREATE TABLE [dbo].[Orders]
 | :--- | :--- | :--- |
 | Merge conflict in `.sqlproj` | Both branches added files | Open `.sqlproj`, keep all `<Build>` entries (SDK-style usually auto-includes, so conflict may not occur) |
 | PR build fails with unresolved reference | Object referenced in one branch, deleted in another | Resolve the merge conflict to include both the object definition and its reference |
-| Direct push to `main` bypasses review | No branch protection | ==Enable branch protection rules in Azure DevOps or GitHub== |
+| Direct push to `main` bypasses review | No branch protection | `Enable branch protection rules in Azure DevOps or GitHub` |
 | Schema Compare shows unexpected changes after merge | Merge introduced formatting differences | Use SSDT Schema Compare to validate actual structural differences |
 
 ---

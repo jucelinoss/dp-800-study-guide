@@ -1,6 +1,6 @@
 # Translating the DP-800 Study Guide
 
-Translations live under `i18n/<locale>/` and mirror the English structure under `certification/`. The English content remains canonical — translations are valued additions, not replacements.
+Translations live under `i18n/<locale>/` and mirror the English structures under `certification/` and `practice/labs/`. The English content remains canonical — translations are valued additions, not replacements.
 
 ## Why a parallel `i18n/` tree
 
@@ -30,6 +30,8 @@ i18n/
             ├── mock-exam/
             ├── mock-exam-2/
             └── practice-questions/
+    └── practice/
+        └── labs/                    # mirror of practice/labs/ SQL labs
 ```
 
 A translation does **not** need to be complete to be useful. Even a single translated file — `certification/resources/final-review.md`, for example — is a real contribution. Each locale's `README.md` should track what's translated.
@@ -58,8 +60,8 @@ If you're starting from scratch, translate in this order — the earlier items g
 
 ## Conventions for translated files
 
-- **Keep the file path identical** to the English source. `i18n/th/certification/09-models-embeddings/01-external-models.md` mirrors `certification/09-models-embeddings/01-external-models.md`.
-- **Translate prose but keep code blocks untranslated.** SQL keywords, function names, error messages, JSON field names — leave in English. If a code comment is in English, you may translate the comment but leave the code itself unchanged.
+- **Keep the file path identical** to the English source. `i18n/th/certification/09-models-embeddings/01-external-models.md` mirrors `certification/09-models-embeddings/01-external-models.md`; `i18n/th/practice/labs/01-database-objects/01-tables-indexes-lab.sql` mirrors `practice/labs/01-database-objects/01-tables-indexes-lab.sql`.
+- **Translate prose but keep code blocks untranslated.** SQL keywords, function names, error messages, JSON field names — leave in English. For SQL labs, translate comments, section banners, expected-result notes, and execution guidance while leaving executable SQL unchanged.
 - **Translate the YAML frontmatter `title` field; leave `tags` and `type` as-is.** Tags are used for indexing and must stay stable across locales.
 - **Internal links should point within the locale tree.** `[Vector search](./02-vector-search.md)` in a translated file should resolve to the translated sibling. If the sibling isn't translated yet, link directly to the English original: `[Vector search](../../../certification/10-intelligent-search/02-vector-search.md)` — and add a note (e.g., `*(English only)*`) so the reader isn't surprised.
 - **External links (Microsoft Learn, etc.) stay as-is.** Microsoft auto-redirects `/en-us/` to the user's locale where translated docs exist; trying to hardcode `/th/` or `/ja/` URLs creates 404s when Microsoft hasn't translated that page.

@@ -189,7 +189,7 @@ RAISERROR ('Value: %d', 16, 1, @MyVariable);   -- with parameter
 | Can use in CATCH | Yes (re-throw) | Yes |
 | Terminates batch | Yes (with XACT_ABORT) | Depends on severity |
 | Error number range | 50000+ or any | Any |
-| Re-raise original | ==`THROW;` preserves original error== | Not possible |
+| Re-raise original | ``THROW;` preserves original error` | Not possible |
 | Parameters | No formatting | printf-style formatting |
 | Recommended | **Modern code (SQL 2012+)** | Legacy |
 
@@ -263,7 +263,7 @@ WHERE TRY_CONVERT(DATE, EventDateStr) IS NOT NULL;
 | Value | Meaning |
 | :--- | :--- |
 | `1` | Active transaction, committable |
-| `-1` | ==Active transaction, doomed — must ROLLBACK== |
+| `-1` | `Active transaction, doomed — must ROLLBACK` |
 | `0` | No active transaction |
 
 ```sql
@@ -341,7 +341,7 @@ END;
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| `NOT IN` returns no rows | NULL in subquery result | ==Use `NOT EXISTS` instead (handles NULLs correctly)== |
+| `NOT IN` returns no rows | NULL in subquery result | `Use `NOT EXISTS` instead (handles NULLs correctly)` |
 | `CATCH` not catching | Error severity < 11 or compile error | `TRY/CATCH` only catches runtime errors ≥ severity 11 |
 | `THROW` outside `CATCH` | Used without preceding CATCH | Only use bare `THROW;` inside a `CATCH` block |
 | Partial transaction after error | `XACT_ABORT OFF` (default) | Set `XACT_ABORT ON` in stored procedures |
@@ -380,8 +380,11 @@ END;
 A stored procedure uses `TRY/CATCH` but does NOT use `SET XACT_ABORT ON`. An error occurs on the second of three INSERT statements. What is the state of the transaction when execution reaches the CATCH block?
 
 A. The entire transaction has been automatically rolled back
+
 B. Only the second INSERT is rolled back; the first INSERT is still pending
+
 C. All three INSERTs are rolled back
+
 D. The transaction is committed up to the point of the error
 
 > [!success]- Answer

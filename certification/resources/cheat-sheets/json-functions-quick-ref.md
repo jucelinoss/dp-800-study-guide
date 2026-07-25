@@ -35,7 +35,7 @@ All JSON functions available in Azure SQL Database and SQL Server 2022+, with sy
 | `JSON_ARRAY()` | Build JSON array | NVARCHAR(MAX) |
 | `JSON_ARRAYAGG()` | Aggregate rows into array | NVARCHAR(MAX) |
 | `JSON_OBJECTAGG()` | Aggregate key-value pairs | NVARCHAR(MAX) |
-| ==`OPENJSON()`== | Parse JSON to rowset | Table |
+| ``OPENJSON()`` | Parse JSON to rowset | Table |
 | `FOR JSON PATH` | Serialize rows to JSON | NVARCHAR(MAX) |
 | `FOR JSON AUTO` | Serialize rows (auto-nesting) | NVARCHAR(MAX) |
 
@@ -99,7 +99,7 @@ SELECT JSON_QUERY(@json, '$.customer.name');        -- NULL
 
 | Scenario | JSON_VALUE | JSON_QUERY |
 | :--- | :--- | :--- |
-| Scalar (string, number) | ==Returns value== | NULL |
+| Scalar (string, number) | `Returns value` | NULL |
 | Object `{}` | NULL | Returns object |
 | Array `[]` | NULL | Returns array |
 
@@ -306,7 +306,7 @@ WHERE JSON_VALUE(ProfileData, '$.email') = 'alice@example.com';
 
 | Behavior | Lax (default) | Strict |
 | :--- | :--- | :--- |
-| Path not found | ==Returns NULL== | Raises error |
+| Path not found | `Returns NULL` | Raises error |
 | Type mismatch (e.g., JSON_VALUE on object) | Returns NULL | Raises error |
 | Syntax | `$.path` | `strict $.path` |
 

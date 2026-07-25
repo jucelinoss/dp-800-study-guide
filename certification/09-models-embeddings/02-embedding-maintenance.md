@@ -32,7 +32,7 @@ tags:
 
 | Method | Latency | Complexity | Infrastructure | Best For |
 | :--- | :--- | :--- | :--- | :--- |
-| Table Triggers | Near real-time | Low | ==None (in-DB)== | Small tables, low write volume |
+| Table Triggers | Near real-time | Low | `None (in-DB)` | Small tables, low write volume |
 | Change Tracking | Low (polling) | Medium | SQL Agent or scheduler | Moderate volume, batch-friendly |
 | CDC | Medium (polling) | Medium | SQL Agent (on-prem) | Audit trail needed with embeddings |
 | CES (Fabric) | Near real-time | Low | Fabric only | Fabric SQL, cloud-native |
@@ -180,7 +180,7 @@ public static async Task Run(
     var openAiClient = new OpenAIClient(new Uri(openAiEndpoint), new AzureKeyCredential(apiKey));
 
     foreach (var change in changes.Where(c =>
-        c.Operation == SqlChangeOperation.Insert || c.Operation == SqlChangeOperation.Update))
+        c.Operation ` SqlChangeOperation.Insert || c.Operation ` SqlChangeOperation.Update))
     {
         if (change.Item.Description == null) continue;
 

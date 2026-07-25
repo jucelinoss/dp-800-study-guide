@@ -38,7 +38,7 @@ Designing and implementing tables is foundational to the DP-800 exam. This cover
 | **Integer** | `tinyint`, `smallint`, `int`, `bigint` | Use the smallest type that fits the range |
 | **Decimal** | `decimal(p,s)`, `numeric(p,s)` | Use for financial data; avoid `float`/`real` for exact values |
 | **Character** | `char(n)`, `varchar(n)`, `nvarchar(n)` | Use `nvarchar` for Unicode; `varchar(max)` up to 2 GB |
-| **Date/Time** | `date`, `time`, `datetime2`, `datetimeoffset` | ==Prefer `datetime2` over legacy `datetime`== |
+| **Date/Time** | `date`, `time`, `datetime2`, `datetimeoffset` | `Prefer `datetime2` over legacy `datetime`` |
 | **Binary** | `varbinary(n)`, `varbinary(max)` | For BLOBs; consider Azure Blob Storage for very large objects |
 | **Other** | `uniqueidentifier`, `bit`, `xml`, `json` (via `nvarchar`) | `uniqueidentifier` for GUIDs |
 
@@ -93,7 +93,7 @@ INCLUDE (OrderDate, TotalAmount);
 
 | Type | Use Case |
 | :--- | :--- |
-| **Clustered Columnstore Index (CCI)** | ==Full analytical/DW tables; replaces B-tree clustered index== |
+| **Clustered Columnstore Index (CCI)** | `Full analytical/DW tables; replaces B-tree clustered index` |
 | **Non-Clustered Columnstore Index (NCCI)** | Add analytical capability to OLTP tables without replacing the rowstore |
 
 ```sql
@@ -124,7 +124,7 @@ ON dbo.Orders (OrderDate, CustomerId, TotalAmount);
 | :--- | :--- | :--- |
 | **Storage** | IAM + data pages in any order | Sorted B-tree pages |
 | **INSERT** | Fast (append) | May cause page splits |
-| **SELECT by PK** | Full scan (no order) | ==Efficient seek== |
+| **SELECT by PK** | Full scan (no order) | `Efficient seek` |
 | **Forwarding pointers** | Yes (after UPDATEs) | No |
 | **Best for** | Staging/bulk load, then index | Most OLTP tables |
 
@@ -171,7 +171,7 @@ The `INCLUDE` clause adds non-key columns to the leaf level of a non-clustered i
 | Aspect | Key Column | Included Column |
 | :--- | :--- | :--- |
 | **Sorted** | Yes — in B-tree order | No — stored only at leaf level |
-| **16-key limit** | Counts toward limit | ==Does not count== |
+| **16-key limit** | Counts toward limit | `Does not count` |
 | **Use for** | WHERE, JOIN ON, ORDER BY | SELECT output columns only |
 | **Index size** | Affects all B-tree levels | Affects leaf level only |
 
@@ -244,7 +244,7 @@ Choosing which columns to index — and how — has a significant impact on quer
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
 | Index fragmentation | Frequent INSERT/UPDATE/DELETE | Rebuild (`ALTER INDEX ... REBUILD`) or reorganize |
-| Page splits | Sequential GUID PKs cause random inserts | ==Use `NEWSEQUENTIALID()` or `INT IDENTITY`== |
+| Page splits | Sequential GUID PKs cause random inserts | `Use `NEWSEQUENTIALID()` or `INT IDENTITY`` |
 | Delta store large | Low row count inserts into columnstore | Batch inserts to fill row groups (min 102,400 rows) |
 | `nvarchar(max)` off-row | Value exceeds 8000 bytes | Expected behavior; consider chunking large text |
 | Filtered index not used | Query uses variable/parameter instead of literal | Rewrite query to use literal value or use `OPTION (RECOMPILE)` |
@@ -294,8 +294,11 @@ Choosing which columns to index — and how — has a significant impact on quer
 A query `SELECT CustomerID, TotalAmount FROM Orders WHERE Status = 'Pending'` performs a key lookup. Which index change eliminates the key lookup?
 
 A. Add a filtered index on Status = 'Pending'
+
 B. Add CustomerID and TotalAmount as INCLUDE columns to the existing Status index
+
 C. Rebuild the clustered index with PAGE compression
+
 D. Create a second clustered index on Status
 
 > [!success]- Answer

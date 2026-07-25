@@ -52,6 +52,8 @@ sequenceDiagram
     App-->>U: response
 ```
 
+![RAG End-to-End Architecture in SQL Server](../../../dist/images/rag_architecture_sql_server.png)
+
 > **Mental model**: RAG is **open-book exam** — the model reads the notes you handed it for this one question; its weights do not change. Fine-tuning is **studying** — it changes what the student knows.
 
 For a full T-SQL walkthrough that builds this entire flow in ~80 lines, see [End-to-End RAG Walkthrough](../resources/code-examples/tsql/rag-end-to-end-walkthrough.md).
@@ -94,7 +96,7 @@ User Question
 
 | Without RAG | With RAG |
 | :--- | :--- |
-| LLM may hallucinate facts | ==Answers grounded in actual database records== |
+| LLM may hallucinate facts | `Answers grounded in actual database records` |
 | Knowledge cutoff from training | Uses current data (pricing, inventory, policies) |
 | No access to proprietary data | Can reference internal documents, customer records |
 | Generic responses | Specific, personalized responses |

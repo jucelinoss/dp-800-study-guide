@@ -67,7 +67,7 @@ SELECT * FROM sys.fulltext_index_columns;
 
 | Option | Behavior |
 | :--- | :--- |
-| `AUTO` | ==SQL Server automatically updates the FTS index when rows change== |
+| `AUTO` | `SQL Server automatically updates the FTS index when rows change` |
 | `MANUAL` | Updates only when you call `ALTER FULLTEXT INDEX ... START UPDATE POPULATION` |
 | `OFF` | No change tracking; manual full population only |
 

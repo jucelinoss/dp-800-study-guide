@@ -228,7 +228,7 @@ sqlpackage /Action:DeployReport \
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `BlockOnPossibleDataLoss` | `true` | ==Fail if deployment might lose data (column drops, type changes)== |
+| `BlockOnPossibleDataLoss` | `true` | `Fail if deployment might lose data (column drops, type changes)` |
 | `DropObjectsNotInSource` | `false` | Drop DB objects not in the dacpac (use with caution) |
 | `GenerateSmartDefaults` | `false` | Auto-generate default values when adding NOT NULL columns |
 | `IncludeTransactionalScripts` | `false` | Wrap each change in a transaction for safer rollback |
@@ -281,7 +281,7 @@ SDK-style projects support referencing shared objects as NuGet packages:
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
 | `Unresolved reference to object` | Object referenced before it's defined | Use fully qualified names; SQL projects resolve by dependency order |
-| `BlockOnPossibleDataLoss` error | Column drop or type change detected | ==Review the change; use pre-deployment script to migrate data first== |
+| `BlockOnPossibleDataLoss` error | Column drop or type change detected | `Review the change; use pre-deployment script to migrate data first` |
 | Pre/post scripts not running | Build Action not set correctly | Add `<PreDeploy>` / `<PostDeploy>` elements in `.sqlproj` |
 | Test files included in dacpac | No exclusion rule | Add `<None Include="Tests\**\*.sql" />` to project |
 | `DSP` property mismatch | Wrong schema provider for target | Set DSP to match target: `SqlAzureV12` for Azure SQL |

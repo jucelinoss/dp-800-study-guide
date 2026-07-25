@@ -19,8 +19,11 @@ Complete all 50 questions (45 standalone + 5-question case study) before checkin
 A developer has an OLTP table `dbo.Sales` with a clustered B-tree index that is heavily used for INSERT/UPDATE/DELETE. The team wants to run analytical aggregations without replacing the clustered index. What is the best approach?
 
 A. Replace the clustered B-tree index with a clustered columnstore index
+
 B. Add a non-clustered columnstore index alongside the existing clustered index
+
 C. Create a separate reporting database and replicate data
+
 D. Add multiple non-clustered B-tree indexes on each aggregation column
 
 > [!success]- Answer
@@ -35,8 +38,11 @@ D. Add multiple non-clustered B-tree indexes on each aggregation column
 A developer needs all versions of a row from `dbo.Products` that were active at any point between January 1, 2025 and March 31, 2025. Which clause is correct?
 
 A. `FOR SYSTEM_TIME AS OF '2025-01-01'`
+
 B. `FOR SYSTEM_TIME BETWEEN '2025-01-01' AND '2025-03-31'`
+
 C. `FOR SYSTEM_TIME FROM '2025-01-01' TO '2025-03-31'`
+
 D. `FOR SYSTEM_TIME ALL WHERE SysStartTime >= '2025-01-01' AND SysEndTime <= '2025-03-31'`
 
 > [!success]- Answer
@@ -51,8 +57,11 @@ D. `FOR SYSTEM_TIME ALL WHERE SysStartTime >= '2025-01-01' AND SysEndTime <= '20
 A developer has a JSON array `[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]` stored in a variable. They want to return it as a relational result set. Which query is correct?
 
 A. `SELECT * FROM JSON_QUERY(@json, '$')`
+
 B. `SELECT * FROM OPENJSON(@json) WITH (id int, name nvarchar(100))`
+
 C. `SELECT JSON_VALUE(@json, '$[0].id'), JSON_VALUE(@json, '$[0].name')`
+
 D. `SELECT * FROM STRING_SPLIT(@json, ',')`
 
 > [!success]- Answer
@@ -67,8 +76,11 @@ D. `SELECT * FROM STRING_SPLIT(@json, ',')`
 A developer wants to compare each day's sales to the previous day's sales to calculate the day-over-day change. Which function retrieves the previous row's value?
 
 A. `LEAD(DailySales, 1) OVER (ORDER BY SaleDate)`
+
 B. `LAG(DailySales, 1) OVER (ORDER BY SaleDate)`
+
 C. `FIRST_VALUE(DailySales) OVER (ORDER BY SaleDate)`
+
 D. `ROW_NUMBER() OVER (ORDER BY SaleDate) - 1`
 
 > [!success]- Answer
@@ -83,8 +95,11 @@ D. `ROW_NUMBER() OVER (ORDER BY SaleDate) - 1`
 A table `dbo.Events` is partitioned by month on `EventDate`. A query filters `WHERE EventDate BETWEEN '2025-03-01' AND '2025-03-31'`. What optimization does the query plan benefit from?
 
 A. Parallelism across all partitions simultaneously
+
 B. Partition elimination — only the March 2025 partition is scanned
+
 C. Automatic index creation on the EventDate column
+
 D. Lock escalation to the partition level instead of the table level
 
 > [!success]- Answer
@@ -99,8 +114,11 @@ D. Lock escalation to the partition level instead of the table level
 A developer wants to find the shortest path between two nodes in a graph table using SQL Server's built-in function. Which syntax is available in SQL Server 2019+?
 
 A. `MATCH(p1-(e*)->p2)` with `SHORTEST_PATH` qualifier
+
 B. Recursive CTE simulating BFS traversal
+
 C. `GRAPH_PATH_SHORTEST(p1, p2, e)` function
+
 D. `MATCH(SHORTEST_PATH(p1(-(e)->p)+p2))`
 
 > [!success]- Answer
@@ -115,8 +133,11 @@ D. `MATCH(SHORTEST_PATH(p1(-(e)->p)+p2))`
 A developer wants to replace a slow scalar UDF with an inline table-valued function (iTVF). What is the key advantage of an iTVF?
 
 A. iTVFs support more complex logic than scalar UDFs
+
 B. The optimizer can inline the iTVF's query into the outer query, enabling parallelism and plan optimization
+
 C. iTVFs return results faster because they use a cache
+
 D. iTVFs automatically create indexes on their output
 
 > [!success]- Answer
@@ -131,8 +152,11 @@ D. iTVFs automatically create indexes on their output
 A developer needs to update a single property inside a JSON column without replacing the entire JSON value. The column `Settings nvarchar(max)` stores `{"theme":"dark","notifications":true}`. Which function updates only the `theme` property to `"light"`?
 
 A. `UPDATE dbo.Users SET Settings = REPLACE(Settings, 'dark', 'light')`
+
 B. `UPDATE dbo.Users SET Settings = JSON_MODIFY(Settings, '$.theme', 'light')`
+
 C. `UPDATE dbo.Users SET Settings = JSON_VALUE(Settings, '$.theme') + '"light"'`
+
 D. `UPDATE dbo.Users SET Settings = JSON_QUERY(Settings, '$.theme', 'light')`
 
 > [!success]- Answer
@@ -147,8 +171,11 @@ D. `UPDATE dbo.Users SET Settings = JSON_QUERY(Settings, '$.theme', 'light')`
 A staging table receives millions of rows via bulk insert each night, is then read in full once for transformation, and is truncated afterward. Which storage structure is most appropriate?
 
 A. Clustered B-tree index on the surrogate key
+
 B. Heap (no clustered index)
+
 C. Clustered columnstore index
+
 D. Non-clustered index on the primary key
 
 > [!success]- Answer
@@ -163,8 +190,11 @@ D. Non-clustered index on the primary key
 A developer wants to find all `ProductId` values in `dbo.Products` that do not exist in `dbo.OrderItems`. Which approach correctly handles NULL values in both tables?
 
 A. `SELECT ProductId FROM dbo.Products WHERE ProductId NOT IN (SELECT ProductId FROM dbo.OrderItems)`
+
 B. `SELECT ProductId FROM dbo.Products EXCEPT SELECT ProductId FROM dbo.OrderItems`
+
 C. `SELECT ProductId FROM dbo.Products p WHERE NOT EXISTS (SELECT 1 FROM dbo.OrderItems o WHERE o.ProductId = p.ProductId)`
+
 D. Both B and C handle NULLs correctly
 
 > [!success]- Answer
@@ -179,8 +209,11 @@ D. Both B and C handle NULLs correctly
 A developer runs an analytical GROUP BY query on a large rowstore table without a columnstore index. SQL Server 2019 delivers much better performance than expected. What feature might explain this?
 
 A. Automatic creation of a hidden columnstore index
+
 B. Batch mode on rowstore — the optimizer can use batch mode execution without a columnstore index
+
 C. Row-level compression enabled automatically
+
 D. The query was cached from a previous columnstore execution
 
 > [!success]- Answer
@@ -195,8 +228,11 @@ D. The query was cached from a previous columnstore execution
 A `FOR JSON PATH` query returns a single-element array `[{"name":"Alice"}]`. A developer wants to wrap this in a root element named `"employee"`. Which option achieves this?
 
 A. `FOR JSON PATH, ROOT('employee')`
+
 B. `FOR JSON AUTO, ROOT`
+
 C. `FOR JSON PATH, INCLUDE_NULL_VALUES`
+
 D. `FOR JSON PATH, WITHOUT_ARRAY_WRAPPER`
 
 > [!success]- Answer
@@ -211,8 +247,11 @@ D. `FOR JSON PATH, WITHOUT_ARRAY_WRAPPER`
 A query against a CCI table uses batch mode. Which operators are capable of batch mode execution? (Select the best answer)
 
 A. Only Hash Match (aggregate and join)
+
 B. Hash Match, Bitmap Filter, Sort, Window Aggregate, and several others
+
 C. Only Index Scan on columnstore
+
 D. All operators automatically use batch mode on CCI tables
 
 > [!success]- Answer
@@ -227,8 +266,11 @@ D. All operators automatically use batch mode on CCI tables
 After creating an updatable ledger table and making several modifications, a compliance officer asks how to verify that the ledger's hash chain has not been tampered with. Which procedure is used?
 
 A. `DBCC CHECKDB`
+
 B. `sys.sp_verify_database_ledger`
+
 C. `ALTER DATABASE ... REBUILD LEDGER`
+
 D. `SELECT * FROM sys.database_ledger_transactions`
 
 > [!success]- Answer
@@ -243,8 +285,11 @@ D. `SELECT * FROM sys.database_ledger_transactions`
 A developer wants to transform rows into columns. The `dbo.SalesData` table has `(Region, Quarter, Amount)`. They want one row per Region with columns Q1, Q2, Q3, Q4. Which operator is used?
 
 A. `UNPIVOT`
+
 B. `PIVOT`
+
 C. `CROSS APPLY`
+
 D. `GROUPING SETS`
 
 > [!success]- Answer
@@ -267,8 +312,11 @@ D. `GROUPING SETS`
 A developer wants to determine the column names and data types that a stored procedure returns without executing it. Which system procedure provides this information?
 
 A. `sys.dm_exec_describe_first_result_set_for_object`
+
 B. `sp_help`
+
 C. `sys.sp_describe_first_result_set`
+
 D. `EXEC sp_columns 'StoredProcedureName'`
 
 > [!success]- Answer
@@ -283,8 +331,11 @@ D. `EXEC sp_columns 'StoredProcedureName'`
 A developer uses `STRING_SPLIT('a,b,c', ',')` and needs the results in the original order. Which additional column preserves the original position (SQL Server 2022+)?
 
 A. `ordinal` — available when the optional third argument is `1`
+
 B. `position` — automatically included
+
 C. `index` — the default ordering column
+
 D. `STRING_SPLIT` does not guarantee order; use `CHARINDEX` instead
 
 > [!success]- Answer
@@ -301,8 +352,11 @@ D. `STRING_SPLIT` does not guarantee order; use `CHARINDEX` instead
 A developer configures Always Encrypted on a `SSN` column. When they query the table using SSMS without enabling Always Encrypted in the connection, what do they see?
 
 A. The plaintext SSN values, because SSMS has special access
+
 B. The encrypted ciphertext bytes (unintelligible)
+
 C. NULL for all SSN values
+
 D. An error: "Access denied to encrypted column"
 
 > [!success]- Answer
@@ -317,8 +371,11 @@ D. An error: "Access denied to encrypted column"
 A `PhoneNumber` column uses `MASKED WITH (FUNCTION = 'partial(0, "XXX-XXX-", 4)')`. For stored value `425-555-1234`, what does a masked user see?
 
 A. `XXXX`
+
 B. `4XX-XXX-1234`
+
 C. `XXX-XXX-1234`
+
 D. `425-555-XXXX`
 
 > [!success]- Answer
@@ -333,8 +390,11 @@ D. `425-555-XXXX`
 An RLS security policy has a BLOCK predicate with `AFTER UPDATE`. What does `AFTER UPDATE` specifically prevent?
 
 A. Prevents UPDATE statements from modifying any rows
+
 B. Prevents UPDATE statements from changing a row such that it would no longer be visible to the current user
+
 C. Prevents UPDATE statements on rows that the user cannot see
+
 D. Prevents the user from running UPDATE at all
 
 > [!success]- Answer
@@ -349,8 +409,11 @@ D. Prevents the user from running UPDATE at all
 A developer creates a user with `CREATE USER [AppUser] WITH PASSWORD = 'P@ssw0rd'`. This creates what type of user?
 
 A. A SQL login-based user at the server level
+
 B. A contained database user — authenticated directly by the database without a server login
+
 C. A Windows authentication user
+
 D. An Azure AD user
 
 > [!success]- Answer
@@ -365,8 +428,11 @@ D. An Azure AD user
 Two transactions use Snapshot Isolation. Transaction 1 reads row A (value=10) and later updates it to 20. Meanwhile, Transaction 2 also read row A (value=10) under snapshot and attempts to update it to 30. What happens when Transaction 2 tries to commit?
 
 A. Transaction 2 succeeds; the final value is 30
+
 B. Transaction 2 gets error 3960: update conflict; it must retry
+
 C. Transaction 2 is chosen as a deadlock victim (error 1205)
+
 D. Transaction 2 sees Transaction 1's committed value and updates to 30 based on that
 
 > [!success]- Answer
@@ -381,8 +447,11 @@ D. Transaction 2 sees Transaction 1's committed value and updates to 30 based on
 A DBA observes high `PAGEIOLATCH_SH` wait counts in `sys.dm_os_wait_stats`. What is the primary cause of this wait type?
 
 A. CPU is fully utilized and queries are waiting to execute
+
 B. SQL Server is waiting for data pages to be read from disk into the buffer pool
+
 C. Queries are blocked by lock contention on shared data
+
 D. Network packets are being delayed between the client and server
 
 > [!success]- Answer
@@ -397,8 +466,11 @@ D. Network packets are being delayed between the client and server
 A developer adds `WITH (NOLOCK)` to a query to avoid blocking. What risk does this introduce?
 
 A. The query will always return zero rows
+
 B. The query may return dirty reads — uncommitted data from concurrent transactions
+
 C. The query will acquire exclusive locks instead of shared locks
+
 D. The query cannot use indexes
 
 > [!success]- Answer
@@ -413,8 +485,11 @@ D. The query cannot use indexes
 A query joining two large tables with no useful indexes produces a Hash Match join. Which scenario would allow the optimizer to use a more efficient Merge Join instead?
 
 A. Adding `WITH (LOOP JOIN)` hint to the query
+
 B. Creating indexes that return both tables' rows already sorted on the join key
+
 C. Increasing max degree of parallelism
+
 D. Running `UPDATE STATISTICS` on both tables
 
 > [!success]- Answer
@@ -429,8 +504,11 @@ D. Running `UPDATE STATISTICS` on both tables
 A developer configures Automatic Plan Correction (`ALTER DATABASE ... SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON)`). What does this feature do?
 
 A. Rebuilds indexes automatically when fragmentation exceeds 30%
+
 B. Detects plan regressions and automatically forces the last known good plan when a regression is confirmed
+
 C. Automatically creates missing indexes identified by the optimizer
+
 D. Reverts statistics to the previous version when queries degrade
 
 > [!success]- Answer
@@ -445,8 +523,11 @@ D. Reverts statistics to the previous version when queries degrade
 A DBA wants to check whether any schema changes were made directly to the production database since the last dacpac deployment. Which sqlpackage command generates this report?
 
 A. `sqlpackage /Action:Extract /SourceConnectionString:... /TargetFile:prod.dacpac`
+
 B. `sqlpackage /Action:DriftReport /SourceFile:baseline.dacpac /TargetConnectionString:...`
+
 C. `sqlpackage /Action:DeployReport /SourceFile:current.dacpac /TargetConnectionString:...`
+
 D. `sqlpackage /Action:Compare /SourceConnectionString:... /TargetFile:baseline.dacpac`
 
 > [!success]- Answer
@@ -461,8 +542,11 @@ D. `sqlpackage /Action:Compare /SourceConnectionString:... /TargetFile:baseline.
 An organization needs to audit all login attempts at the SQL Server instance level (across all databases) and specific DML operations only within a specific database. Which audit configuration achieves this?
 
 A. One server audit with action groups for both logins and DML
+
 B. A server audit for login events plus a database audit specification for DML on the specific database
+
 C. Two database audit specifications — one for logins, one for DML
+
 D. One server audit specification targeting both levels
 
 > [!success]- Answer
@@ -477,8 +561,11 @@ D. One server audit specification targeting both levels
 A developer configures an Azure SQL Database server to use Azure Active Directory as the authentication authority. Which account type can serve as the Azure AD admin for the server?
 
 A. Only Azure AD user accounts
+
 B. Only Azure AD service principals
+
 C. Azure AD users, groups, or service principals (managed identities included)
+
 D. Only on-premises Active Directory accounts synced via AD Connect
 
 > [!success]- Answer
@@ -493,8 +580,11 @@ D. Only on-premises Active Directory accounts synced via AD Connect
 A developer's application uses Change Tracking. After the first sync, the application stores a `@last_sync_version` value. On the next sync, they run `CHANGETABLE(CHANGES dbo.Orders, @last_sync_version)`. What happens if `@last_sync_version` is older than the minimum valid change tracking version (cleanup has removed older data)?
 
 A. The function returns all rows in the table
+
 B. The function returns no rows
+
 C. An error is raised, signaling that the application must perform a full resync
+
 D. The function automatically extends the retention period
 
 > [!success]- Answer
@@ -509,8 +599,11 @@ D. The function automatically extends the retention period
 By default, which HTTP methods does Data API Builder map to database operations for a REST entity?
 
 A. GET only (read-only by default)
+
 B. GET (read), POST (create), PUT/PATCH (update), DELETE (delete)
+
 C. GET, POST, and DELETE only — PATCH requires explicit configuration
+
 D. All HTTP methods are blocked until explicitly configured
 
 > [!success]- Answer
@@ -525,8 +618,11 @@ D. All HTTP methods are blocked until explicitly configured
 An Azure SQL Database needs to retrieve a column master key from Azure Key Vault for Always Encrypted with Secure Enclaves. The database uses a system-assigned managed identity. Which role must be assigned to the managed identity on the Key Vault?
 
 A. Key Vault Administrator
+
 B. Key Vault Secrets User
+
 C. Key Vault Crypto User (or Key Vault Crypto Service Encryption User)
+
 D. Owner
 
 > [!success]- Answer
@@ -541,8 +637,11 @@ D. Owner
 A CI/CD pipeline should fail if a dacpac deployment to staging would require any data-loss operations (e.g., DROP TABLE, DROP COLUMN). Which sqlpackage flag achieves this?
 
 A. `/p:AllowIncompatiblePlatform=false`
+
 B. `/p:BlockOnPossibleDataLoss=true`
+
 C. `/p:DropObjectsNotInSource=false`
+
 D. `/p:IgnoreExtendedProperties=true`
 
 > [!success]- Answer
@@ -557,8 +656,11 @@ D. `/p:IgnoreExtendedProperties=true`
 An application uses `sp_set_session_context N'TenantId', @tenantId` with default settings. A malicious stored procedure attempts to override this value later in the same session. What prevents this?
 
 A. Session context values are read-only once set
+
 B. Adding `@read_only = 1` to the `sp_set_session_context` call makes the value immutable for the session
+
 C. The value is encrypted and cannot be modified
+
 D. Only sa can modify session context values
 
 > [!success]- Answer
@@ -575,8 +677,11 @@ D. Only sa can modify session context values
 A developer uses a `CHAT_COMPLETION` external model and needs the response in a specific JSON schema for downstream processing. Which capability of modern LLM APIs supports this?
 
 A. Prompt injection — adding "respond in JSON" to the system prompt
+
 B. Structured output / JSON mode — configuring the model to guarantee valid JSON output matching a schema
+
 C. Few-shot prompting with JSON examples
+
 D. Post-processing the response with `ISJSON()` to validate
 
 > [!success]- Answer
@@ -591,8 +696,11 @@ D. Post-processing the response with `ISJSON()` to validate
 A developer creates a DiskANN vector index with `METRIC = 'dot'` and wants the results to behave like cosine similarity. Which prerequisite must be met?
 
 A. The column must be the primary key
+
 B. The vectors must be normalized to unit length (apply `VECTOR_NORMALIZE` before inserting)
+
 C. The table must have fewer than 1 million rows
+
 D. The column must use `VECTOR(512)` or smaller dimensions
 
 > [!success]- Answer
@@ -607,8 +715,11 @@ D. The column must use `VECTOR(512)` or smaller dimensions
 A developer uses `FREETEXTTABLE(dbo.Docs, Content, 'database performance tuning')` and joins the result. What does this function return compared to `FREETEXT`?
 
 A. The same rows as `FREETEXT` but without NULL values
+
 B. A table with `KEY` and `RANK` columns, enabling results to be sorted by relevance
+
 C. Only the top 10 results by default
+
 D. A comma-separated list of matching document IDs
 
 > [!success]- Answer
@@ -623,8 +734,11 @@ D. A comma-separated list of matching document IDs
 A developer implements semantic chunking for a technical manual. Instead of splitting by token count, they split at paragraph boundaries and then merge small paragraphs until reaching a target size. What is the primary advantage of this approach over fixed-size chunking?
 
 A. Semantic chunking always produces smaller chunks
+
 B. Each chunk contains a semantically coherent unit, improving the embedding's representativeness
+
 C. Semantic chunking is faster to compute
+
 D. Semantic chunking works with any language model
 
 > [!success]- Answer
@@ -639,8 +753,11 @@ D. Semantic chunking works with any language model
 A developer wants the 10 most similar products to a query embedding against a **latest-version** DiskANN vector index on Azure SQL. Which clause is the recommended current syntax?
 
 A. `SELECT TOP (10) ... ORDER BY VECTOR_DISTANCE('cosine', col, @q) WITH APPROXIMATE`
+
 B. `WITH (TOP_K = 10)` in the VECTOR_SEARCH options
+
 C. `LIMIT 10` at the end of the query
+
 D. `VECTOR_SEARCH(..., TOP_N = 10)`
 
 > [!success]- Answer
@@ -655,8 +772,11 @@ D. `VECTOR_SEARCH(..., TOP_N = 10)`
 A developer builds a RAG prompt by concatenating retrieved chunks into a T-SQL string and passing it to `sp_invoke_external_rest_endpoint`. The chunks contain special characters (quotes, backslashes). What is the safest way to build the JSON payload?
 
 A. Use `REPLACE(@context, '"', '\"')` to escape quotes before concatenation
+
 B. Use `JSON_OBJECT` and `JSON_ARRAY` to construct the payload — these functions handle escaping automatically
+
 C. Use `CAST(@context AS nvarchar(max))` to sanitize the string
+
 D. Use `STRING_ESCAPE(@context, 'json')` before embedding in the string
 
 > [!success]- Answer
@@ -671,8 +791,11 @@ D. Use `STRING_ESCAPE(@context, 'json')` before embedding in the string
 A developer implements hybrid search combining FTS (`CONTAINSTABLE`) and vector search. After getting separate ranked lists, they apply RRF with k=60. The final result should return the top 5 documents. Which CTE structure correctly implements this?
 
 A. Union the two result sets and take TOP 5 by the highest individual RANK
+
 B. Compute RRF scores by summing `1/(60+rank)` from each result set per document, then order by RRF score descending and take TOP 5
+
 C. Multiply the FTS RANK by the vector distance and take the minimum 5
+
 D. Take TOP 5 from FTS and TOP 5 from vector search, then union and deduplicate
 
 > [!success]- Answer
@@ -687,8 +810,11 @@ D. Take TOP 5 from FTS and TOP 5 from vector search, then union and deduplicate
 A team is choosing between `text-embedding-3-small` (1536 dims) and `text-embedding-3-large` (3072 dims). They have 50 million documents and cost/storage is a concern. What is the key trade-off?
 
 A. Larger dimensions always produce worse results for non-English text
+
 B. Larger dimensions generally produce higher quality embeddings at the cost of more storage, higher compute, and slower vector search
+
 C. Smaller dimensions cannot be used with VECTOR_SEARCH
+
 D. The dimension count has no practical impact on retrieval quality
 
 > [!success]- Answer
@@ -703,8 +829,11 @@ D. The dimension count has no practical impact on retrieval quality
 After calling `sp_invoke_external_rest_endpoint`, the output parameters include `@response_headers` and `@status_code`. What HTTP status code indicates a successful Azure OpenAI response?
 
 A. 201
+
 B. 204
+
 C. 200
+
 D. 202
 
 > [!success]- Answer
@@ -719,8 +848,11 @@ D. 202
 A developer creates a DATABASE SCOPED CREDENTIAL for an Azure OpenAI model using Managed Identity rather than an API key. Which IDENTITY value is used?
 
 A. `IDENTITY = 'HTTPEndpointHeaders'`
+
 B. `IDENTITY = 'Managed Identity'`
+
 C. `IDENTITY = 'SHARED ACCESS SIGNATURE'`
+
 D. `IDENTITY = 'Azure Active Directory'`
 
 > [!success]- Answer
@@ -735,8 +867,11 @@ D. `IDENTITY = 'Azure Active Directory'`
 A developer runs a `VECTOR_SEARCH` query but needs to restrict results to documents where `Category = 'Finance'`. The `Category` column has a regular B-tree index. What is the most efficient approach?
 
 A. Run `VECTOR_SEARCH` first, return all results, then filter in the application layer
+
 B. Add a `WHERE Category = 'Finance'` filter in the outer query that joins to the `VECTOR_SEARCH` result — the optimizer applies the filter post-ANN
+
 C. Create a filtered DiskANN index on the subset of Finance documents
+
 D. Use `CONTAINS(Category, 'Finance')` inside the VECTOR_SEARCH call
 
 > [!success]- Answer
@@ -768,8 +903,11 @@ Northwind is building a semantic product-catalog search and Q&A assistant on **A
 Product descriptions vary from 200 to 1 200 words. Many products have multi-paragraph descriptions covering specs, materials, and warranty separately. Which chunking strategy fits best?
 
 A. One chunk per product (embed the entire `Description`)
+
 B. Fixed-size 200-token chunks with 10–20 % overlap
+
 C. **Paragraph-based chunking with 10–20 % overlap** between adjacent chunks
+
 D. One chunk per character (max granularity)
 
 > [!success]- Answer
@@ -784,8 +922,11 @@ D. One chunk per character (max granularity)
 With 5 000 updates/min, the team must keep embeddings fresh without blocking writes. Which approach is best suited?
 
 A. A synchronous `AFTER UPDATE` trigger calling `PREDICT` inline
+
 B. **Change Tracking** with a background job (Azure Functions SQL trigger binding or SQL Agent) that re-embeds changed rows in batches
+
 C. CDC with a custom .NET consumer
+
 D. Azure Logic Apps polling every 5 minutes
 
 > [!success]- Answer
@@ -800,8 +941,11 @@ D. Azure Logic Apps polling every 5 minutes
 For the 2 M-row catalog with p95 < 200 ms latency, which index and metric should be configured?
 
 A. No index — use `VECTOR_DISTANCE` in `ORDER BY` (exact kNN)
+
 B. **DiskANN vector index with `METRIC = 'cosine'`**, and queries use `SELECT TOP (N) ... WITH APPROXIMATE` with cosine
+
 C. DiskANN with `METRIC = 'dot'`, no normalisation
+
 D. A traditional B-tree index on the `DescriptionEmbedding` column
 
 > [!success]- Answer
@@ -816,8 +960,11 @@ D. A traditional B-tree index on the `DescriptionEmbedding` column
 Customers want both semantic relevance AND exact keyword matches to rank well ("waterproof", "Wi-Fi 7"). How should the team combine signals?
 
 A. Run vector search only — semantic embeddings capture keyword meaning
+
 B. Run full-text `CONTAINS` only — keyword matching is exact
+
 C. **Run both: vector search (cosine) AND full-text (`CONTAINSTABLE` for RANK), then combine via Reciprocal Rank Fusion (`score = Σ 1/(60 + rank_i)`)**
+
 D. Run vector search, then run `LIKE '%keyword%'` on the results
 
 > [!success]- Answer
@@ -832,8 +979,11 @@ D. Run vector search, then run `LIKE '%keyword%'` on the results
 The Q&A assistant must answer using only the retrieved chunks. Which combination of model-call settings best minimises hallucination?
 
 A. System prompt: "answer creatively"; temperature 0.9; pass query only
+
 B. System prompt: "answer using only the provided product excerpts; if not present, say so"; **temperature 0.1**; pass retrieved chunks as a system message; parse with `JSON_VALUE(@resp, '$.result.choices[0].message.content')`
+
 C. Temperature 0.5; pass the user query but not the retrieved chunks
+
 D. Use `JSON_VALUE(@resp, '$.choices[0].message.content')` and a high temperature
 
 > [!success]- Answer

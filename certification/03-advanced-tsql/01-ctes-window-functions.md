@@ -252,7 +252,7 @@ Both functions produce a value between 0.0 and 1.0 and are useful for percentile
 
 | Function | Formula | Range |
 | :--- | :--- | :--- |
-| `PERCENT_RANK()` | (rank - 1) / (total rows - 1) | ==0.0 (lowest) to 1.0 (highest)== |
+| `PERCENT_RANK()` | (rank - 1) / (total rows - 1) | `0.0 (lowest) to 1.0 (highest)` |
 | `CUME_DIST()` | rows with value ≤ current / total rows | 1/n (lowest) to 1.0 (highest) |
 
 Key difference: `PERCENT_RANK` uses the row's rank position; `CUME_DIST` counts how many rows have a value less than or equal to the current row.
@@ -331,7 +331,7 @@ SELECT * FROM Ranked WHERE dr <= 3;
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
 | Infinite recursion in CTE | Missing/incorrect termination condition | Add `WHERE` in recursive member; use `MAXRECURSION` |
-| Wrong running total | Missing `ROWS UNBOUNDED PRECEDING` | ==Default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` — can cause unexpected results with ties== |
+| Wrong running total | Missing `ROWS UNBOUNDED PRECEDING` | `Default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` — can cause unexpected results with ties` |
 | `LAST_VALUE` returns current row | Default frame ends at current row | Add `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING` |
 | CTE runs slower when referenced twice | No materialization; query runs CTE logic multiple times | Replace with `#temp table` to force materialization |
 
@@ -377,8 +377,11 @@ SELECT * FROM Ranked WHERE dr <= 3;
 A CTE is referenced twice in the same query and contains a complex aggregation. The query runs slower than expected. What is the MOST LIKELY cause?
 
 A. CTEs cannot contain aggregation functions
+
 B. The CTE is executed twice because CTEs are not materialized
+
 C. Window functions inside CTEs disable parallel execution
+
 D. CTEs are limited to 100 rows by default
 
 > [!success]- Answer

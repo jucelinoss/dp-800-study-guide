@@ -123,7 +123,7 @@ SELECT * FROM sys.database_permissions WHERE grantee_principal_id = USER_ID('Rep
 | Type | Lifecycle | Use Case |
 | :--- | :--- | :--- |
 | **System-assigned** | Tied to the Azure resource | Single-service authentication |
-| **User-assigned** | Independent resource | ==Multiple services sharing an identity== |
+| **User-assigned** | Independent resource | `Multiple services sharing an identity` |
 
 ### Configuring Managed Identity for Azure SQL
 
@@ -211,7 +211,7 @@ CREATE USER [user@domain.com] FROM EXTERNAL PROVIDER;  -- AAD user
 | `EXECUTE AS USER` | Database | Impersonate a database user |
 | `EXECUTE AS LOGIN` | Server | Impersonate a server login |
 | `EXECUTE AS CALLER` | Module | Use caller's identity (default) |
-| `EXECUTE AS OWNER` | Module | ==Use the object owner's identity== |
+| `EXECUTE AS OWNER` | Module | `Use the object owner's identity` |
 | `EXECUTE AS SELF` | Module | Use the identity of the user who defined the object |
 
 `REVERT` restores the original security context after impersonation.
@@ -261,7 +261,7 @@ CREATE PROCEDURE dbo.sp_GetHRData AS SELECT * FROM hr.Employees;
 
 | Role | Scope | Permissions |
 | :--- | :--- | :--- |
-| `db_owner` | Database | ==Full control of database== |
+| `db_owner` | Database | `Full control of database` |
 | `db_datareader` | Database | SELECT on all tables/views |
 | `db_datawriter` | Database | INSERT/UPDATE/DELETE on all tables |
 | `db_ddladmin` | Database | CREATE/ALTER/DROP schema objects |
@@ -337,8 +337,11 @@ CREATE PROCEDURE dbo.sp_GetHRData AS SELECT * FROM hr.Employees;
 A stored procedure owned by `dbo` calls a table owned by `hr_schema`. A user has EXECUTE permission on the procedure but no explicit permissions on `hr_schema.Employees`. What happens when the user runs the procedure?
 
 A. The procedure executes successfully due to ownership chaining
+
 B. The procedure fails because ownership chaining only works within the same schema
+
 C. The procedure fails because the chain breaks across different owners
+
 D. The procedure runs only if the user has db_datareader role
 
 > [!success]- Answer

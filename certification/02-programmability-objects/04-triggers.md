@@ -69,7 +69,7 @@ END;
 | :--- | :--- | :--- |
 | INSERT | New rows | Empty |
 | DELETE | Empty | Old rows |
-| UPDATE | ==New values== | Old values |
+| UPDATE | `New values` | Old values |
 
 ### INSTEAD OF Triggers
 
@@ -298,7 +298,7 @@ WHERE object_id = OBJECT_ID('trg_Orders_Audit');
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| Trigger fires once for multi-row DML | `inserted`/`deleted` tables have multiple rows | ==Write set-based logic, not `SELECT TOP 1` or scalar variables== |
+| Trigger fires once for multi-row DML | `inserted`/`deleted` tables have multiple rows | `Write set-based logic, not `SELECT TOP 1` or scalar variables` |
 | Recursive trigger loop | Trigger updates a table that triggers itself | Check `sys.triggers.is_recursive` or disable recursive triggers |
 | Performance degradation | Trigger runs synchronously on every DML | Move heavy work to async process (Service Broker, queue) |
 | Logon trigger locks everyone out | Faulty ROLLBACK logic in logon trigger | Connect via DAC (`admin:`) to disable or drop the trigger |
@@ -344,8 +344,11 @@ WHERE object_id = OBJECT_ID('trg_Orders_Audit');
 A view joins the Orders and Customers tables. A user tries to INSERT into the view and gets an error. Which trigger type resolves this?
 
 A. AFTER INSERT trigger on the Orders table
+
 B. INSTEAD OF INSERT trigger on the view
+
 C. DDL trigger for CREATE event on the view
+
 D. AFTER INSERT trigger on the view
 
 > [!success]- Answer

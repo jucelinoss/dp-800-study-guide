@@ -21,7 +21,7 @@ behave the way the exam expects.
 
 > [!abstract]
 >
-> - Four labs covering ==vector search==, ==RAG==, ==full-text + hybrid search==, and ==MCP server endpoints==
+> - Four labs covering `vector search`, `RAG`, `full-text + hybrid search`, and `MCP server endpoints`
 > - All four labs share a toy `Products` catalogue so you can run them against the same database
 > - Every script targets SQL Server 2025 / Azure SQL Database / SQL database in Microsoft Fabric
 > - Each lab includes setup, numbered steps with expected output, cleanup, and a common-issues table

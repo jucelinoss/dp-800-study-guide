@@ -69,7 +69,7 @@ The `DURABILITY` option controls whether data survives a server restart.
 | Durability | Survives Restart | Transaction Log | Best For |
 | :--- | :--- | :--- | :--- |
 | `SCHEMA_AND_DATA` | Yes (data + structure) | Yes — fully logged | Orders, financial data, anything requiring persistence |
-| `SCHEMA_ONLY` | ==Structure only (data lost)== | No logging | Session state, caches, temp aggregations |
+| `SCHEMA_ONLY` | `Structure only (data lost)` | No logging | Session state, caches, temp aggregations |
 
 ```sql
 -- SCHEMA_AND_DATA: durable (default) — data persists through restart
@@ -124,7 +124,7 @@ ORDER BY ValidFrom;
 
 | Clause | Returns |
 | :--- | :--- |
-| `AS OF <date>` | ==Row state at exactly that point in time== |
+| `AS OF <date>` | `Row state at exactly that point in time` |
 | `FROM <start> TO <end>` | Rows active during any part of the range |
 | `BETWEEN <start> AND <end>` | Inclusive of the end boundary |
 | `CONTAINED IN (<start>, <end>)` | Rows that started AND ended within the range |
@@ -281,7 +281,7 @@ See [04-Graph Queries](../03-advanced-tsql/04-graph-queries.md) for advanced MAT
 | **In-Memory** | Session state, shopping carts, real-time counters |
 | **Temporal** | Audit history, slowly changing dimensions, compliance |
 | **External** | Data virtualization, querying data lake files |
-| **Ledger** | ==Financial records, regulated audit trails, cryptographic proof== |
+| **Ledger** | `Financial records, regulated audit trails, cryptographic proof` |
 | **Graph** | Social networks, fraud detection, recommendation engines |
 
 ---
@@ -293,7 +293,7 @@ See [04-Graph Queries](../03-advanced-tsql/04-graph-queries.md) for advanced MAT
 | Memory-optimized table creation fails | No MEMORY_OPTIMIZED_DATA filegroup | Add filegroup before creating table |
 | Temporal history table growing large | High update frequency | Add retention policy: `HISTORY_RETENTION_PERIOD = 1 YEAR` |
 | External table slow | File format mismatch or no statistics | Use `CREATE STATISTICS` on external tables |
-| Ledger verify fails | File tampering or corruption | ==Report to compliance; evidence of tampering== |
+| Ledger verify fails | File tampering or corruption | `Report to compliance; evidence of tampering` |
 | `CONTAINED IN` returns no rows | Period wider than any row's lifetime | Check ValidFrom/ValidTo range; rows must start AND end inside the window |
 
 ---
@@ -335,8 +335,11 @@ See [04-Graph Queries](../03-advanced-tsql/04-graph-queries.md) for advanced MAT
 An auditor asks for proof that no one has modified the salary records table since it was created. Which table type provides cryptographic proof of data integrity?
 
 A. Temporal table with SYSTEM_TIME versioning
+
 B. Ledger table with APPEND_ONLY = ON
+
 C. Updatable ledger table with sp_verify_database_ledger
+
 D. Memory-optimized table with DURABILITY = SCHEMA_AND_DATA
 
 > [!success]- Answer

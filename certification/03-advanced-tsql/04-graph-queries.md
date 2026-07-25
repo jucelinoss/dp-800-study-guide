@@ -242,7 +242,7 @@ CREATE INDEX IX_Person_Name ON Person(Name);
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
 | `MATCH` fails | Graph tables not in FROM clause | All nodes and edges used in MATCH must be in the FROM clause |
-| Edge insert fails | Wrong `$node_id` value | ==Always use subquery `(SELECT $node_id FROM ...)` to reference nodes== |
+| Edge insert fails | Wrong `$node_id` value | `Always use subquery `(SELECT $node_id FROM ...)` to reference nodes` |
 | Multiple MATCH patterns | Separate MATCH calls connected by AND | Use `AND MATCH(...)` for additional patterns |
 | SHORTEST_PATH returns no rows | Source node has no outbound edges | Verify edge direction and that `FOR PATH` aliases are used correctly |
 | Edge constraint violation | Inserting edge between disallowed node types | Check `CONNECTION` constraint definition; ensure source/target match allowed types |
@@ -303,8 +303,11 @@ CREATE INDEX IX_Person_Name ON Person(Name);
 You need to find all people within 3 hops of a specific person in a social graph. Which T-SQL feature enables this query?
 
 A. Recursive CTE with a UNION ALL and hop counter
+
 B. MATCH with SHORTEST_PATH using a + quantifier
+
 C. A self-join with a JOIN depth of 3
+
 D. OPENJSON to traverse a graph stored in JSON
 
 > [!success]- Answer

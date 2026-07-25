@@ -62,6 +62,8 @@ Where `k` is a constant (typically 60) that reduces the impact of very high rank
 
 Documents appearing in both lists score higher than those in only one list. The `k=60` constant prevents a rank-1 result in one list from completely dominating if it scores poorly in the other.
 
+![Hybrid Search & Reciprocal Rank Fusion Architecture](../../../dist/images/hybrid_search_rrf_architecture.png)
+
 ---
 
 ## Implementing Hybrid Search with RRF in T-SQL
@@ -252,7 +254,7 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 
 | Lever | Impact |
 | :--- | :--- |
-| Vector index (DiskANN) | ==Major — milliseconds vs seconds for ANN== |
+| Vector index (DiskANN) | `Major — milliseconds vs seconds for ANN` |
 | FTS index | Major — instant vs full table scan |
 | Reduce TOP_N in VECTOR_SEARCH | Minor — fewer candidates |
 | Reduce FTS result limit | Minor — faster FTS evaluation |
@@ -292,7 +294,7 @@ Larger k → more uniform distribution across ranks
 
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
-| One list always dominates | k too small; one list much larger | ==Increase k; ensure both lists return similar numbers of candidates== |
+| One list always dominates | k too small; one list much larger | `Increase k; ensure both lists return similar numbers of candidates` |
 | FTS returns nothing | Stop words removed all query terms | Add fallback: if FTS empty, use vector-only |
 | NULL RRFScore | FULL OUTER JOIN with no FTS result | Use `ISNULL(..., 0)` around RRF score components |
 | Slow hybrid search | No vector index | Create DiskANN index; use `VECTOR_SEARCH` |

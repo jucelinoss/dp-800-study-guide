@@ -152,7 +152,7 @@ ORDER BY DotDistance ASC;
 
 | Metric | Formula | Range | Best For |
 | :--- | :--- | :--- | :--- |
-| `cosine` | 1 - cos(θ) | 0 to 2 | ==Text embeddings, direction-based similarity== |
+| `cosine` | 1 - cos(θ) | 0 to 2 | `Text embeddings, direction-based similarity` |
 | `euclidean` | √Σ(a-b)² | 0 to ∞ | Spatial/geometric data, normalized vectors |
 | `dot` | 1 - Σ(aᵢ×bᵢ) | -∞ to +∞ | When vectors are already L2-normalized |
 
@@ -333,7 +333,7 @@ ORDER BY vs.distance ASC;
 | `Cannot use VECTOR_DISTANCE on NULL` | NULL vector in column | Add `WHERE DescriptionVector IS NOT NULL` |
 | Dimension mismatch error | Query vector dimension ≠ column dimension | Ensure query embedding uses the same model as stored embeddings |
 | ANN results differ from ENN | Expected — ANN is approximate | Increase `TOP_N` in VECTOR_SEARCH for higher recall |
-| Vector index not used | Using `VECTOR_DISTANCE` in ORDER BY, not `VECTOR_SEARCH` | ==Use `VECTOR_SEARCH` function to leverage the index== |
+| Vector index not used | Using `VECTOR_DISTANCE` in ORDER BY, not `VECTOR_SEARCH` | `Use `VECTOR_SEARCH` function to leverage the index` |
 | Poor search results | Embeddings not normalized, using dot product | Either normalize vectors or use `cosine` metric |
 
 ---

@@ -27,7 +27,7 @@ Key **Dynamic Management Views** (DMVs), diagnostic queries, and performance tun
 
 | DMV | Category | Purpose |
 | :--- | :--- | :--- |
-| ==`sys.dm_exec_query_stats`== | Query | Aggregate query performance stats |
+| ``sys.dm_exec_query_stats`` | Query | Aggregate query performance stats |
 | `sys.dm_exec_query_plan` | Query | XML execution plan for a plan handle |
 | `sys.dm_exec_sql_text` | Query | SQL text for a sql_handle |
 | `sys.dm_exec_requests` | Session | Currently executing requests |
@@ -154,7 +154,7 @@ ORDER BY wait_time_ms DESC;
 | Wait Type | Category | Indicates |
 | :--- | :--- | :--- |
 | `CXPACKET` / `CXCONSUMER` | Parallelism | Parallel query waits (often benign) |
-| ==`PAGEIOLATCH_*`== | I/O | Reading pages from disk |
+| ``PAGEIOLATCH_*`` | I/O | Reading pages from disk |
 | `LCK_M_*` | Locking | Blocked by another session |
 | `SOS_SCHEDULER_YIELD` | CPU | CPU pressure |
 | `WRITELOG` | Transaction log | Log write latency |
@@ -234,7 +234,7 @@ ORDER BY ips.avg_fragmentation_in_percent DESC;
 | Fragmentation | Action |
 | :--- | :--- |
 | 10-30% | `ALTER INDEX ... REORGANIZE` |
-| > 30% | ==`ALTER INDEX ... REBUILD`== |
+| > 30% | ``ALTER INDEX ... REBUILD`` |
 | < 10% | No action needed |
 
 > [!tip] Exam Tip
@@ -302,7 +302,7 @@ ORDER BY end_time DESC;
 | Key Lookup | Bookmark lookup to clustered index | Add INCLUDE columns to nonclustered index |
 | Sort with spill | Sort exceeded memory grant | Update statistics, increase memory grant |
 | Hash match spill | Hash join exceeded memory grant | Update statistics, add index |
-| ==Implicit conversion== | Data type mismatch in join/filter | Fix column types or cast explicitly |
+| `Implicit conversion` | Data type mismatch in join/filter | Fix column types or cast explicitly |
 | Parameter sniffing | Plan compiled for atypical value | OPTION (RECOMPILE), plan guides, OPTIMIZE FOR |
 | Cardinality estimate warning | Row estimate far from actual | Update statistics, use query hints |
 

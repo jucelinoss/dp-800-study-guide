@@ -189,7 +189,7 @@ GROUP BY DocumentId, ChunkNumber;
 | Strategy | Pros | Cons | Best For |
 | :--- | :--- | :--- | :--- |
 | Fixed-size | Simple, predictable | May cut mid-sentence | Technical docs, long text |
-| Overlapping | ==Better boundary recall== | More chunks, higher cost | General documents |
+| Overlapping | `Better boundary recall` | More chunks, higher cost | General documents |
 | Sentence-based | Semantically coherent | Variable chunk size | Articles, reviews, Q&A |
 | Paragraph-based | Natural breaks | Very variable size | Web content, documentation |
 

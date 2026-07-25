@@ -70,7 +70,7 @@ FROM dbo.Documents;
 
 | Metric | Range | Lower = More Similar? | Best For |
 | :--- | :--- | :--- | :--- |
-| ==`cosine`== | 0 to 2 | Yes (0 = identical) | Normalized embeddings (most common) |
+| ``cosine`` | 0 to 2 | Yes (0 = identical) | Normalized embeddings (most common) |
 | `dot` | Varies | No (higher = more similar) | When magnitude matters |
 | `euclidean` | 0 to infinity | Yes (0 = identical) | Spatial / coordinate data |
 
@@ -203,7 +203,7 @@ ORDER BY ft.RANK DESC;
 | :--- | :--- | :--- | :--- |
 | `CONTAINS` | Exact / boolean | No | Precise keyword matching |
 | `FREETEXT` | Semantic | No | Natural language queries |
-| ==`CONTAINSTABLE`== | Exact / boolean | Yes | Ranked keyword results |
+| ``CONTAINSTABLE`` | Exact / boolean | Yes | Ranked keyword results |
 | `FREETEXTTABLE` | Semantic | Yes | Ranked semantic results |
 
 > [!warning] Common Mistake

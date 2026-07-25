@@ -72,7 +72,7 @@ The entity's REST path defaults to the entity name. Override with `path`.
 | GET | Read one or many | `/api/Order` or `/api/Order/42` | None |
 | POST | Create | `/api/Order` | JSON of new row |
 | PUT | Replace (full update) | `/api/Order/42` | Complete JSON |
-| PATCH | ==Partial update== | `/api/Order/42` | Changed fields only |
+| PATCH | `Partial update` | `/api/Order/42` | Changed fields only |
 | DELETE | Delete | `/api/Order/42` | None |
 
 ### GET — Querying Data
@@ -439,7 +439,7 @@ GraphQL pagination response:
 | GraphQL `null` for nested relationship | Relationship not configured | Add `relationships` section to entity config |
 | `403 Forbidden` | Role not granted action | Verify `permissions` in entity config includes the user's role |
 | PUT returns 404 | PK value not in request body | PUT requires PK in URL; body provides the full new state |
-| Stored proc `GET` method not working | SP defaults to `post` | ==Explicitly set `"methods": ["get"]` for read-only SPs== |
+| Stored proc `GET` method not working | SP defaults to `post` | `Explicitly set `"methods": ["get"]` for read-only SPs` |
 
 ---
 

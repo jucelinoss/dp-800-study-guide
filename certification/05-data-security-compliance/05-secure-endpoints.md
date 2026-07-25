@@ -90,7 +90,7 @@ SECRET = '{"api-key":"your-api-key-here"}';
 | Provider | Use Case |
 | :--- | :--- |
 | `StaticWebApps` | Azure Static Web Apps (built-in auth) |
-| `AzureAD` | ==Azure Active Directory / Entra ID== |
+| `AzureAD` | `Azure Active Directory / Entra ID` |
 | `Simulator` | Development and testing only |
 | `Anonymous` | Public data (no auth required) |
 
@@ -181,7 +181,7 @@ Azure SQL → Networking tab:
 | VNet integration | Traffic via backbone | Private IP in VNet |
 | Cross-region | Limited | Yes (via Private Link) |
 | Cost | Free | Requires Private Link pricing |
-| Exam preferred option | Legacy approach | ==Modern/recommended== |
+| Exam preferred option | Legacy approach | `Modern/recommended` |
 
 > [!warning] Common Mistake
 > Private endpoint and service endpoint sound similar but work differently. Service endpoint = your VNet traffic stays on Azure backbone, but the SQL Server endpoint is still a public IP (reachable from the internet if firewall allows). Private endpoint = SQL Server gets a private IP in your VNet — fully private, not publicly routable.
@@ -329,8 +329,11 @@ Microsoft Defender for SQL provides two capabilities under a single plan:
 An organization requires that their Azure SQL Database is accessible only from within their Azure virtual network and NOT reachable from the public internet. Which configuration achieves this?
 
 A. Create a server-level firewall rule allowing only the VNet IP range
+
 B. Enable a service endpoint and block all public access rules
+
 C. Create a private endpoint and disable the public endpoint on the SQL server
+
 D. Enable Managed Identity authentication to replace password-based access
 
 > [!success]- Answer

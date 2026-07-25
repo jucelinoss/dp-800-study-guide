@@ -169,6 +169,13 @@ ON dbo.Events (CAST(JSON_VALUE(Payload, '$.userId') AS int));
 
 **Problem:** Using `JSON_VALUE` in a `WHERE` clause causes a table scan — the optimizer cannot index a JSON path expression directly.
 
+> [!note] Table Scan vs Clustered Index Scan Equivalency
+> Filtering on a `JSON_VALUE(...)` expression without an index forces the engine to inspect every row in the table, executing `JSON_VALUE` for each record in memory.
+> - **Heap table (no PK)**: Produces a **Table Scan** operator.
+> - **Clustered Index table (with PK)**: Produces a **Clustered Index Scan** operator.
+> 
+> Functionally and performance-wise, **Table Scan** and **Clustered Index Scan** are equivalent in this context: both require a 100% full physical scan of every data page in the table. DBA terminology often uses "Table Scan" generically for any expensive 100% full table scan in contrast to a targeted **Index Seek**.
+
 **Solution:** Extract the JSON property into a **PERSISTED computed column**, then create an index on that column.
 
 PERSISTED computed columns are physically stored on disk (unlike virtual computed columns), which is required for indexing.
@@ -299,7 +306,7 @@ WITH (SKU NVARCHAR(20) '$.sku', Qty INT '$.qty') li;
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| `JSON_VALUE` returns NULL | Path does not exist or value is not scalar | ==Use `JSON_QUERY` for objects/arrays; verify path== |
+| `JSON_VALUE` returns NULL | Path does not exist or value is not scalar | `Use `JSON_QUERY` for objects/arrays; verify path` |
 | Slow JSON queries | No index on JSON property | Create PERSISTED computed column + index on the property |
 | `ISJSON` returns 0 | Malformed JSON in the column | Add CHECK constraint on insert; validate at application layer |
 | `OPENJSON` returns no rows | JSON is valid but path is wrong | Test path with `JSON_VALUE` first |
@@ -346,8 +353,11 @@ WITH (SKU NVARCHAR(20) '$.sku', Qty INT '$.qty') li;
 A table has a JSON column `Metadata` and a query filters on `JSON_VALUE(Metadata, '$.region') = 'EU'`. The query is slow with a full table scan. What is the BEST solution?
 
 A. Use FOR JSON PATH to reformat the data
+
 B. Add a PERSISTED computed column on `JSON_VALUE(Metadata, '$.region')` and index it
+
 C. Switch to OPENJSON for better performance
+
 D. Enable JSON path strict mode
 
 > [!success]- Answer

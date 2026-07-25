@@ -406,9 +406,9 @@ BEGIN
     DECLARE @system_message NVARCHAR(MAX) =
         N'You are an expert on Azure SQL Database and Microsoft Fabric SQL. '
         + N'Answer using only the context below.' + CHAR(10)
-        + N'=== CONTEXT ===' + CHAR(10)
+        + N'=` CONTEXT `=' + CHAR(10)
         + @context + CHAR(10)
-        + N'=== END CONTEXT ===';
+        + N'=` END CONTEXT `=';
 
     -- ----------------------------------------------------------------
     -- Step 4: Call the LLM (chat completions)

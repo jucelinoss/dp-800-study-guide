@@ -20,8 +20,11 @@ Domain 3 covers 20–25% of the DP-800 exam.
 A developer wants to call Azure OpenAI's `text-embedding-3-small` model from T-SQL to generate embeddings. Which statement correctly registers this model in Azure SQL Database?
 
 A. `CREATE MODEL EmbeddingModel TYPE = AZURE_OPENAI WITH (MODEL = 'text-embedding-3-small')`
+
 B. `CREATE EXTERNAL MODEL EmbeddingModel WITH (LOCATION = '...', CREDENTIAL = ..., MODEL_TYPE = EMBEDDINGS, MODEL = 'text-embedding-3-small')`
+
 C. `CREATE EXTERNAL MODEL EmbeddingModel WITH (ENDPOINT = '...', KEY = '...', TYPE = 'OpenAI')`
+
 D. `EXEC sp_create_external_model 'EmbeddingModel', 'text-embedding-3-small'`
 
 > [!success]- Answer
@@ -45,8 +48,11 @@ D. `EXEC sp_create_external_model 'EmbeddingModel', 'text-embedding-3-small'`
 A developer registers an external model with `TASK = CHAT_COMPLETION` pointing to a GPT-4o deployment. Which capability does this enable that a text-only model does not support?
 
 A. Generating SQL queries from natural language
+
 B. Accepting image inputs alongside text prompts
+
 C. Producing structured JSON output exclusively
+
 D. Running entirely within the SQL Server process
 
 > [!success]- Answer
@@ -65,8 +71,11 @@ D. Running entirely within the SQL Server process
 A developer creates a column to store embeddings from `text-embedding-ada-002`, which produces 1536-dimensional vectors. Which column definition is correct?
 
 A. `EmbeddingVector varbinary(max)`
+
 B. `EmbeddingVector float NOT NULL`
+
 C. `EmbeddingVector VECTOR(1536)`
+
 D. `EmbeddingVector nvarchar(max)`
 
 > [!success]- Answer
@@ -85,8 +94,11 @@ D. `EmbeddingVector nvarchar(max)`
 A developer runs a similarity search using `VECTOR_DISTANCE('cosine', queryEmbedding, docEmbedding)`. Two documents return distances of 0.12 and 0.87. Which document is more semantically similar to the query?
 
 A. The document with distance 0.87, because higher values mean greater similarity
+
 B. The document with distance 0.12, because lower cosine distance means greater similarity
+
 C. They cannot be compared without normalization
+
 D. The document with distance 0.87, because cosine distance ranges from 0 to 1 and 0.87 is closer to 1
 
 > [!success]- Answer
@@ -105,8 +117,11 @@ D. The document with distance 0.87, because cosine distance ranges from 0 to 1 a
 A developer must choose between `cosine`, `euclidean`, and `dot` distance metrics for a semantic search application. The embedding vectors are already normalized (unit vectors). Which metric is equivalent to cosine similarity for normalized vectors?
 
 A. euclidean
+
 B. cosine
+
 C. dot (dot product)
+
 D. All three are equivalent for normalized vectors
 
 > [!success]- Answer
@@ -125,8 +140,11 @@ D. All three are equivalent for normalized vectors
 What is the primary purpose of `VECTOR_NORMALIZE(vector)` in Azure SQL Database?
 
 A. To compress the vector to reduce storage size
+
 B. To scale the vector to unit length (magnitude = 1) to enable dot-product-based similarity
+
 C. To round float values to 4 decimal places
+
 D. To convert the vector from VECTOR type to varbinary for storage
 
 > [!success]- Answer
@@ -143,8 +161,11 @@ D. To convert the vector from VECTOR type to varbinary for storage
 A production table `dbo.Articles` has an embedding column that must stay synchronized whenever the `BodyText` column is updated. The team wants minimal overhead and does not need before-images of changed rows — only the current content. Which approach is most appropriate?
 
 A. CDC (Change Data Capture) — because it captures all column changes
+
 B. A DML trigger on `dbo.Articles` that calls `sp_invoke_external_rest_endpoint` inline
+
 C. Change Tracking with a background job that queries `CHANGETABLE` and re-generates embeddings for changed PKs
+
 D. An Azure Function with a SQL trigger binding monitoring the change table
 
 > [!success]- Answer
@@ -163,8 +184,11 @@ D. An Azure Function with a SQL trigger binding monitoring the change table
 A developer is preparing legal contract documents for RAG (Retrieval Augmented Generation). The documents have complex sentence structures and paragraph-level semantics. Which chunking strategy best preserves semantic context?
 
 A. Fixed-size chunking with no overlap — simplest and most consistent
+
 B. Fixed-size chunking with 10–20% overlap — prevents context loss at chunk boundaries
+
 C. Sentence-based or paragraph-based chunking — preserves natural semantic units
+
 D. Single-token chunking — maximum granularity
 
 > [!success]- Answer
@@ -183,8 +207,11 @@ D. Single-token chunking — maximum granularity
 A developer needs to determine the number of dimensions in a `VECTOR` column before performing operations. Which function returns this metadata?
 
 A. `DATALENGTH(EmbeddingVector)`
+
 B. `VECTORPROPERTY(EmbeddingVector, 'Dimensions')`
+
 C. `COLUMNPROPERTY(OBJECT_ID('dbo.Articles'), 'EmbeddingVector', 'Dimensions')`
+
 D. `LEN(EmbeddingVector)`
 
 > [!success]- Answer
@@ -203,8 +230,11 @@ D. `LEN(EmbeddingVector)`
 A developer is building a real-time product search for an e-commerce site with 50 million product embeddings. They choose `VECTOR_SEARCH` with `METRIC = 'cosine'` and `WITH (index_type = 'DISKANN')`. What tradeoff does ANN (Approximate Nearest Neighbor) search make compared to ENN (Exact Nearest Neighbor)?
 
 A. ANN is slower but always returns the mathematically closest vectors
+
 B. ANN is faster but may occasionally miss some of the true nearest neighbors
+
 C. ANN requires more memory but uses less CPU
+
 D. ANN and ENN produce identical results; ANN is just the newer algorithm name
 
 > [!success]- Answer
@@ -223,8 +253,11 @@ D. ANN and ENN produce identical results; ANN is just the newer algorithm name
 A developer needs to search a `Description` column for rows where the word "running" appears, including its inflectional forms like "run", "ran", and "runs". Which full-text predicate should they use?
 
 A. `WHERE CONTAINS(Description, '"running"')` — for exact phrase matching
+
 B. `WHERE FREETEXT(Description, 'running')` — for linguistic inflectional matching
+
 C. `WHERE Description LIKE '%running%'` — for pattern matching
+
 D. `WHERE CONTAINS(Description, 'running*')` — for prefix matching
 
 > [!success]- Answer
@@ -243,8 +276,11 @@ D. `WHERE CONTAINS(Description, 'running*')` — for prefix matching
 A developer uses `CONTAINSTABLE(dbo.Articles, BodyText, 'database')` and joins the result to `dbo.Articles`. What does the `RANK` column in the CONTAINSTABLE result represent?
 
 A. The row number in the result set
+
 B. A relevance score (higher = more relevant) used to sort results by match quality
+
 C. The number of times the search term appears in the column
+
 D. The full-text index key value
 
 > [!success]- Answer
@@ -268,8 +304,11 @@ D. The full-text index key value
 A developer implements hybrid search combining full-text search results and vector search results. They use Reciprocal Rank Fusion (RRF) to merge the ranked lists. What is the purpose of RRF?
 
 A. To eliminate duplicate documents from both result sets
+
 B. To combine ranked lists from multiple retrieval methods into a single unified ranking without requiring score normalization
+
 C. To re-rank results using a cross-encoder language model
+
 D. To weight keyword matches higher than semantic matches
 
 > [!success]- Answer
@@ -288,8 +327,11 @@ D. To weight keyword matches higher than semantic matches
 A developer uses `sp_invoke_external_rest_endpoint` to call Azure OpenAI's chat completion API from T-SQL. The payload must be valid JSON. Which T-SQL clause correctly builds the messages array in the request body?
 
 A. `'{"messages": [{"role": "user", "content": "' + @question + '"}]}'`
+
 B. `JSON_OBJECT('messages': JSON_ARRAY(JSON_OBJECT('role': 'user', 'content': @question)))`
+
 C. `(SELECT 'user' AS role, @question AS content FOR JSON PATH)`
+
 D. `CONCAT('{"messages":[{"role":"user","content":', @question, '}]}')`
 
 > [!success]- Answer
@@ -308,8 +350,11 @@ D. `CONCAT('{"messages":[{"role":"user","content":', @question, '}]}')`
 A developer needs `sp_invoke_external_rest_endpoint` to authenticate to Azure OpenAI using an API key. The key must not appear in the T-SQL code. What is the correct approach?
 
 A. Pass the API key in the `@headers` parameter as a plain text string
+
 B. Store the key in a SQL Server Agent job step and retrieve it at runtime
+
 C. Create a DATABASE SCOPED CREDENTIAL with the API key and reference it in the `@credential` parameter
+
 D. Encrypt the key using `ENCRYPTBYPASSPHRASE` and store it in a table
 
 > [!success]- Answer
@@ -334,8 +379,11 @@ D. Encrypt the key using `ENCRYPTBYPASSPHRASE` and store it in a table
 A developer creates a DiskANN vector index `WITH (METRIC = 'cosine')` on the `EmbeddingVector` column. They then call `VECTOR_SEARCH(... METRIC = 'euclidean' ...)` against the same column. What is the expected result?
 
 A. The query runs but a warning is raised and the engine falls back to exact kNN (no index used)
+
 B. The query runs and uses the cosine index, ignoring the `METRIC` parameter
+
 C. An error is raised — the index metric and the query metric must match
+
 D. The query runs and rebuilds the index automatically with the new metric
 
 > [!success]- Answer
@@ -352,8 +400,11 @@ D. The query runs and rebuilds the index automatically with the new metric
 A team wants to reduce vector storage cost in SQL Server 2025 by half while keeping use of vector operators (`VECTOR_DISTANCE`, `VECTOR_SEARCH`). Which feature should they evaluate?
 
 A. Switch to `VECTOR(n)` with bit-packed storage
+
 B. Compress the table with `DATA_COMPRESSION = PAGE`
+
 C. Use the preview half-precision (`float16`, 16-bit) `VECTOR` storage option
+
 D. Store vectors as `varbinary(max)` and compress at the application layer
 
 > [!success]- Answer
@@ -370,8 +421,11 @@ D. Store vectors as `varbinary(max)` and compress at the application layer
 A team wants the simplest, lowest-code option for keeping embeddings synchronized with a source SQL column in Microsoft Fabric — no SQL Agent jobs, no Azure Functions to operate. Which option from the DP-800 blueprint best fits?
 
 A. CDC with a custom .NET reader
+
 B. A DML trigger that calls `sp_invoke_external_rest_endpoint`
+
 C. Microsoft Foundry data pipeline
+
 D. Azure Logic Apps polling on a 1-minute recurrence
 
 > [!success]- Answer
@@ -388,8 +442,11 @@ D. Azure Logic Apps polling on a 1-minute recurrence
 A SQL Database in Microsoft Fabric must publish row changes for near-real-time consumption by a downstream Lakehouse pipeline. The team prefers zero infrastructure to operate. Which is the most appropriate choice?
 
 A. CDC with a custom pipeline reading from `cdc.fn_cdc_get_all_changes_*`
+
 B. Change Event Streaming (CES) publishing to Fabric Eventstream / Azure Event Hubs, with the Lakehouse hop handled downstream
+
 C. Azure Functions with `SqlTrigger` binding
+
 D. Azure Logic Apps SQL connector on a 1-minute recurrence
 
 > [!success]- Answer
@@ -406,8 +463,11 @@ D. Azure Logic Apps SQL connector on a 1-minute recurrence
 A developer notices that `VECTOR_SEARCH` against a latest-version DiskANN index is occasionally missing relevant items that an exact `VECTOR_DISTANCE` query would surface. They cannot afford to give up the ANN performance gain. Which is the recommended way to raise recall?
 
 A. Drop the DiskANN index and re-create it with `METRIC = 'dot'`
+
 B. Increase the candidate count via `SELECT TOP (N) WITH APPROXIMATE …` (the current syntax)
+
 C. Normalize the stored vectors with `VECTOR_NORMALIZE`
+
 D. Switch from `VECTOR(1536)` to `VECTOR(3072)`
 
 > [!success]- Answer

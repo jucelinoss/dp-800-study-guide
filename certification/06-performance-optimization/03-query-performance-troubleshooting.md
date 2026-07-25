@@ -54,7 +54,7 @@ SET STATISTICS XML OFF;
 | **Index Seek** | Uses index to find specific rows | Good — efficient |
 | **Index Scan** | Reads entire index | Review if large table |
 | **Table Scan** (Heap) | Reads entire table | Add a clustered index |
-| **Key Lookup** | Fetches extra columns from clustered index | ==Add INCLUDE columns to covering index== |
+| **Key Lookup** | Fetches extra columns from clustered index | `Add INCLUDE columns to covering index` |
 | **Hash Match** | Join/aggregation using hash table | OK for large datasets; bad with low memory |
 | **Nested Loops** | Iterative join | Efficient for small outer input |
 | **Merge Join** | Sorted inputs joined | Efficient for large, sorted datasets |
@@ -253,7 +253,7 @@ EXEC sp_control_plan_guide N'DROP', N'PG_GetOrders';
 | :--- | :--- |
 | `SQL` | Ad-hoc or parameterized SQL statements |
 | `OBJECT` | Stored procedures or functions |
-| `TEMPLATE` | ==Auto-parameterized queries (server-wide template)== |
+| `TEMPLATE` | `Auto-parameterized queries (server-wide template)` |
 
 ---
 
@@ -366,7 +366,7 @@ EXEC sp_updatestats;
 | :--- | :--- | :--- |
 | Query fast first run, slow after | Parameter sniffing | OPTION(RECOMPILE) or OPTIMIZE FOR UNKNOWN |
 | Plan changed after index rebuild | Statistics updated with new distribution | Verify plan; force if needed |
-| Plan guide not applied | Query text mismatch (whitespace, case) | ==Use `sys.fn_validate_plan_guide` to diagnose== |
+| Plan guide not applied | Query text mismatch (whitespace, case) | `Use `sys.fn_validate_plan_guide` to diagnose` |
 | Query Store full | Max storage size reached | Increase `MAX_STORAGE_SIZE_MB` or change cleanup mode |
 | Stale stats on large table | 20% threshold not reached | Manual `UPDATE STATISTICS WITH FULLSCAN` |
 
@@ -412,8 +412,11 @@ EXEC sp_updatestats;
 A third-party application sends parameterized queries that consistently get poor execution plans due to parameter sniffing. You cannot modify the application code. What is the BEST solution?
 
 A. Use OPTION(RECOMPILE) added directly to the query
+
 B. Create a plan guide using sp_create_plan_guide to add the OPTIMIZE FOR hint
+
 C. Disable auto-update statistics for the affected tables
+
 D. Force a specific plan using sp_query_store_force_plan
 
 > [!success]- Answer

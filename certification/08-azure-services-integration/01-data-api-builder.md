@@ -17,6 +17,39 @@ tags:
 
 DAB supports Azure SQL, SQL Server, Azure Cosmos DB, and MySQL/PostgreSQL, and can be deployed as a container or hosted in Azure Static Web Apps or Azure App Service.
 
+```mermaid
+flowchart LR
+    subgraph CLIENTS ["1. CLIENT APPLICATIONS"]
+        direction TB
+        WEB["Web Apps / Single Page Apps"]
+        MOBILE["Mobile Apps"]
+        CLI["REST Clients / Postman"]
+    end
+
+    subgraph DAB ["2. DATA API BUILDER ENGINE (Declarative Runtime)"]
+        direction TB
+        CONF[("dab-config.json<br/>(Sources, Entities, Permissions)")]
+        AUTH["JWT Validation / Identity Provider"]
+        REST_EP["REST Endpoints (/api/Entity/id)"]
+        GQL_EP["GraphQL Endpoint (/graphql)"]
+        
+        CONF --> REST_EP & GQL_EP
+        AUTH --> REST_EP & GQL_EP
+    end
+
+    subgraph DB ["3. SQL DATABASE LAYER"]
+        direction TB
+        TABLES["Tables / Views"]
+        PROCS["Stored Procedures"]
+        RLS["Session Context & RLS Predicates"]
+    end
+
+    CLIENTS -->|REST / GraphQL Requests + JWT| DAB
+    DAB -->|Parameterized T-SQL| DB
+```
+
+![Data API Builder Architecture](../../../dist/images/data_api_builder_architecture.png)
+
 > [!abstract]
 >
 > - Covers Data API Builder (DAB): what it is, config file structure, entity mapping, and permissions
@@ -401,7 +434,7 @@ az containerapp create \
 | `Anonymous access denied` | Permission not set for anonymous role | Add `"role": "anonymous", "actions": ["read"]` to entity permissions |
 | `Key field not found` | `key-fields` doesn't match column name | Verify column name matches exactly; check `mappings` if renamed |
 | `Stored procedure parameter type mismatch` | Wrong type in `parameters` config | Use `"number"` for INT, `"string"` for VARCHAR |
-| Connection string in config file | Security risk | ==Use `@env('VAR_NAME')` to reference environment variables== |
+| Connection string in config file | Security risk | `Use `@env('VAR_NAME')` to reference environment variables` |
 | GraphQL introspection disabled in prod | `allow-introspection: false` | Set to `true` only in dev; keep `false` in production for security |
 
 ---

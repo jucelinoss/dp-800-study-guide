@@ -302,7 +302,7 @@ PRINT 'Reference data load complete.';
 
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
-| `CLR not enabled` | tSQLt requires CLR | ==`EXEC sp_configure 'clr enabled', 1; RECONFIGURE;`== |
+| `CLR not enabled` | tSQLt requires CLR | ``EXEC sp_configure 'clr enabled', 1; RECONFIGURE;`` |
 | `TRUSTWORTHY must be ON` | tSQLt assembly requirement | `ALTER DATABASE db SET TRUSTWORTHY ON` |
 | Test fails with FK violation | FakeTable not used | Add `EXEC tSQLt.FakeTable` for dependency tables |
 | MERGE deletes unexpected rows | `WHEN NOT MATCHED BY SOURCE THEN DELETE` | Remove the DELETE clause if partial updates are intended |

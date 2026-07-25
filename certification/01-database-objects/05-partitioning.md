@@ -36,6 +36,34 @@ Partitioning requires three objects:
 2. **Partition Scheme** — maps partitions to filegroups
 3. **Partitioned Table/Index** — table or index created `ON` the partition scheme
 
+```mermaid
+flowchart TD
+    subgraph PF ["1. PARTITION FUNCTION (Logical Value Boundaries)"]
+        direction TB
+        PF_P1["Partition 1: < 2025-01-01"]
+        PF_P2["Partition 2: >= 2025-01-01 AND < 2025-02-01"]
+        PF_P3["Partition 3: >= 2025-02-01"]
+    end
+
+    subgraph PS ["2. PARTITION SCHEME (Logical to Physical Mapping)"]
+        direction TB
+        PS_DEF["CREATE PARTITION SCHEME PS_SalesByMonth<br/>AS PARTITION PF_SalesByMonth<br/>TO (FG_Historical, FG_2025_01, FG_2025_02)"]
+    end
+
+    subgraph FG ["3. FILEGROUPS & DISK STORAGE (Physical)"]
+        direction LR
+        FG1[("FG_Historical<br/>(Slow HDD Storage)")]
+        FG2[("FG_2025_01<br/>(Fast NVMe Storage)")]
+        FG3[("FG_2025_02<br/>(Fast NVMe Storage)")]
+    end
+
+    PF_P1 -->|Maps via PS| FG1
+    PF_P2 -->|Maps via PS| FG2
+    PF_P3 -->|Maps via PS| FG3
+```
+
+![Partition Function vs Scheme vs Filegroups Architecture](../../../dist/images/partition_function_scheme_filegroups.png)
+
 ### Partition Function
 
 A **partition function** defines the boundary values and direction (RANGE LEFT or RANGE RIGHT) that determine which rows go into each partition.
@@ -65,7 +93,7 @@ AS RANGE RIGHT FOR VALUES (
 | Direction | Boundary value belongs to | Typical use |
 | :--- | :--- | :--- |
 | `RANGE LEFT` | Left (lower) partition (≤ boundary) | Numeric ranges |
-| `RANGE RIGHT` | ==Right (upper) partition (≥ boundary)== | Date ranges — boundary starts the new period |
+| `RANGE RIGHT` | `Right (upper) partition (≥ boundary)` | Date ranges — boundary starts the new period |
 
 ### Partition Scheme
 
@@ -131,6 +159,36 @@ WHERE object_id = OBJECT_ID('Orders') AND index_id <= 1;
 
 The sliding window pattern continuously adds new partitions for incoming data and removes old ones, keeping a rolling window (e.g., last 12 months) without unbounded table growth.
 
+```mermaid
+flowchart LR
+    subgraph IN ["1. INCOMING (New Data)"]
+        direction TB
+        INS["New Sales (Inserts)"]
+        SPLIT["SPLIT RANGE (Prepares future boundary)"]
+        P_NEW["Partition 14 (Feb/2025 - Future)"]
+        INS --> P_NEW
+        SPLIT --> P_NEW
+    end
+
+    subgraph ACTIVE ["2. ACTIVE TABLE (Orders)"]
+        direction TB
+        P_MID["Partitions 2 to 13 (Feb/2024 to Jan/2025)<br/>(Maintained 12-Month Window)"]
+    end
+
+    subgraph OUT ["3. OUTGOING (Archival)"]
+        direction TB
+        P_OLD["Partition 1 (Jan/2024 - Expired)"]
+        SWITCH["SWITCH PARTITION (Instant Metadata Switch)"]
+        ARCH[("OrdersArchive (Archive Table)")]
+        P_OLD --> SWITCH --> ARCH
+    end
+
+    IN --> ACTIVE
+    ACTIVE --> OUT
+```
+
+![Sliding Window Visual Dynamics](../../../dist/images/sliding_window_partitioning.png)
+
 **Steps for each cycle:**
 
 1. Add a new boundary value with `SPLIT RANGE` (creates a new empty partition for the next period)
@@ -150,7 +208,22 @@ ALTER PARTITION FUNCTION pf_OrdersByMonth()
 MERGE RANGE ('2024-01-01');
 ```
 
-**Key tip:** Always SPLIT before loading new data, and always switch out the old partition before merging its boundary. SPLIT on an empty partition is instantaneous; SPLIT on a populated partition causes data movement.
+> [!warning] DP-800 Exam Trap: Why SPLIT / MERGE on Populated Partitions Causes Data Movement
+>
+> Executing `SPLIT RANGE` or `MERGE RANGE` on partitions that **already contain data** forces SQL Server to perform physical row movement (*Data Movement*), defeating the performance benefits of partitioning.
+>
+> 1. **Why `SPLIT` on a populated partition is slow:**
+>    - When inserting a boundary into a populated partition, SQL Server must scan every row in that partition to evaluate whether it belongs to the left or right of the new boundary value.
+>    - Rows falling into the new range must be **physically copied and written** from old filegroup pages to new filegroup pages.
+>    - This causes schema modification locks (`Sch-M`), blocks reads and writes on the entire table, bloats the transaction log (`.ldf`), and fragments indexes.
+>
+> 2. **Why `MERGE` on a populated partition is slow:**
+>    - Merging two adjacent populated partitions requires consolidating data from two filegroups into a single physical location.
+>    - All rows from the eliminated partition must be **physically transferred** into the remaining partition.
+>
+> 3. **The Golden Rule of Sliding Window (Instant Metadata Operations):**
+>    - **`SPLIT` on Empty Partition**: Running `SPLIT RANGE` **before** data for that period arrives ensures the split partition is empty. SQL Server updates only catalog metadata pointers (`sys.partition_functions`) in **< 1 millisecond**.
+>    - **`SWITCH` before `MERGE`**: Evicting old data via `SWITCH PARTITION` to an archive table first leaves the partition to be merged at **0 rows**. The resulting `MERGE RANGE` is an instant 0-second metadata update with zero disk row movement.
 
 ---
 
@@ -243,7 +316,7 @@ A **non-aligned index** has a different partitioning scheme (or is not partition
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
 | Switch fails: not on same filegroup | Partition scheme maps to different FG | Use `ALL TO [PRIMARY]` for simplicity |
-| Switch fails: target not empty | Staging/archive partition has rows | ==Truncate or move target partition first== |
+| Switch fails: target not empty | Staging/archive partition has rows | `Truncate or move target partition first` |
 | No partition elimination | WHERE clause doesn't use partition key | Ensure filter is on the partition column directly |
 | SPLIT/MERGE slow | Large data movement between partitions | Keep the new/merged partition empty before SPLIT |
 | Switch fails: non-aligned index | Table has an index on a different scheme | Rebuild the index ON the same partition scheme |
@@ -288,8 +361,11 @@ A **non-aligned index** has a different partitioning scheme (or is not partition
 You need to archive last month's orders from a partitioned Orders table to an archive table with zero downtime. Which operation achieves this?
 
 A. INSERT INTO OrdersArchive SELECT ... followed by DELETE FROM Orders
+
 B. ALTER TABLE Orders SWITCH PARTITION n TO OrdersArchive
+
 C. CREATE TABLE OrdersArchive AS SELECT * FROM Orders WHERE OrderDate < ...
+
 D. ALTER PARTITION FUNCTION MERGE RANGE on the oldest boundary
 
 > [!success]- Answer

@@ -26,7 +26,7 @@ needs, and what an MCP `call_tool` round-trip looks like.
 >
 > - Configure an MCP server pointing at SQL Server 2025 / Azure SQL via `.vscode/mcp.json`
 > - Wire the same endpoint to **Microsoft Foundry** Copilot in Fabric using the hosted Fabric lakehouse MCP URL
-> - Authenticate with ==Managed Identity== (preferred) or a least-privilege SQL user
+> - Authenticate with `Managed Identity` (preferred) or a least-privilege SQL user
 > - Run a chat session that uses MCP to discover schema and write a query against the lab `dbo.Products` catalogue
 
 > [!warning] Preview status

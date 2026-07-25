@@ -19,8 +19,11 @@ Complete all 50 questions (45 standalone + 5-question case study) before checkin
 A data engineering team is building a reporting table that will receive nightly bulk loads and support exclusively analytical queries. Which index type maximizes compression and analytical query performance?
 
 A. Clustered B-tree index on the load date column
+
 B. Non-clustered columnstore index added alongside the heap
+
 C. Clustered columnstore index
+
 D. Multiple non-clustered B-tree indexes on each report dimension
 
 > [!success]- Answer
@@ -35,8 +38,11 @@ D. Multiple non-clustered B-tree indexes on each report dimension
 A developer needs to see the state of the `dbo.Contracts` temporal table as it appeared on March 1, 2025 at noon UTC. Which syntax is correct?
 
 A. `SELECT * FROM dbo.Contracts WHERE SysStartTime <= '2025-03-01 12:00:00'`
+
 B. `SELECT * FROM dbo.Contracts FOR SYSTEM_TIME AS OF '2025-03-01T12:00:00'`
+
 C. `SELECT * FROM dbo.Contracts FOR SYSTEM_TIME ALL WHERE SysStartTime = '2025-03-01 12:00:00'`
+
 D. `SELECT * FROM dbo.ContractsHistory WHERE SysEndTime > '2025-03-01 12:00:00'`
 
 > [!success]- Answer
@@ -51,8 +57,11 @@ D. `SELECT * FROM dbo.ContractsHistory WHERE SysEndTime > '2025-03-01 12:00:00'`
 A column stores `{"product":{"name":"Laptop","specs":{"ram":16}}}`. A developer wants to return the `specs` object as a JSON fragment. Which function is correct?
 
 A. `JSON_VALUE(col, '$.product.specs')`
+
 B. `JSON_QUERY(col, '$.product.specs')`
+
 C. `JSON_MODIFY(col, '$.product.specs', NULL)`
+
 D. `OPENJSON(col, '$.product.specs')`
 
 > [!success]- Answer
@@ -67,8 +76,11 @@ D. `OPENJSON(col, '$.product.specs')`
 A developer wants a 3-row moving average of `DailySales` ordered by `SaleDate`. Which OVER clause is correct?
 
 A. `AVG(DailySales) OVER (ORDER BY SaleDate ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)`
+
 B. `AVG(DailySales) OVER (ORDER BY SaleDate RANGE BETWEEN 2 PRECEDING AND CURRENT ROW)`
+
 C. `AVG(DailySales) OVER (ORDER BY SaleDate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`
+
 D. `AVG(DailySales) OVER (PARTITION BY SaleDate)`
 
 > [!success]- Answer
@@ -83,8 +95,11 @@ D. `AVG(DailySales) OVER (PARTITION BY SaleDate)`
 A partition function is defined as `CREATE PARTITION FUNCTION PF (date) AS RANGE LEFT FOR VALUES ('2025-01-01', '2025-02-01')`. Which partition contains a row with value `'2025-01-01'`?
 
 A. Partition 1 (values before 2025-01-01)
+
 B. Partition 2 (January 2025)
+
 C. Partition 3 (values on/after 2025-02-01)
+
 D. Partition 1 (because RANGE LEFT places the boundary in the left partition)
 
 > [!success]- Answer
@@ -99,8 +114,11 @@ D. Partition 1 (because RANGE LEFT places the boundary in the left partition)
 A recursive CTE traversing an employee hierarchy is returning error "Maximum recursion 100 has been exhausted." The data has no circular references. What is the most appropriate fix?
 
 A. Change `UNION ALL` to `UNION` to prevent duplicates
+
 B. Add `OPTION (MAXRECURSION 0)` if the hierarchy legitimately exceeds 100 levels, after verifying no circular references exist
+
 C. Remove the WHERE clause from the anchor member
+
 D. Replace the recursive CTE with a WHILE loop
 
 > [!success]- Answer
@@ -115,8 +133,11 @@ D. Replace the recursive CTE with a WHILE loop
 A developer attempts to create an indexed view with `GROUP BY` but gets an error. Which two conditions are required for the view to be indexable?
 
 A. The view must use `WITH SCHEMABINDING` and the first index must be a unique clustered index
+
 B. The view must use `WITH ENCRYPTION` and include a primary key
+
 C. The view must include `COUNT_BIG(*)` and use `WITH SCHEMABINDING`
+
 D. The first index must be non-clustered unique and the view must reference only one table
 
 > [!success]- Answer
@@ -131,8 +152,11 @@ D. The first index must be non-clustered unique and the view must reference only
 Node tables `User` and `Product` exist along with an edge table `Purchased`. Which query finds all products purchased by users who follow Alice?
 
 A. `MATCH(alice-(Purchased)->user-(follows)->product)`
+
 B. `MATCH(alice-(follows)->user-(Purchased)->product)`
+
 C. `MATCH(alice<-(follows)-user AND user-(Purchased)->product)`
+
 D. `MATCH(alice, follows, user, Purchased, product)`
 
 > [!success]- Answer
@@ -147,8 +171,11 @@ D. `MATCH(alice, follows, user, Purchased, product)`
 A developer writes `WHERE ProductId NOT IN (SELECT ProductId FROM dbo.Discontinued)` and gets zero rows despite expecting results. The most likely cause is:
 
 A. The subquery returns more than 1000 rows
+
 B. A NULL exists in the `ProductId` column of `dbo.Discontinued`
+
 C. `NOT IN` requires an index on `ProductId`
+
 D. The data types of `ProductId` in both tables differ
 
 > [!success]- Answer
@@ -163,8 +190,11 @@ D. The data types of `ProductId` in both tables differ
 A scalar UDF is called in a SELECT list against a 100-million-row table. Performance is unacceptably slow. What is the primary reason?
 
 A. Scalar UDFs do not support indexes
+
 B. Scalar UDFs execute once per row and prevent parallelism in the query plan
+
 C. Scalar UDFs require explicit transactions
+
 D. The function is not compiled to native code
 
 > [!success]- Answer
@@ -179,8 +209,11 @@ D. The function is not compiled to native code
 A financial auditing system requires a table where records can never be deleted or modified after insertion, enforced at the engine level. Which CREATE TABLE option achieves this?
 
 A. `WITH (SYSTEM_VERSIONING = ON)`
+
 B. `WITH (LEDGER = ON, APPEND_ONLY = ON)`
+
 C. `WITH (LEDGER = ON)` (updatable ledger)
+
 D. Adding a trigger that raises an error on DELETE
 
 > [!success]- Answer
@@ -195,8 +228,11 @@ D. Adding a trigger that raises an error on DELETE
 A developer needs to aggregate product names into a JSON array per category using `JSON_ARRAYAGG`. On which minimum version is this available?
 
 A. SQL Server 2016
+
 B. SQL Server 2019
+
 C. SQL Server 2022 / Azure SQL Database
+
 D. SQL Server 2017
 
 > [!success]- Answer
@@ -211,8 +247,11 @@ D. SQL Server 2017
 A developer configures an MCP server for Azure SQL to be used with GitHub Copilot in VS Code. Which authentication method is recommended to avoid credentials in configuration files?
 
 A. SQL Server authentication with an encrypted password
+
 B. Windows authentication with domain credentials
+
 C. Active Directory Managed Identity
+
 D. Basic authentication with Base64-encoded credentials
 
 > [!success]- Answer
@@ -227,8 +266,11 @@ D. Basic authentication with Base64-encoded credentials
 After bulk-loading 500,000 rows into a CCI table, a developer notices that some rows appear in the delta store rather than compressed column segments. What triggers compression of delta rowstore rows into column segments?
 
 A. Running `UPDATE STATISTICS` on the table
+
 B. The delta store reaching approximately 1,048,576 rows, triggering the tuple mover
+
 C. Executing `DBCC CHECKDB`
+
 D. Reaching 50% fill factor on the delta rowstore
 
 > [!success]- Answer
@@ -243,8 +285,11 @@ D. Reaching 50% fill factor on the delta rowstore
 A team wants GitHub Copilot to always follow their project's T-SQL coding standards in chat sessions. Where should these standards be defined?
 
 A. A `copilot.config.json` file in the project root
+
 B. `.github/copilot-instructions.md` in the repository root
+
 C. A comment at the top of each SQL file
+
 D. The VS Code settings.json file
 
 > [!success]- Answer
@@ -259,8 +304,11 @@ D. The VS Code settings.json file
 A developer wants full control over the JSON key names and nesting structure in the output. Which FOR JSON option should they use?
 
 A. `FOR JSON AUTO` — automatically infers structure from the SELECT
+
 B. `FOR JSON PATH` — uses dot-notation aliases to control nesting
+
 C. `FOR JSON ROOT` — wraps the output in a root object
+
 D. `FOR JSON INCLUDE_NULL_VALUES` — preserves null fields
 
 > [!success]- Answer
@@ -275,8 +323,11 @@ D. `FOR JSON INCLUDE_NULL_VALUES` — preserves null fields
 A DBA uses a sliding window partition scheme to archive data. Each month, the oldest partition is switched to an archive table and a new empty partition is added for the next month. Which operation switches a partition to an archive table?
 
 A. `ALTER TABLE dbo.Sales MERGE RANGE ('2024-01-01')`
+
 B. `ALTER TABLE dbo.Sales SWITCH PARTITION 1 TO dbo.SalesArchive PARTITION 1`
+
 C. `ALTER TABLE dbo.Sales SPLIT RANGE ('2025-01-01')`
+
 D. `ALTER INDEX CCI_Sales REORGANIZE PARTITION = 1`
 
 > [!success]- Answer
@@ -293,8 +344,11 @@ D. `ALTER INDEX CCI_Sales REORGANIZE PARTITION = 1`
 A developer applies Always Encrypted to a `NationalId` column. The application needs to query `WHERE NationalId = @value`. Which encryption type is required?
 
 A. RANDOMIZED — for maximum security
+
 B. DETERMINISTIC — to support equality comparisons
+
 C. Either type works for equality comparisons
+
 D. SYMMETRIC — the default Always Encrypted type
 
 > [!success]- Answer
@@ -309,8 +363,11 @@ D. SYMMETRIC — the default Always Encrypted type
 A column `EmailAddress` has `MASKED WITH (FUNCTION = 'email()')` applied. What does a user without UNMASK permission see for the value `john.doe@example.com`?
 
 A. `XXXX`
+
 B. `jXXX@XXXX.com`
+
 C. `****@****`
+
 D. `null`
 
 > [!success]- Answer
@@ -325,8 +382,11 @@ D. `null`
 An RLS security policy uses an inline table-valued function as the predicate. The function is `CREATE FUNCTION dbo.fn_rls(@RegionId int) RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT 1 AS result WHERE @RegionId IN (SELECT RegionId FROM dbo.UserRegions WHERE UserId = USER_ID())`. What does `WITH SCHEMABINDING` on the function ensure?
 
 A. The function cannot be modified after the policy is created
+
 B. The referenced table `dbo.UserRegions` cannot be dropped or altered without first removing the function
+
 C. The function executes with elevated permissions
+
 D. The function is compiled to native code for performance
 
 > [!success]- Answer
@@ -341,8 +401,11 @@ D. The function is compiled to native code for performance
 A user `AnalystA` is a member of role `Readers` which has `SELECT GRANTED` on `dbo.FinancialData`. The DBA then runs `DENY SELECT ON dbo.FinancialData TO AnalystA`. What is the outcome?
 
 A. The role grant takes precedence; AnalystA can SELECT
+
 B. DENY overrides the role grant; AnalystA cannot SELECT
+
 C. The permissions cancel out; AnalystA gets no access
+
 D. The most recently applied permission wins; AnalystA cannot SELECT
 
 > [!success]- Answer
@@ -357,8 +420,11 @@ D. The most recently applied permission wins; AnalystA cannot SELECT
 An Azure Function with a system-assigned managed identity named `MyFunction` needs read access to Azure SQL Database. What T-SQL creates the appropriate user?
 
 A. `CREATE LOGIN [MyFunction] FROM EXTERNAL PROVIDER`
+
 B. `CREATE USER [MyFunction] WITH PASSWORD = 'none'`
+
 C. `CREATE USER [MyFunction] FROM EXTERNAL PROVIDER`
+
 D. `CREATE USER [MyFunction] FOR LOGIN [MyFunction]`
 
 > [!success]- Answer
@@ -373,8 +439,11 @@ D. `CREATE USER [MyFunction] FOR LOGIN [MyFunction]`
 A security team requires SQL audit logs to be retained for 90 days in a queryable format for ad-hoc investigations. Which audit destination is most appropriate?
 
 A. Azure Blob Storage
+
 B. Azure Log Analytics workspace
+
 C. Azure Event Hub
+
 D. SQL Server Audit File on the local disk
 
 > [!success]- Answer
@@ -389,8 +458,11 @@ D. SQL Server Audit File on the local disk
 A DBA wants to enable Read Committed Snapshot Isolation for a database without requiring application code changes. Which command is correct?
 
 A. `SET TRANSACTION ISOLATION LEVEL SNAPSHOT`
+
 B. `ALTER DATABASE MyDB SET READ_COMMITTED_SNAPSHOT ON`
+
 C. `ALTER DATABASE MyDB SET ALLOW_SNAPSHOT_ISOLATION ON`
+
 D. `SET TRANSACTION ISOLATION LEVEL READ COMMITTED WITH SNAPSHOT`
 
 > [!success]- Answer
@@ -405,8 +477,11 @@ D. `SET TRANSACTION ISOLATION LEVEL READ COMMITTED WITH SNAPSHOT`
 An application catches SQL error 1205. What is the recommended response?
 
 A. Log the error and terminate the connection
+
 B. Immediately retry the same transaction without delay
+
 C. Wait for a random backoff period and retry the transaction
+
 D. Increase the lock timeout and retry once
 
 > [!success]- Answer
@@ -421,8 +496,11 @@ D. Increase the lock timeout and retry once
 A query `SELECT * FROM dbo.Orders WHERE CustomerId = 42` uses an Index Scan on a non-clustered index on `CustomerId`. A developer suggests this should be an Index Seek. Under what condition would the optimizer prefer a Scan over a Seek?
 
 A. When the index is fragmented above 30%
+
 B. When statistics show that 42% of rows have `CustomerId = 42` (low selectivity), making a full scan cheaper
+
 C. When the table has fewer than 1000 rows
+
 D. When the query includes `ORDER BY`
 
 > [!success]- Answer
@@ -437,8 +515,11 @@ D. When the query includes `ORDER BY`
 A DBA wants to find the top missing indexes that could most improve query performance. Which DMV provides this information?
 
 A. `sys.dm_exec_query_stats`
+
 B. `sys.dm_db_missing_index_details` joined with `sys.dm_db_missing_index_group_stats`
+
 C. `sys.dm_os_wait_stats`
+
 D. `sys.dm_exec_cached_plans`
 
 > [!success]- Answer
@@ -453,8 +534,11 @@ D. `sys.dm_exec_cached_plans`
 After a SQL Server upgrade, a business-critical query regressed from 200ms to 8 seconds. The query has not changed. What is the most likely cause and the recommended Query Store action?
 
 A. The query text changed; rewrite the query
+
 B. A plan regression occurred due to updated statistics or cardinality estimator changes; use Query Store to force the pre-upgrade plan
+
 C. The table's indexes need rebuilding; run index maintenance
+
 D. The server needs more memory; increase the buffer pool
 
 > [!success]- Answer
@@ -469,8 +553,11 @@ D. The server needs more memory; increase the buffer pool
 A team uses sqlpackage to deploy a dacpac to Azure SQL Database. Which sqlpackage action publishes the dacpac to an existing database, applying only the changes needed to bring it in sync with the model?
 
 A. `sqlpackage /Action:Extract`
+
 B. `sqlpackage /Action:Export`
+
 C. `sqlpackage /Action:Publish`
+
 D. `sqlpackage /Action:DeployReport`
 
 > [!success]- Answer
@@ -485,8 +572,11 @@ D. `sqlpackage /Action:DeployReport`
 A CI/CD pipeline deploys a dacpac to a staging database each sprint. A developer wants to detect if anyone made unauthorized schema changes directly to production (schema drift) before deploying. Which sqlpackage action should be run before deployment?
 
 A. `sqlpackage /Action:Publish` with `/p:BlockOnPossibleDataLoss=true`
+
 B. `sqlpackage /Action:DriftReport` against the production database
+
 C. `sqlpackage /Action:DeployReport` comparing the dacpac to production
+
 D. `sqlpackage /Action:Extract` to capture the current schema
 
 > [!success]- Answer
@@ -501,8 +591,11 @@ D. `sqlpackage /Action:Extract` to capture the current schema
 A data warehouse ETL process needs to capture all changes to `dbo.Transactions` including the **before and after values** of every UPDATE to support slowly changing dimensions. Which technology provides this?
 
 A. Change Tracking — it captures before and after images
+
 B. CDC (Change Data Capture) — it captures full row images in change tables
+
 C. Temporal tables — they store current and historical rows
+
 D. DML triggers — they can access INSERTED and DELETED pseudo-tables
 
 > [!success]- Answer
@@ -517,8 +610,11 @@ D. DML triggers — they can access INSERTED and DELETED pseudo-tables
 An analyst queries the Log Analytics workspace for SQL audit events. The workspace uses the `AzureDiagnostics` table. Which KQL clause filters to only SELECT statements executed in the last 24 hours?
 
 A. `| where EventType == 'SELECT' and TimeGenerated > now() - 24h`
+
 B. `| where Category == 'SQLSecurityAuditEvents' and statement_s startswith 'SELECT' and TimeGenerated > ago(24h)`
+
 C. `| where OperationName == 'SELECT' and timestamp > ago(24h)`
+
 D. `| where action_name_s == 'SELECT' and TimeGenerated > ago(24h)`
 
 > [!success]- Answer
@@ -533,8 +629,11 @@ D. `| where action_name_s == 'SELECT' and TimeGenerated > ago(24h)`
 A developer configures Data API Builder with a `books` entity pointing to `dbo.Books`. By default, which endpoints does DAB expose?
 
 A. Only a REST endpoint at `/api/books`
+
 B. Only a GraphQL endpoint at `/graphql`
+
 C. Both a REST endpoint at `/api/books` and a GraphQL endpoint at `/graphql`
+
 D. A WebSocket endpoint for real-time updates
 
 > [!success]- Answer
@@ -549,8 +648,11 @@ D. A WebSocket endpoint for real-time updates
 A pipeline needs to retrieve a secret from Azure Key Vault at deploy time. The pipeline's service principal has `Key Vault Secrets User` role. Which approach follows the principle of least privilege?
 
 A. Grant the service principal Owner role on the Key Vault
+
 B. Store the secret in the pipeline as a plain text variable
+
 C. Use the `Key Vault Secrets User` role to read only the specific secrets needed
+
 D. Grant the service principal `Key Vault Administrator` role for full access
 
 > [!success]- Answer
@@ -567,8 +669,11 @@ D. Grant the service principal `Key Vault Administrator` role for full access
 A table column stores embeddings from a model that outputs 768-dimensional vectors. Which column definition is correct for Azure SQL Database?
 
 A. `Embedding float(53)`
+
 B. `Embedding varbinary(6144)`
+
 C. `Embedding VECTOR(768)`
+
 D. `Embedding nvarchar(max)`
 
 > [!success]- Answer
@@ -583,8 +688,11 @@ D. `Embedding nvarchar(max)`
 A developer runs `SELECT TOP 5 Id, VECTOR_DISTANCE('cosine', @query, Embedding) AS dist FROM dbo.Docs ORDER BY dist ASC`. What does ordering by `dist ASC` accomplish?
 
 A. Returns the 5 least relevant documents
+
 B. Returns the 5 most semantically similar documents (lowest distance = highest similarity)
+
 C. Returns documents in alphabetical order
+
 D. Has no effect since cosine distance is always 0
 
 > [!success]- Answer
@@ -599,8 +707,11 @@ D. Has no effect since cosine distance is always 0
 A production vector search table has 10 million rows. A developer chooses to create a DiskANN vector index. What is the primary benefit?
 
 A. DiskANN guarantees returning the exact mathematically nearest neighbors
+
 B. DiskANN dramatically reduces search latency using approximate nearest neighbor (ANN) search at scale
+
 C. DiskANN compresses vectors to reduce storage by 90%
+
 D. DiskANN enables full-text search on vector columns
 
 > [!success]- Answer
@@ -615,8 +726,11 @@ D. DiskANN enables full-text search on vector columns
 A developer chunks documents into 512-token chunks. They notice that important concepts are sometimes split across chunk boundaries, causing poor retrieval. What technique addresses this?
 
 A. Increase the chunk size to 4096 tokens
+
 B. Use overlapping chunks (e.g., 512 tokens with 64-token overlap between consecutive chunks)
+
 C. Remove stop words before chunking
+
 D. Use a smaller embedding model
 
 > [!success]- Answer
@@ -631,8 +745,11 @@ D. Use a smaller embedding model
 A developer uses an AFTER UPDATE trigger on `dbo.Products` to regenerate embeddings by calling `sp_invoke_external_rest_endpoint` inside the trigger body. What is the primary risk of this approach?
 
 A. Triggers cannot call stored procedures
+
 B. The REST call adds latency and failure risk to every UPDATE transaction, potentially causing rollbacks
+
 C. The trigger will fire twice for each UPDATE
+
 D. `sp_invoke_external_rest_endpoint` is not allowed in triggers
 
 > [!success]- Answer
@@ -647,8 +764,11 @@ D. `sp_invoke_external_rest_endpoint` is not allowed in triggers
 A developer needs to find documents containing both "machine" AND "learning" in the `Content` column. Which `CONTAINS` expression is correct?
 
 A. `CONTAINS(Content, 'machine learning')`
+
 B. `CONTAINS(Content, '"machine" AND "learning"')`
+
 C. `CONTAINS(Content, 'machine & learning')`
+
 D. `CONTAINS(Content, 'machine + learning')`
 
 > [!success]- Answer
@@ -663,8 +783,11 @@ D. `CONTAINS(Content, 'machine + learning')`
 A developer combines FTS results (ranked by BM25 relevance) and vector search results (ranked by cosine distance) using Reciprocal Rank Fusion with k=60. Document A ranks 3rd in FTS and 1st in vector search. Document B ranks 1st in FTS and 5th in vector search. Which has the higher RRF score?
 
 A. Document A — because vector search rank is more important
+
 B. Document B — because FTS rank is more important
+
 C. They score identically
+
 D. Document A — `1/(60+3) + 1/(60+1) ≈ 0.0317` vs Document B — `1/(60+1) + 1/(60+5) ≈ 0.0316`; scores are nearly equal
 
 > [!success]- Answer
@@ -679,8 +802,11 @@ D. Document A — `1/(60+3) + 1/(60+1) ≈ 0.0317` vs Document B — `1/(60+1) +
 A developer calls `sp_invoke_external_rest_endpoint` to query Azure OpenAI. The response is captured in `@response nvarchar(max)`. Which path correctly extracts the assistant's reply text?
 
 A. `SELECT @response`
+
 B. `SELECT JSON_VALUE(@response, '$.choices[0].message.content')`
+
 C. `SELECT JSON_VALUE(@response, '$.result.choices[0].message.content')`
+
 D. `SELECT OPENJSON(@response, '$.choices') WITH (content nvarchar(max) '$.message.content')`
 
 > [!success]- Answer
@@ -695,8 +821,11 @@ D. `SELECT OPENJSON(@response, '$.choices') WITH (content nvarchar(max) '$.messa
 A developer runs `SELECT VECTORPROPERTY(EmbeddingCol, 'Dimensions') FROM dbo.Docs WHERE Id = 1` and gets `1536`. What does this confirm?
 
 A. The column stores up to 1536 characters
+
 B. The embedding vector for that row has 1536 dimensions
+
 C. The table has 1536 rows
+
 D. The embedding was generated with 1536 tokens of context
 
 > [!success]- Answer
@@ -711,8 +840,11 @@ D. The embedding was generated with 1536 tokens of context
 A developer needs to register an external Azure OpenAI deployment that generates 1536-dimensional embeddings for product descriptions. Which `MODEL_TYPE` value belongs in `CREATE EXTERNAL MODEL ... WITH (...)`?
 
 A. `MODEL_TYPE = EMBEDDINGS`
+
 B. `MODEL_TYPE = COMPLETIONS`
+
 C. `TASK = EMBEDDINGS`
+
 D. `MODEL_TYPE = TEXT`
 
 > [!success]- Answer
@@ -727,8 +859,11 @@ D. `MODEL_TYPE = TEXT`
 A developer needs to create a DATABASE SCOPED CREDENTIAL to pass an Azure OpenAI API key as an HTTP header to `sp_invoke_external_rest_endpoint`. Which IDENTITY value signals that the SECRET should be injected as HTTP headers?
 
 A. `IDENTITY = 'SHARED ACCESS SIGNATURE'`
+
 B. `IDENTITY = 'Managed Identity'`
+
 C. `IDENTITY = 'HTTPEndpointHeaders'`
+
 D. `IDENTITY = 'API Key'`
 
 > [!success]- Answer
@@ -760,8 +895,11 @@ Contoso is migrating its on-prem HR application to **Azure SQL Database** with n
 `NationalId` must be encrypted such that the **server never sees plaintext**, AND the app must still be able to filter `WHERE NationalId = @value`. Which configuration meets both requirements?
 
 A. Dynamic Data Masking with `partial()` mask on `NationalId`
+
 B. Always Encrypted with **DETERMINISTIC** encryption and a **BIN2 collation** on the column
+
 C. Always Encrypted with **RANDOMIZED** encryption
+
 D. Transparent Data Encryption (TDE) at the database level
 
 > [!success]- Answer
@@ -776,8 +914,11 @@ D. Transparent Data Encryption (TDE) at the database level
 `SalaryNotes` is free-text, never queried with equality filters, but must still be encrypted such that the server never sees plaintext. Which is the appropriate choice and why?
 
 A. Always Encrypted with DETERMINISTIC — same as `NationalId` for consistency
+
 B. Always Encrypted with **RANDOMIZED** — stronger security; equality filtering not needed
+
 C. Dynamic Data Masking with `default()` — simpler to implement
+
 D. No encryption — `nvarchar(max)` cannot be encrypted with Always Encrypted
 
 > [!success]- Answer
@@ -792,8 +933,11 @@ D. No encryption — `nvarchar(max)` cannot be encrypted with Always Encrypted
 HR staff use the web app, which connects with a single pooled SQL login. Each request should only return employees in the user's region. Which combination implements this correctly?
 
 A. Application-side `WHERE` clause — easier than RLS
+
 B. Row-Level Security with a filter predicate that reads `SUSER_SNAME()`
+
 C. Row-Level Security with a filter predicate that reads `SESSION_CONTEXT(N'RegionId')`, set by the app via `sp_set_session_context` with `@read_only = 1`
+
 D. Dynamic Data Masking on the `Region` column
 
 > [!success]- Answer
@@ -808,8 +952,11 @@ D. Dynamic Data Masking on the `Region` column
 The policy-lookup assistant needs `sp_invoke_external_rest_endpoint` to call Azure OpenAI **without storing the API key in T-SQL or in app config**. Which approach satisfies the passwordless mandate?
 
 A. Store the key in a DATABASE SCOPED CREDENTIAL with `IDENTITY = 'HTTPEndpointHeaders'`
+
 B. Pass the key in the `@headers` parameter at call time
+
 C. Enable Managed Identity on the Azure SQL Database; grant it `Cognitive Services OpenAI User` on the Azure OpenAI resource; create a DATABASE SCOPED CREDENTIAL with `IDENTITY = 'Managed Identity'`
+
 D. Store the key encrypted in a table and decrypt at call time using `DECRYPTBYPASSPHRASE`
 
 > [!success]- Answer
@@ -824,8 +971,11 @@ D. Store the key encrypted in a table and decrypt at call time using `DECRYPTBYP
 Contoso decides to migrate `Employees` to **SQL database in Microsoft Fabric** so it lands in OneLake alongside other Fabric data. When rows change, a Lakehouse table must receive the change near real-time. Requirements: **no SQL Agent**, **no polling**, **no Azure Functions to operate**. Which mechanism fits?
 
 A. CDC with a custom .NET reader running on a VM
+
 B. Change Tracking with a 30-second polling job in Azure Automation
+
 C. **Change Event Streaming (CES)** in Fabric SQL, with the Lakehouse selected as the destination
+
 D. A DML trigger on `Employees` calling `sp_invoke_external_rest_endpoint` to push to a Fabric REST endpoint
 
 > [!success]- Answer

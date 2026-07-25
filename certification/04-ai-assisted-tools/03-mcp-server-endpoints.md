@@ -198,7 +198,7 @@ MCP servers are **process-based** for stdio transport: the AI tool spawns the se
 
 | Transport | Description | Use Case |
 | :--- | :--- | :--- |
-| **stdio** | JSON-RPC over standard input/output | ==Local dev, CLI-launched servers== |
+| **stdio** | JSON-RPC over standard input/output | `Local dev, CLI-launched servers` |
 | **SSE** | Server-Sent Events over HTTP | Remote servers, multi-client scenarios |
 
 stdio is the most common for local database MCP servers. SSE (Server-Sent Events) is used when the MCP server is hosted remotely (e.g., the Fabric lakehouse MCP endpoint).
@@ -294,7 +294,7 @@ MCP servers should return structured error objects rather than raw exceptions. A
 | Error | Cause | Resolution |
 | :--- | :--- | :--- |
 | `CONNECTION_TIMEOUT` | Firewall blocking, server cold start | Check firewall rules; retry |
-| `PERMISSION_DENIED` | Account lacks required permission | ==Grant `SELECT` or `VIEW DEFINITION`== |
+| `PERMISSION_DENIED` | Account lacks required permission | `Grant `SELECT` or `VIEW DEFINITION`` |
 | `INVALID_TOOL_INPUT` | Query fails JSON Schema validation | Check tool input schema |
 | `SERVER_NOT_FOUND` | Wrong package name or npx cache issue | Verify package name; clear npx cache |
 | `AUTH_FAILURE` | Expired token or wrong credentials | Refresh token or update connection string |
@@ -312,7 +312,7 @@ MCP server implementations should catch database exceptions and re-throw them as
 | Audience | AI coding assistants | Applications / web clients |
 | Protocol | JSON-RPC over stdio/SSE | HTTP |
 | Authentication | Via config/env vars | OAuth, API keys |
-| Schema discovery | ==Built-in tool for schema== | Manual or Swagger |
+| Schema discovery | `Built-in tool for schema` | Manual or Swagger |
 | Best for | AI-assisted development | Production app backends |
 
 MCP and REST/DAB are complementary: MCP is for the **development phase** (helping developers write code), while DAB and REST APIs serve **runtime application requests**.
@@ -425,8 +425,11 @@ Azure SQL → Networking:
 A developer configures a GitHub Copilot MCP server pointing to a production Azure SQL Database with a high-privilege service account. What is the PRIMARY security concern?
 
 A. MCP servers cannot connect to Azure SQL databases
+
 B. AI tools may execute unauthorized queries using the high-privilege account
+
 C. The MCP server configuration file cannot store environment variables
+
 D. GitHub Copilot does not support MCP servers for database access
 
 > [!success]- Answer

@@ -25,7 +25,7 @@ vector results from Lab 1 using Reciprocal Rank Fusion (RRF).
 > - Set up a full-text catalog and index over `dbo.Products` (Description + ProductName)
 > - Run `CONTAINS`, `FREETEXT`, `CONTAINSTABLE`, `FREETEXTTABLE` queries and inspect the `RANK` column
 > - Combine vector and full-text ranked lists into a single ranked result with the canonical RRF formula `score = SUM(1 / (k + rank))`
-> - See ==when hybrid beats vector-only==: queries with rare technical terms (model numbers, brand names) where keywords matter
+> - See `when hybrid beats vector-only`: queries with rare technical terms (model numbers, brand names) where keywords matter
 
 > [!tip] What you'll do
 >

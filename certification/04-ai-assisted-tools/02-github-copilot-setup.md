@@ -126,7 +126,7 @@ Available models (as of early 2026, varies by subscription):
 | Model | Strengths for SQL/Database Work |
 |:---|:---|
 | GPT-4o | General-purpose SQL generation, fast responses |
-| o3-mini | ==Reasoning-heavy tasks, complex query logic== |
+| o3-mini | `Reasoning-heavy tasks, complex query logic` |
 | Claude 3.5 Sonnet | Long-context schema understanding, code review |
 | Claude 3.7 Sonnet | Extended reasoning, complex multi-step analysis |
 | Gemini 2.0 Flash | Fast completions, broad multi-modal context |
@@ -213,7 +213,7 @@ Fabric provides Copilot for both **SQL analytics endpoints** (Lakehouse) and **F
 | Surface | Copilot Capability |
 |:---|:---|
 | SQL analytics endpoint | Natural language to T-SQL, explain errors |
-| Fabric SQL database | ==Generate, explain, fix T-SQL; schema-aware== |
+| Fabric SQL database | `Generate, explain, fix T-SQL; schema-aware` |
 | Notebook (Spark SQL) | SQL cell generation, explain output |
 
 **Key Fabric SQL Copilot features:**
@@ -368,7 +368,7 @@ AI models often generate the unsafe pattern. Always replace direct concatenation
 | Issue | Cause | Resolution |
 |:---|:---|:---|
 | Copilot not suggesting SQL | Extension not installed | Install GitHub Copilot + Copilot Chat extensions |
-| Instructions file not used | Wrong location or format | ==Must be `.github/copilot-instructions.md` at repo root== |
+| Instructions file not used | Wrong location or format | `Must be `.github/copilot-instructions.md` at repo root` |
 | MCP server not connecting | Configuration error | Check `mcp.json` and environment variables |
 | Hallucinated column names | Model lacks schema context | Add schema summary to instructions file or use MCP |
 | Wrong model available | Subscription tier | Enterprise plans unlock all models; Individual has subset |
@@ -403,8 +403,11 @@ AI models often generate the unsafe pattern. Always replace direct concatenation
 A developer wants GitHub Copilot to always generate T-SQL for Azure SQL Database with schema prefixes and THROW for error handling. Which approach persists these instructions across all Copilot sessions in the repository?
 
 A. Set instructions in each individual VS Code chat session
+
 B. Create a `.github/copilot-instructions.md` file in the repository root
+
 C. Configure system prompt in the GitHub Copilot extension settings.json
+
 D. Add instructions as code comments in each SQL file
 
 > [!success]- Answer

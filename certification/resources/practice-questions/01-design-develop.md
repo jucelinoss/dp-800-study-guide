@@ -20,8 +20,11 @@ Domain 1 covers 35–40% of the DP-800 exam.
 A data engineer is creating a table in Azure SQL that will be used exclusively for analytical queries aggregating hundreds of millions of rows. They want the maximum query performance for these aggregations. Which index should they create?
 
 A. A clustered B-tree index on the date column
+
 B. A non-clustered B-tree index on each aggregation column
+
 C. A clustered columnstore index
+
 D. A non-clustered columnstore index on the aggregation columns
 
 > [!success]- Answer
@@ -44,8 +47,11 @@ D. A non-clustered columnstore index on the aggregation columns
 A developer needs to retrieve the salary value for employee ID 42 as it was on January 15, 2024. The `dbo.Employees` table is a system-versioned temporal table. Which query is correct?
 
 A. `SELECT Salary FROM dbo.Employees WHERE EmployeeId = 42 AND ValidTo > '2024-01-15'`
+
 B. `SELECT Salary FROM dbo.Employees FOR SYSTEM_TIME AS OF '2024-01-15' WHERE EmployeeId = 42`
+
 C. `SELECT Salary FROM dbo.Employees FOR SYSTEM_TIME ALL WHERE EmployeeId = 42 AND '2024-01-15' BETWEEN ValidFrom AND ValidTo`
+
 D. `SELECT Salary FROM dbo.EmployeesHistory WHERE EmployeeId = 42 AND ValidFrom <= '2024-01-15'`
 
 > [!success]- Answer
@@ -64,8 +70,11 @@ D. `SELECT Salary FROM dbo.EmployeesHistory WHERE EmployeeId = 42 AND ValidFrom 
 A developer is implementing Always Encrypted for a `SSN` column that must support `WHERE SSN = '123-45-6789'` filter queries from the application. Which encryption type must be used?
 
 A. RANDOMIZED
+
 B. DETERMINISTIC
+
 C. SYMMETRIC
+
 D. AES_256
 
 > [!success]- Answer
@@ -84,8 +93,11 @@ D. AES_256
 A developer has a column `Metadata nvarchar(max)` storing JSON like `{"address":{"city":"Seattle","zip":"98101"}}`. They want to return the city value as a scalar string. Which function is correct?
 
 A. `JSON_QUERY(Metadata, '$.address')`
+
 B. `JSON_VALUE(Metadata, '$.address')`
+
 C. `JSON_VALUE(Metadata, '$.address.city')`
+
 D. `JSON_QUERY(Metadata, '$.address.city')`
 
 > [!success]- Answer
@@ -104,8 +116,11 @@ D. `JSON_QUERY(Metadata, '$.address.city')`
 A developer is writing a recursive CTE to traverse an org chart. The CTE is running indefinitely and timing out. Which is the most likely cause?
 
 A. The anchor member is returning too many rows
+
 B. The recursive member is missing a proper termination condition causing circular references
+
 C. The `UNION ALL` should be `UNION DISTINCT`
+
 D. Recursive CTEs don't support `JOIN` in the recursive member
 
 > [!success]- Answer
@@ -124,8 +139,11 @@ D. Recursive CTEs don't support `JOIN` in the recursive member
 A developer wants to calculate a running total of `TotalAmount` for each customer ordered by `OrderDate`. Which window function syntax is correct?
 
 A. `SUM(TotalAmount) OVER (PARTITION BY CustomerId ORDER BY OrderDate)`
+
 B. `SUM(TotalAmount) OVER (PARTITION BY CustomerId)`
+
 C. `SUM(TotalAmount) OVER (ORDER BY OrderDate PARTITION BY CustomerId ROWS UNBOUNDED PRECEDING)`
+
 D. `SUM(TotalAmount) GROUP BY CustomerId ORDER BY OrderDate`
 
 > [!success]- Answer
@@ -144,8 +162,11 @@ D. `SUM(TotalAmount) GROUP BY CustomerId ORDER BY OrderDate`
 A developer has node tables `Person` and `Restaurant`, and an edge table `Likes`. They want to find all restaurants liked by friends of Alice (two-hop traversal). Which MATCH pattern is correct?
 
 A. `MATCH(alice-(likes)->restaurant AND alice-(friendOf)->friend)`
+
 B. `MATCH(alice-(friendOf)->friend-(likes)->restaurant)`
+
 C. `MATCH(alice<-(friendOf)-friend-(likes)->restaurant)`
+
 D. `MATCH(alice-(likes)->friend AND friend-(friendOf)->restaurant)`
 
 > [!success]- Answer
@@ -164,8 +185,11 @@ D. `MATCH(alice-(likes)->friend AND friend-(friendOf)->restaurant)`
 A developer created a scalar UDF `dbo.fn_CalculateTax(@Amount decimal)` and uses it in a SELECT against a 50-million row table: `SELECT dbo.fn_CalculateTax(Amount) FROM dbo.Sales`. Performance is poor. What is the primary cause?
 
 A. Scalar UDFs are not supported on large tables
+
 B. The function lacks an index
+
 C. Scalar UDFs execute row-by-row and prevent parallelism
+
 D. The function needs `WITH SCHEMABINDING`
 
 > [!success]- Answer
@@ -184,8 +208,11 @@ D. The function needs `WITH SCHEMABINDING`
 A developer creates a partition function: `CREATE PARTITION FUNCTION PF_Daily (date) AS RANGE RIGHT FOR VALUES ('2025-01-01', '2025-02-01')`. A row with value `'2025-01-01'` belongs to which partition?
 
 A. Partition 1 (before January 2025)
+
 B. Partition 2 (January 2025)
+
 C. Partition 3 (February 2025 onward)
+
 D. It depends on the partition scheme
 
 > [!success]- Answer
@@ -204,8 +231,11 @@ D. It depends on the partition scheme
 A team wants GitHub Copilot to automatically use project-specific SQL conventions (like always using `datetime2` instead of `datetime`) in every chat session without manually specifying them. What should they create?
 
 A. A `.vscode/settings.json` file with SQL preferences
+
 B. A `.github/copilot-instructions.md` file at the repository root
+
 C. A `CLAUDE.md` file at the repository root
+
 D. A GitHub Actions workflow that sets Copilot context
 
 > [!success]- Answer
@@ -222,9 +252,13 @@ D. A GitHub Actions workflow that sets Copilot context
 A developer wants to create an indexed view on `dbo.Sales` with a `GROUP BY ProductId` aggregation. Which combination of requirements must be met? (Select two)
 
 A. The view must include `WITH SCHEMABINDING`
+
 B. The first index must be a non-clustered unique index
+
 C. The view must use `COUNT_BIG(*)` in the GROUP BY
+
 D. The first index must be a unique clustered index
+
 E. The view must use `COUNT(*)` instead of `COUNT_BIG(*)`
 
 > [!success]- Answer
@@ -245,8 +279,11 @@ E. The view must use `COUNT(*)` instead of `COUNT_BIG(*)`
 A developer wants to use `JSON_ARRAYAGG()` to aggregate product names into a JSON array per category. On which platform is this function available?
 
 A. SQL Server 2019 and later
+
 B. SQL Server 2016 and later
+
 C. SQL Server 2022 and later
+
 D. Only in Azure SQL Managed Instance
 
 > [!success]- Answer
@@ -263,8 +300,11 @@ D. Only in Azure SQL Managed Instance
 A compliance team requires a table where historical records can never be deleted or modified after insertion — to serve as a tamper-evident audit trail. Which table type best meets this requirement?
 
 A. A temporal table with `SYSTEM_VERSIONING = ON`
+
 B. An append-only ledger table with `LEDGER = ON, APPEND_ONLY = ON`
+
 C. An updatable ledger table with `LEDGER = ON`
+
 D. A table with a DML trigger that prevents DELETE
 
 > [!success]- Answer
@@ -283,8 +323,11 @@ D. A table with a DML trigger that prevents DELETE
 A developer is configuring an MCP server connection to Azure SQL for use with GitHub Copilot. Which authentication method is recommended for production use?
 
 A. Username and password in the connection string
+
 B. SQL Server authentication with a strong password
+
 C. Active Directory Managed Identity authentication
+
 D. Windows authentication
 
 > [!success]- Answer
@@ -303,8 +346,11 @@ D. Windows authentication
 A developer writes `SELECT * FROM dbo.Customers WHERE CustomerId NOT IN (SELECT CustomerId FROM dbo.Orders)`. The query returns zero rows even though there are clearly customers without orders. What is the most likely cause?
 
 A. The subquery returns too many rows
+
 B. There is a NULL value in the `CustomerId` column of `dbo.Orders`
+
 C. The `CustomerId` columns have different data types
+
 D. NOT IN cannot be used with subqueries
 
 > [!success]- Answer
@@ -328,8 +374,11 @@ D. NOT IN cannot be used with subqueries
 A developer writes a SQL graph query using `SHORTEST_PATH` to find paths between people through a `Knows` edge table. The query must follow the edge in **either direction** (A knows B implies B knows A for this traversal). Which pattern correctly expresses bidirectional traversal?
 
 A. `MATCH (start)-(Knows+)->(end)` — single direction is sufficient because graph queries are undirected by default
+
 B. `MATCH (start)-(Knows+)-(end)` — omit the arrow to make the edge undirected
+
 C. `MATCH (start)-(Knows+)->(end) OR (start)<-(Knows+)-(end)` — explicit `OR` between two directed patterns
+
 D. `MATCH SHORTEST_PATH((start)-(Knows+)->(end))` followed by a second `MATCH` for the reverse — UNION the results
 
 > [!success]- Answer
@@ -348,8 +397,11 @@ D. `MATCH SHORTEST_PATH((start)-(Knows+)->(end))` followed by a second `MATCH` f
 A team wants to create memory-optimized tables in an on-premises SQL Server 2022 instance for an OLTP hot path. The first `CREATE TABLE` with `WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_AND_DATA)` fails. Which prerequisite is most likely missing?
 
 A. The database must be in `SIMPLE` recovery model
+
 B. The database must have a filegroup with `CONTAINS MEMORY_OPTIMIZED_DATA`
+
 C. The database must enable `READ_COMMITTED_SNAPSHOT`
+
 D. The table must use the `bwin` storage engine
 
 > [!success]- Answer
@@ -374,8 +426,11 @@ D. The table must use the `bwin` storage engine
 A developer has a column `Tags nvarchar(200)` storing comma-separated values like `'azure,sql,ai,vector'`. They need to return one row per tag for joining and aggregation. Which approach uses the regex family added to Azure SQL / Fabric SQL?
 
 A. `STRING_SPLIT(Tags, ',')` — the legacy function, fine for this case
+
 B. `REGEXP_SPLIT_TO_TABLE(Tags, ',')` — returns one row per split element
+
 C. `REGEXP_MATCHES(Tags, '[^,]+')` — returns a scalar count of matches
+
 D. `REGEXP_REPLACE(Tags, ',', CHAR(10))` followed by `STRING_SPLIT`
 
 > [!success]- Answer

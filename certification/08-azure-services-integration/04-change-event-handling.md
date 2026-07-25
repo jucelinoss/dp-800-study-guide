@@ -169,7 +169,7 @@ SET @sync_version = CHANGE_TRACKING_CURRENT_VERSION();
 
 | Feature | Change Tracking | CDC |
 | :--- | :--- | :--- |
-| Before image (old values) | No | ==Yes== |
+| Before image (old values) | No | `Yes` |
 | After image (new values) | No (join to table) | Yes |
 | Column-level granularity | Which columns (optional) | Full row |
 | Storage overhead | Low | Medium |
@@ -331,7 +331,7 @@ END;
 
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
-| CDC capture job not running | SQL Agent not running (on-prem/MI) | ==Start SQL Agent; on Azure SQL, CDC cleanup runs automatically== |
+| CDC capture job not running | SQL Agent not running (on-prem/MI) | `Start SQL Agent; on Azure SQL, CDC cleanup runs automatically` |
 | `@from_lsn` returns NULL | CDC not enabled or no data yet | Verify `sp_cdc_enable_db` and `sp_cdc_enable_table` ran successfully |
 | Change Tracking retention exceeded | Sync version too old | Use `CHANGE_TRACKING_MIN_VALID_VERSION()` to validate; do full resync if needed |
 | SQL trigger function not firing | Change Tracking not enabled | SQL trigger binding auto-enables it; check connection string permissions |
