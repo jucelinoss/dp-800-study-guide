@@ -736,3 +736,13 @@ GO
 -- and TX-103 received the new ID 5002!
 SELECT GlobalSalesID, TransactionCode, CustomerCPF, Amount, LastUpdated FROM lab.ConsolidatedSalesDW;
 GO
+
+-- =================================================================================================
+-- OFFICIAL MICROSOFT LEARN REFERENCES
+-- =================================================================================================
+-- CREATE TABLE, PRIMARY KEY, UNIQUE, CHECK and FOREIGN KEY constraints:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/create-table-transact-sql?view=sql-server-ver17
+-- CREATE SEQUENCE, CACHE/NO CACHE and sp_sequence_get_range:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/create-sequence-transact-sql?view=sql-server-ver17
+-- Sequence numbers and NEXT VALUE FOR:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/sequence-numbers/sequence-numbers?view=sql-server-ver17

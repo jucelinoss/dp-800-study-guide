@@ -606,3 +606,13 @@ GO
 -- Teste de Execução da Stored Procedure 100% Dinâmica:
 EXEC lab.sp_ExecuteFullyDynamicJsonQuery @TargetTableName = 'OrdersJSON';
 GO
+
+-- =================================================================================================
+-- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
+-- =================================================================================================
+-- Funções JSON: ISJSON, JSON_VALUE, JSON_QUERY, OPENJSON, JSON_ARRAYAGG e JSON_OBJECTAGG:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/functions/json-functions-transact-sql?view=sql-server-ver17
+-- Dados JSON no SQL Server, incluindo indexação por coluna calculada:
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/json/json-data-sql-server?view=sql-server-ver17
+-- SQL dinâmico seguro:
+-- https://learn.microsoft.com/pt-br/sql/connect/ado-net/sql/writing-secure-dynamic-sql

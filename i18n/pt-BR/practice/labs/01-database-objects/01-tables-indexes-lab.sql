@@ -729,3 +729,15 @@ DROP TABLE IF EXISTS lab.SalesOrderDetail_Row;
 DROP TABLE IF EXISTS lab.SalesOrderDetail_Page;
 -- DROP SCHEMA IF EXISTS lab;
 */
+
+-- =================================================================================================
+-- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
+-- =================================================================================================
+-- CREATE INDEX, colunas incluídas e índices filtrados:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/statements/create-index-transact-sql?view=sql-server-ver17
+-- Compactação de dados (ROW e PAGE):
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/data-compression/data-compression?view=sql-server-ver17
+-- Índices columnstore:
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/indexes/columnstore-indexes-query-performance?view=sql-server-ver17
+-- Colunas esparsas (sparse columns):
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/tables/use-sparse-columns?view=sql-server-ver17

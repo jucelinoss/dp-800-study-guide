@@ -302,3 +302,15 @@ GO
 -- Solução: Remover o índice não-alinhado ou recriá-lo como alinhado
 DROP INDEX IX_OrdersPartitioned_NonAligned ON lab.OrdersPartitioned;
 GO
+
+-- =================================================================================================
+-- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
+-- =================================================================================================
+-- Funções e esquemas de partição, além de índices alinhados:
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/partitions/create-partitioned-tables-and-indexes?view=sql-server-ver17
+-- Função de metadados $PARTITION:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/functions/partition-transact-sql?view=sql-server-ver17
+-- Operações SPLIT e MERGE:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/statements/alter-partition-function-transact-sql?view=sql-server-ver17
+-- Troca de partições (partition switching):
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/partitions/switching-partitions?view=sql-server-ver17

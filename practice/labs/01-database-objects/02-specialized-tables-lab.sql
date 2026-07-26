@@ -142,6 +142,7 @@ USE AdventureWorks2025;
 GO
 */
 
+
 -- C. Checking the post-restart result:
 -- The SCHEMA_AND_DATA table will have its data preserved.
 -- The SCHEMA_ONLY table will be COMPLETELY EMPTY (but its structure/schema continues to exist).
@@ -1247,6 +1248,20 @@ IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = 'MyStorage
 IF OBJECT_ID('tempdb..#SalesImport') IS NOT NULL DROP TABLE #SalesImport;
 GO
 */
+
+-- =================================================================================================
+-- OFFICIAL MICROSOFT LEARN REFERENCES
+-- =================================================================================================
+-- Memory-optimized tables and durability:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/in-memory-oltp/introduction-to-memory-optimized-tables?view=sql-server-ver17
+-- System-versioned temporal tables:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/tables/temporal-tables?view=sql-server-ver17
+-- Ledger tables:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/security/ledger/ledger-landing-sql-server?view=sql-server-ver17
+-- SQL Graph:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/graphs/sql-graph-overview?view=sql-server-ver17
+-- External tables and PolyBase:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/create-external-table-transact-sql?view=sql-server-ver17
 
 
 

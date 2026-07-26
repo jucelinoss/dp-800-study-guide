@@ -302,3 +302,15 @@ GO
 -- Solution: Remove the non-aligned index or recreate it as aligned
 DROP INDEX IX_OrdersPartitioned_NonAligned ON lab.OrdersPartitioned;
 GO
+
+-- =================================================================================================
+-- OFFICIAL MICROSOFT LEARN REFERENCES
+-- =================================================================================================
+-- Partition functions, partition schemes and aligned indexes:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/partitions/create-partitioned-tables-and-indexes?view=sql-server-ver17
+-- $PARTITION metadata function:
+-- https://learn.microsoft.com/en-us/sql/t-sql/functions/partition-transact-sql?view=sql-server-ver17
+-- SPLIT and MERGE operations:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-partition-function-transact-sql?view=sql-server-ver17
+-- Partition switching:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/partitions/switching-partitions?view=sql-server-ver17
