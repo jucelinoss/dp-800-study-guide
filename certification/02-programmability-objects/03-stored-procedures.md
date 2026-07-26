@@ -8,6 +8,27 @@ tags:
   - execute-as
 ---
 
+> [!info] 🗺️ Quick Navigation Index
+>
+> - 📍 [1. Overview](#overview)
+> - 📍 [2. Stored Procedure Development](#creating-stored-procedures)
+>   - 🔹 [Creating Stored Procedures](#creating-stored-procedures)
+>   - 🔹 [Output Parameters](#output-parameters)
+>   - 🔹 [Table-Valued Parameters](#table-valued-parameters)
+>   - 🔹 [Error Handling](#error-handling)
+> - 📍 [3. Advanced Architecture, Security & Performance](#execute-as--security-context)
+>   - 🔹 [EXECUTE AS — Security Context](#execute-as--security-context)
+>   - 🔹 [Recompilation and Plan Caching](#recompilation)
+>   - 🔹 [sp_executesql for Dynamic SQL](#sp_executesql-for-dynamic-sql)
+>   - 🔹 [Natively Compiled Stored Procedures](#natively-compiled-stored-procedures)
+> - 📍 [4. Practical Application & Summary](#use-cases)
+>   - 🔹 [Use Cases](#use-cases)
+>   - 🔹 [Common Issues](#common-issues--errors)
+>   - 🔹 [Best Practices & Exam Tips](#best-practices)
+>   - 🔹 [Practice Question](#practice-question)
+
+---
+
 # Stored Procedures
 
 ## Overview
@@ -96,7 +117,7 @@ GO
 -- Use it in a procedure
 CREATE PROCEDURE dbo.usp_InsertOrderItems
     @OrderId    int,
-    @Items      dbo.OrderItemList READONLY
+    @Items      dbo.OrderItemList READONLY -- Must be READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -107,6 +128,11 @@ BEGIN
 END;
 GO
 ```
+
+> [!important] TVPs must be READONLY
+>
+> - Table-valued parameters (TVPs) must **always be passed as READONLY** to a stored procedure.
+> - You cannot modify TVP rows directly inside the procedure with `UPDATE`, `INSERT`, or `DELETE`.
 
 ---
 
@@ -121,14 +147,15 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    BEGIN TRANSACTION;
     BEGIN TRY
+        BEGIN TRANSACTION;
         UPDATE dbo.Accounts SET Balance -= @Amount WHERE AccountId = @FromAccountId;
         UPDATE dbo.Accounts SET Balance += @Amount WHERE AccountId = @ToAccountId;
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
-        ROLLBACK TRANSACTION;
+        IF XACT_STATE() <> 0
+            ROLLBACK TRANSACTION;
         THROW;  -- Re-raise the error to the caller
     END CATCH;
 END;
@@ -170,7 +197,13 @@ BEGIN
 END;
 ```
 
-**EXECUTE AS options:** `CALLER` (default), `SELF` (creator), `OWNER` (schema owner), `'username'` (specific user)
+**EXECUTE AS options:** `CALLER` (default; inherits the caller's context), `SELF` (the object's current creator or owner), `OWNER` (the procedure schema owner), and `'username'` (a specific user).
+
+> [!warning] EXECUTE AS CALLER vs. OWNER vs. USER
+>
+> - **CALLER (default):** Executes with the privileges of the principal calling the procedure.
+> - **OWNER:** Executes with the permissions of the object's schema owner; useful to bridge broken ownership chains without exposing base tables.
+> - **'username':** Executes as a specific user; requires `IMPERSONATE` permission on that user.
 
 ---
 
@@ -185,6 +218,10 @@ CREATE PROCEDURE dbo.usp_VariableQuery
 WITH RECOMPILE
 AS ...
 ```
+
+> [!tip] Exam tip: sniffing vs. recompile
+>
+> - When only one query within a procedure has highly variable cardinality, use `OPTION(RECOMPILE)` on that query rather than recompiling the entire procedure with `WITH RECOMPILE`. This avoids unnecessary CPU consumption.
 
 ---
 
@@ -271,6 +308,17 @@ SQL Server compiles a query plan on the first execution and caches it for reuse.
 - Resulting plan is poor for subsequent calls with high-volume parameters
 - Symptoms: fast for some inputs, slow for others with no schema changes
 
+### Diagnosis: evidence before applying hints
+
+Parameter sniffing is a hypothesis, not an automatic conclusion. Before using `OPTION(RECOMPILE)`, `OPTIMIZE FOR`, or another hint, gather evidence that separates it from stale statistics, a missing index, or a non-sargable predicate:
+
+- **Actual execution plan:** compare `Estimated Rows` with `Actual Rows`, especially in operators downstream of the parameter filter. Large, repeatable variances suggest that compilation cardinality does not represent the current call.
+- **I/O and CPU:** use `SET STATISTICS IO, TIME ON` with selective and nonselective parameters. Record logical reads, CPU, and elapsed time; compare equivalent calls rather than relying only on the plan's percentage cost.
+- **Repeatable pattern:** confirm that slowness changes with the parameter or with the call that compiled the cached plan. A one-off incident could be a cold cache, blocking, resource waits, or concurrent activity.
+- **Statistics and access:** confirm that relevant statistics are current and inspect repeated `Key Lookups`, `Nested Loops` over many rows, excessive scans, and `Sort`/`Hash` spills. Fix the index, statistics, or query before locking in a hint.
+
+Only after this diagnosis should you choose the smallest intervention that resolves the symptom and record the reason. Reassess the decision when data volume or distribution changes.
+
 **Solutions:**
 
 | Option | Behavior | Cost |
@@ -343,31 +391,29 @@ OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN));
 
 ## Key Takeaways
 
-- Stored procedures support input, output, and table-valued parameters
-- Use `TRY/CATCH` with `THROW` for robust error handling
-- `EXECUTE AS` enables least-privilege access patterns without direct table grants
-- `sp_executesql` is always preferred over `EXEC(@sql)` for parameterization and plan caching
-- Parameter sniffing can cause inconsistent performance; `OPTIMIZE FOR UNKNOWN` or `OPTION(RECOMPILE)` are the primary fixes
-- Natively compiled procedures target In-Memory OLTP and use `ATOMIC` blocks instead of `TRY/CATCH`
+- Stored procedures support input, output, and table-valued parameters.
+- Implement robust transactional logic with `TRY/CATCH` blocks and `THROW`.
+- `EXECUTE AS` enables strict access-control patterns without direct permissions on base tables.
+- Parameter sniffing can make execution times unstable; selective recompilation or average distribution statistics can address the inconsistency.
 
 ---
 
 ## Practice Question
 
-A stored procedure that searches orders by CustomerID performs well for most customers but is very slow for one high-volume customer. The plan was created for a low-volume customer. Which is the BEST fix?
+A stored procedure that searches orders by `CustomerID` performs well for almost every search, but is extremely slow for one customer with a very high sales volume. Analysis shows that the cached execution plan was generated on its first call for a customer with very low activity. Which is the BEST approach to permanently address this performance inconsistency?
 
-A. Add WITH RECOMPILE to the procedure definition
+A. Add `WITH RECOMPILE` to the stored procedure definition.
 
-B. Use OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN)) on the query
+B. Add the `OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN))` hint to the query.
 
-C. Rebuild all indexes on the Orders table
+C. Rebuild all physical indexes associated with the `Orders` table.
 
-D. Use EXEC instead of sp_executesql
+D. Modify the internal code to run the search using `EXEC` instead of `sp_executesql`.
 
 > [!success]- Answer
-> **B — Use OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN)) on the query**
+> **B — Add the `OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN))` hint to the query**
 >
-> This is a classic parameter sniffing problem. OPTIMIZE FOR UNKNOWN tells the optimizer to use average statistics rather than the sniffed value, producing a more balanced plan that works reasonably well for all customers. WITH RECOMPILE (A) recompiles every execution which is expensive. Rebuilding indexes (C) doesn't address the plan compilation issue. sp_executesql vs EXEC (D) is about parameterization and injection, not plan selection.
+> This scenario describes a classic *parameter sniffing* problem. `OPTIMIZE FOR UNKNOWN` instructs the optimizer to disregard the input value during compilation and use average record-distribution statistics, producing a balanced plan for any customer. Adding `WITH RECOMPILE` to the procedure (A) would force full recompilation on every execution and incur excessive CPU overhead. Rebuilding indexes (C) or changing the execution command (D) does not address cached-plan parameter sniffing.
 
 ---
 

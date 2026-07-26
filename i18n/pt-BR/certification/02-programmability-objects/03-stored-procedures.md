@@ -309,6 +309,17 @@ O SQL Server compila e armazena o plano de execução de uma procedure em sua pr
 - O plano otimizado gerado é ineficiente para as execuções seguintes contendo volumetria alta de dados.
 - Sintomas típicos: a procedure roda super rápido para alguns clientes, mas é lenta para outros sem que a estrutura ou os indexes tenham mudado.
 
+### Diagnóstico: evidência antes de aplicar hints
+
+*Parameter sniffing* é uma hipótese, não uma conclusão automática. Antes de usar `OPTION(RECOMPILE)`, `OPTIMIZE FOR` ou qualquer outro hint, colete evidências que separem esse problema de estatísticas desatualizadas, índice ausente ou predicado não sargável:
+
+- **Plano de execução real:** compare `Estimated Rows` e `Actual Rows`, principalmente nos operadores posteriores ao filtro por parâmetro. Divergências grandes e repetíveis indicam que a cardinalidade usada na compilação não representa a chamada atual.
+- **I/O e CPU:** use `SET STATISTICS IO, TIME ON` com parâmetros seletivos e não seletivos. Registre leituras lógicas, CPU e duração; compare chamadas equivalentes, não apenas o custo percentual exibido no plano.
+- **Padrão reproduzível:** confirme que a lentidão muda conforme o parâmetro ou conforme qual chamada compilou o plano em cache. Uma ocorrência isolada pode ser cache frio, bloqueio, espera de recursos ou atividade concorrente.
+- **Estatísticas e acesso:** confirme que as estatísticas relevantes estão atualizadas e examine `Key Lookups` repetitivos, `Nested Loops` sobre muitas linhas, scans excessivos e *spills* de `Sort`/`Hash`. Corrija índice, estatística ou query antes de fixar um hint.
+
+Somente após esse diagnóstico escolha a menor intervenção que resolva o sintoma e registre a razão. Reavalie a decisão quando o volume ou a distribuição dos dados mudar.
+
 **Opções de resolução:**
 
 | Abordagem | Funcionamento | Custo / Impacto |
