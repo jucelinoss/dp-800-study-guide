@@ -35,46 +35,74 @@ GO
 IF SCHEMA_ID(N'lab') IS NULL
     EXEC(N'CREATE SCHEMA lab');
 GO
-
 -- Limpeza preventiva caso rode o script mais de uma vez
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_OrderSummaryIndexed' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_OrderSummaryIndexed'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_OrderSummaryIndexed;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_OrderSummaryIndexed_BadCount' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_OrderSummaryIndexed_BadCount'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_OrderSummaryIndexed_BadCount;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_ActiveCustomers' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_ActiveCustomers'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_ActiveCustomers;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_BoundProducts' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_BoundProducts'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_BoundProducts;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_NonDeterministicView' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_NonDeterministicView'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_NonDeterministicView;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_OuterJoinIndexed' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_OuterJoinIndexed'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_OuterJoinIndexed;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_NullableSumIndexed' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_NullableSumIndexed'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_NullableSumIndexed;
+
 IF EXISTS (SELECT *
-FROM sys.views
-WHERE name = 'vw_InvalidOrderBy' AND schema_id = SCHEMA_ID('lab'))
+           FROM   sys.views
+           WHERE  name = 'vw_InvalidOrderBy'
+                  AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_InvalidOrderBy;
 
+IF EXISTS (SELECT *
+           FROM   sys.views
+           WHERE  name = 'vw_DailyCustomerRevenueIndexed'
+                  AND schema_id = SCHEMA_ID('lab'))
+    DROP VIEW lab.vw_DailyCustomerRevenueIndexed;
+
+IF EXISTS (SELECT *
+           FROM   sys.views
+           WHERE  name = 'vw_ActiveCustomerRevenueIndexed'
+                  AND schema_id = SCHEMA_ID('lab'))
+    DROP VIEW lab.vw_ActiveCustomerRevenueIndexed;
+
 DROP TABLE IF EXISTS lab.Orders;
+
 DROP TABLE IF EXISTS lab.NullableOrders;
+
 DROP TABLE IF EXISTS lab.Customers;
+
 DROP TABLE IF EXISTS lab.Products;
-GO
 
 -- Tabelas base para testes
 CREATE TABLE lab.Customers
@@ -154,7 +182,7 @@ GO
 
 -- -- [PONTO DE ATENÇÃO DP-800]
 -- Teste de Violação: Tentar inserir um cliente INATIVO (IsActive = 0) através da view
--- Com WITH CHECK OPTION, aoperação é abortada imediatamente com o erro 550.
+-- Com WITH CHECK OPTION, a operação é abortada imediatamente com o erro 550.
 BEGIN TRY
     INSERT INTO lab.vw_ActiveCustomers
     (CustomerName, IsActive)
@@ -496,13 +524,124 @@ GO
 -- PARTE 7: CENÁRIOS PRÁTICOS DE PROJETO
 -- =================================================================================
 
--- CENÁRIO 1: Dashboard Analítico de Alta Performance para E-Commerce
--- Problema: Relatórios de faturamento agregam milhões de vendas e causam alta CPU.
--- Solução: Utilizar Indexed View materializada com NOEXPAND para zerar o tempo de agregação.
+-- Uma indexed view faz diferença quando a MESMA agregação/join é lida muitas vezes,
+-- as tabelas base são grandes e o custo adicional em cada INSERT/UPDATE/DELETE é aceitável.
+-- Ela não "zera" o tempo de consulta: troca parte do processamento de leitura por espaço em
+-- disco e trabalho de manutenção síncrona no DML das tabelas base.
 
-SELECT CustomerID, TotalSpent
+-- CENÁRIO 1: Ranking em dashboard executivo de e-commerce
+-- Problema: a cada atualização do painel, uma consulta varre vendas para calcular o total
+-- por cliente. Com milhões de pedidos, o GROUP BY compete por CPU e leituras lógicas.
+-- Por que a view ajuda: o total por cliente já está pré-calculado no índice clustered de
+-- vw_OrderSummaryIndexed e a consulta lê apenas os grupos materializados.
+-- Bom perfil: muitas leituras do dashboard e volume de alterações moderado.
+
+SELECT CustomerID, TotalOrders, TotalSpent
+FROM lab.vw_OrderSummaryIndexed WITH (NOEXPAND)
+WHERE TotalSpent > 100.00
+ORDER BY TotalSpent DESC;
+GO
+
+-- Compare no plano de execução com a agregação feita na tabela base. Em uma carga real,
+-- espere ver a segunda consulta processar todas as linhas qualificadas de lab.Orders,
+-- enquanto a primeira busca o índice da view. O resultado deve ser idêntico.
+SET STATISTICS IO, TIME ON;
+GO
+
+SELECT CustomerID, TotalOrders, TotalSpent
 FROM lab.vw_OrderSummaryIndexed WITH (NOEXPAND)
 WHERE TotalSpent > 100.00;
+
+SELECT CustomerID, COUNT_BIG(*) AS TotalOrders, SUM(TotalAmount) AS TotalSpent
+FROM lab.Orders
+GROUP BY CustomerID
+HAVING SUM(TotalAmount) > 100.00;
+GO
+
+SET STATISTICS IO, TIME OFF;
+GO
+
+-- CENÁRIO 2: Monitoramento intradiário de receita e volume por cliente
+-- Problema: uma central de operações atualiza, a cada poucos segundos, cartões como
+-- "receita do dia", "quantidade de pedidos" e alertas de queda de vendas.
+-- Por que a view ajuda: uma mesma agregação por cliente e data deixa de ser recalculada
+-- repetidamente. O índice permite localizar diretamente um dia e um cliente.
+-- Bom perfil: painéis de leitura intensa; o número de pedidos por alteração é menor que
+-- o número de leituras dos indicadores.
+CREATE VIEW lab.vw_DailyCustomerRevenueIndexed
+WITH SCHEMABINDING
+AS
+    SELECT
+        o.CustomerID,
+        o.OrderDate,
+        COUNT_BIG(*) AS TotalOrders,
+        SUM(o.TotalAmount) AS DailyRevenue
+    FROM lab.Orders AS o
+    GROUP BY o.CustomerID, o.OrderDate;
+GO
+
+CREATE UNIQUE CLUSTERED INDEX CIX_vw_DailyCustomerRevenueIndexed
+ON lab.vw_DailyCustomerRevenueIndexed(CustomerID, OrderDate);
+GO
+
+-- Esta consulta é típica de um endpoint que alimenta um cartão de dashboard.
+SELECT CustomerID, OrderDate, TotalOrders, DailyRevenue
+FROM lab.vw_DailyCustomerRevenueIndexed WITH (NOEXPAND)
+WHERE CustomerID = 1
+  AND OrderDate >= '2025-01-01'
+  AND OrderDate < '2025-02-01'
+ORDER BY OrderDate;
+GO
+
+-- CENÁRIO 3: Segmentação de clientes ativos para CRM e atendimento
+-- Problema: vários serviços consultam continuamente o valor e o número de compras dos
+-- clientes ativos. A consulta original junta Customers a Orders e depois agrega.
+-- Por que a view ajuda: materializa tanto o INNER JOIN quanto a agregação. Uma mudança em
+-- IsActive ou em um pedido atualiza o resultado automaticamente.
+-- Bom perfil: poucas alterações de status e muitas leituras de segmentos/rankings.
+CREATE VIEW lab.vw_ActiveCustomerRevenueIndexed
+WITH SCHEMABINDING
+AS
+    SELECT
+        c.CustomerID,
+        COUNT_BIG(*) AS TotalOrders,
+        SUM(o.TotalAmount) AS TotalSpent
+    FROM lab.Customers AS c
+    INNER JOIN lab.Orders AS o
+        ON o.CustomerID = c.CustomerID
+    WHERE c.IsActive = 1
+    GROUP BY c.CustomerID;
+GO
+
+CREATE UNIQUE CLUSTERED INDEX CIX_vw_ActiveCustomerRevenueIndexed
+ON lab.vw_ActiveCustomerRevenueIndexed(CustomerID);
+GO
+
+-- Exemplo: campanha para clientes ativos com alto valor acumulado.
+SELECT CustomerID, TotalOrders, TotalSpent
+FROM lab.vw_ActiveCustomerRevenueIndexed WITH (NOEXPAND)
+WHERE TotalSpent >= 500.00
+ORDER BY TotalSpent DESC;
+GO
+
+-- CENÁRIO 4: Quando NÃO usar uma indexed view
+-- Uma tela administrativa consultada uma vez por dia, ou uma tabela de pedidos que recebe
+-- muitos INSERTs/UPDATEs por segundo, tende a não justificar o custo de manutenção do
+-- índice da view. Em cada DML em lab.Orders, o SQL Server precisa manter também:
+--   * CIX_vw_OrderSummaryIndexed;
+--   * CIX_vw_DailyCustomerRevenueIndexed; e
+--   * CIX_vw_ActiveCustomerRevenueIndexed.
+-- Nesses casos, avalie primeiro índices nas tabelas base, cache de aplicação, tabela de
+-- resumo atualizada em lote ou uma solução analítica separada. Valide sempre com plano
+-- real e SET STATISTICS IO, TIME, comparando leitura economizada versus latência de escrita.
+
+-- RESUMO DE DECISÃO
+-- Caso                                      | Indexed view costuma ser adequada?
+-- Dashboard com agregação repetida          | Sim: pré-calcula GROUP BY/SUM/COUNT_BIG.
+-- Consulta frequente de join + agregação    | Sim: quando atende as restrições de definição.
+-- Relatório esporádico                      | Geralmente não: o custo de manutenção prevalece.
+-- OLTP com escrita muito intensa            | Geralmente não: cada DML mantém todos os índices.
+-- Lógica com OUTER JOIN, TOP ou GETDATE()   | Não: não pode compor uma indexed view.
 GO
 
 -- =================================================================================
@@ -510,6 +649,8 @@ GO
 -- =================================================================================
 /*
 DROP VIEW IF EXISTS lab.vw_NonDeterministicView;
+DROP VIEW IF EXISTS lab.vw_ActiveCustomerRevenueIndexed;
+DROP VIEW IF EXISTS lab.vw_DailyCustomerRevenueIndexed;
 DROP VIEW IF EXISTS lab.vw_OrderSummaryIndexed;
 DROP VIEW IF EXISTS lab.vw_ActiveCustomers;
 DROP VIEW IF EXISTS lab.vw_BoundProducts;
@@ -517,3 +658,13 @@ DROP TABLE IF EXISTS lab.Orders;
 DROP TABLE IF EXISTS lab.Customers;
 DROP TABLE IF EXISTS lab.Products;
 */
+
+-- =================================================================================================
+-- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
+-- =================================================================================================
+-- CREATE VIEW, views atualizáveis e WITH CHECK OPTION:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/statements/create-view-transact-sql?view=sql-server-ver17
+-- Views indexadas, SCHEMABINDING, opções SET obrigatórias e NOEXPAND:
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/views/create-indexed-views?view=sql-server-ver17
+-- Sintaxe de CREATE INDEX e opções de índice:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/statements/create-index-transact-sql?view=sql-server-ver17

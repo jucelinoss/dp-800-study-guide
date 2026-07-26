@@ -69,6 +69,14 @@ IF EXISTS (SELECT *
 FROM sys.views
 WHERE name = 'vw_InvalidOrderBy' AND schema_id = SCHEMA_ID('lab'))
     DROP VIEW lab.vw_InvalidOrderBy;
+IF EXISTS (SELECT *
+FROM sys.views
+WHERE name = 'vw_DailyCustomerRevenueIndexed' AND schema_id = SCHEMA_ID('lab'))
+    DROP VIEW lab.vw_DailyCustomerRevenueIndexed;
+IF EXISTS (SELECT *
+FROM sys.views
+WHERE name = 'vw_ActiveCustomerRevenueIndexed' AND schema_id = SCHEMA_ID('lab'))
+    DROP VIEW lab.vw_ActiveCustomerRevenueIndexed;
 
 DROP TABLE IF EXISTS lab.Orders;
 DROP TABLE IF EXISTS lab.NullableOrders;
@@ -496,13 +504,122 @@ GO
 -- PART 7: PRACTICAL PROJECT SCENARIOS
 -- =================================================================================
 
--- SCENARIO 1: High-Performance Analytical Dashboard for E-Commerce
--- Problem: Billing reports aggregate millions of sales and cause high CPU.
--- Solution: Use materialized Indexed View with NOEXPAND to eliminate aggregation time.
+-- An indexed view makes a difference when the SAME aggregation/join is read frequently,
+-- the base tables are large, and the additional cost of every INSERT/UPDATE/DELETE is acceptable.
+-- It does not "eliminate" query time: it trades some read processing for disk space and
+-- synchronous maintenance work during DML on the base tables.
 
-SELECT CustomerID, TotalSpent
+-- SCENARIO 1: Executive e-commerce dashboard ranking
+-- Problem: every dashboard refresh scans sales to calculate the total per customer. With
+-- millions of orders, the GROUP BY competes for CPU and logical reads.
+-- Why the view helps: the total per customer is already calculated in the clustered index
+-- of vw_OrderSummaryIndexed, so the query reads only the materialized groups.
+-- Good fit: many dashboard reads and a moderate volume of changes.
+SELECT CustomerID, TotalOrders, TotalSpent
+FROM lab.vw_OrderSummaryIndexed WITH (NOEXPAND)
+WHERE TotalSpent > 100.00
+ORDER BY TotalSpent DESC;
+GO
+
+-- Compare the execution plan with the aggregation performed on the base table. In a real
+-- workload, expect the second query to process all qualifying rows in lab.Orders, while
+-- the first seeks the view index. The results must be identical.
+SET STATISTICS IO, TIME ON;
+GO
+
+SELECT CustomerID, TotalOrders, TotalSpent
 FROM lab.vw_OrderSummaryIndexed WITH (NOEXPAND)
 WHERE TotalSpent > 100.00;
+
+SELECT CustomerID, COUNT_BIG(*) AS TotalOrders, SUM(TotalAmount) AS TotalSpent
+FROM lab.Orders
+GROUP BY CustomerID
+HAVING SUM(TotalAmount) > 100.00;
+GO
+
+SET STATISTICS IO, TIME OFF;
+GO
+
+-- SCENARIO 2: Intraday monitoring of customer revenue and volume
+-- Problem: an operations center refreshes cards such as "today's revenue", "order count",
+-- and sales-drop alerts every few seconds.
+-- Why the view helps: the same customer-and-date aggregation is no longer recalculated
+-- repeatedly. The index can directly locate a day and a customer.
+-- Good fit: read-intensive dashboards where there are fewer order changes than indicator reads.
+CREATE VIEW lab.vw_DailyCustomerRevenueIndexed
+WITH SCHEMABINDING
+AS
+    SELECT
+        o.CustomerID,
+        o.OrderDate,
+        COUNT_BIG(*) AS TotalOrders,
+        SUM(o.TotalAmount) AS DailyRevenue
+    FROM lab.Orders AS o
+    GROUP BY o.CustomerID, o.OrderDate;
+GO
+
+CREATE UNIQUE CLUSTERED INDEX CIX_vw_DailyCustomerRevenueIndexed
+ON lab.vw_DailyCustomerRevenueIndexed(CustomerID, OrderDate);
+GO
+
+-- This query is typical of an endpoint that feeds a dashboard card.
+SELECT CustomerID, OrderDate, TotalOrders, DailyRevenue
+FROM lab.vw_DailyCustomerRevenueIndexed WITH (NOEXPAND)
+WHERE CustomerID = 1
+  AND OrderDate >= '2025-01-01'
+  AND OrderDate < '2025-02-01'
+ORDER BY OrderDate;
+GO
+
+-- SCENARIO 3: Active-customer segmentation for CRM and customer service
+-- Problem: several services continuously query active customers' spend and purchase count.
+-- The original query joins Customers to Orders and then aggregates.
+-- Why the view helps: it materializes both the INNER JOIN and aggregation. A change to
+-- IsActive or to an order automatically updates the result.
+-- Good fit: few status changes and many reads for segments and rankings.
+CREATE VIEW lab.vw_ActiveCustomerRevenueIndexed
+WITH SCHEMABINDING
+AS
+    SELECT
+        c.CustomerID,
+        COUNT_BIG(*) AS TotalOrders,
+        SUM(o.TotalAmount) AS TotalSpent
+    FROM lab.Customers AS c
+    INNER JOIN lab.Orders AS o
+        ON o.CustomerID = c.CustomerID
+    WHERE c.IsActive = 1
+    GROUP BY c.CustomerID;
+GO
+
+CREATE UNIQUE CLUSTERED INDEX CIX_vw_ActiveCustomerRevenueIndexed
+ON lab.vw_ActiveCustomerRevenueIndexed(CustomerID);
+GO
+
+-- Example: campaign for active customers with high cumulative value.
+SELECT CustomerID, TotalOrders, TotalSpent
+FROM lab.vw_ActiveCustomerRevenueIndexed WITH (NOEXPAND)
+WHERE TotalSpent >= 500.00
+ORDER BY TotalSpent DESC;
+GO
+
+-- SCENARIO 4: When NOT to use an indexed view
+-- An administrative screen queried once per day, or an orders table receiving many
+-- INSERTs/UPDATEs per second, usually does not justify the view-index maintenance cost.
+-- Every DML operation on lab.Orders makes SQL Server maintain:
+--   * CIX_vw_OrderSummaryIndexed;
+--   * CIX_vw_DailyCustomerRevenueIndexed; and
+--   * CIX_vw_ActiveCustomerRevenueIndexed.
+-- In these cases, first consider indexes on base tables, application caching, a batch-updated
+-- summary table, or a separate analytics solution. Always validate with an actual plan and
+-- SET STATISTICS IO, TIME, comparing saved reads with added write latency.
+
+-- DECISION SUMMARY
+-- Use case                                  | Is an indexed view usually suitable?
+-- Dashboard with repeated aggregation       | Yes: pre-calculates GROUP BY/SUM/COUNT_BIG.
+-- Frequent join + aggregation query         | Yes: when it meets definition restrictions.
+-- Occasional report                          | Usually no: maintenance cost predominates.
+-- Write-intensive OLTP                      | Usually no: every DML maintains all indexes.
+-- OUTER JOIN, TOP, or GETDATE() logic       | No: it cannot compose an indexed view.
 GO
 
 -- =================================================================================
@@ -510,6 +627,8 @@ GO
 -- =================================================================================
 /*
 DROP VIEW IF EXISTS lab.vw_NonDeterministicView;
+DROP VIEW IF EXISTS lab.vw_ActiveCustomerRevenueIndexed;
+DROP VIEW IF EXISTS lab.vw_DailyCustomerRevenueIndexed;
 DROP VIEW IF EXISTS lab.vw_OrderSummaryIndexed;
 DROP VIEW IF EXISTS lab.vw_ActiveCustomers;
 DROP VIEW IF EXISTS lab.vw_BoundProducts;
@@ -517,3 +636,13 @@ DROP TABLE IF EXISTS lab.Orders;
 DROP TABLE IF EXISTS lab.Customers;
 DROP TABLE IF EXISTS lab.Products;
 */
+
+-- =================================================================================================
+-- OFFICIAL MICROSOFT LEARN REFERENCES
+-- =================================================================================================
+-- CREATE VIEW, updatable views and WITH CHECK OPTION:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/create-view-transact-sql?view=sql-server-ver17
+-- Indexed views, SCHEMABINDING, required SET options and NOEXPAND:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/views/create-indexed-views?view=sql-server-ver17
+-- CREATE INDEX syntax and index options:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql?view=sql-server-ver17

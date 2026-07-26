@@ -371,6 +371,35 @@ O divisor de águas entre as Inline TVFs (iTVFs) e as Multi-statement TVFs (mTVF
 - Historicamente, o otimizador usava uma estimativa fixa de linhas para mTVFs (1 linha antes do SQL Server 2014 e 100 linhas a partir do SQL Server 2014).
 - A execução intercalada de mTVFs, disponível no SQL Server 2017+ com nível de compatibilidade 140 e em serviços Azure compatíveis, pode executar a mTVF durante a otimização e usar a cardinalidade real da primeira execução. Ela não é a compilação adiada de variáveis de tabela.
 
+### Execução intercalada (*Interleaved Execution*) para mTVFs
+
+É um recurso de **Intelligent Query Processing (IQP)** que corrige uma limitação específica das mTVFs: antes de conhecer o tamanho de sua tabela de retorno, o otimizador precisava usar um palpite fixo de cardinalidade. A partir do SQL Server 2017, com `COMPATIBILITY_LEVEL` 140 ou superior, uma consulta elegível pode interromper temporariamente a otimização para obter esse dado real.
+
+O fluxo é o seguinte:
+
+1. O otimizador começa a compilar a consulta e encontra uma mTVF candidata.
+2. Em vez de escolher de imediato o restante do plano com o palpite fixo, ele pausa a otimização.
+3. O SQL Server executa a parte da consulta que materializa a mTVF e captura a quantidade real de linhas retornadas.
+4. A otimização é retomada para os operadores **posteriores** à mTVF — por exemplo, `JOIN`, `Sort`, agregações e *memory grant* — agora com essa cardinalidade.
+
+Isso pode mudar uma escolha inadequada de `Nested Loops` para `Hash Join`, dimensionar melhor a memória e reduzir *spills* no TempDB. A primeira execução que compila o plano é essencial: é nela que a cardinalidade é observada; se o plano sair do cache, uma nova compilação repete o processo. `OPTION (RECOMPILE)` também cria um plano novo para aquela execução.
+
+**Pré-requisitos e verificação:** o banco precisa estar em compatibilidade 140+, a configuração de execução intercalada deve estar habilitada (padrão) e a instrução precisa ser elegível. Não é uma garantia para toda mTVF ou todo contexto de consulta. A consulta precisa de fato ser executada para que o mecanismo revise a estimativa; o plano estimado apenas pode indicar candidatos com o atributo XML `ContainsInterleavedExecutionCandidates`. No plano real, compare as linhas estimadas e reais no operador da TVF e nas operações posteriores.
+
+```sql
+-- Confirme o nível de compatibilidade necessário.
+SELECT name, compatibility_level
+FROM sys.databases
+WHERE name = DB_NAME();
+
+-- Verifique a configuração aplicável à versão instalada.
+SELECT name, value, value_for_secondary
+FROM sys.database_scoped_configurations
+WHERE name IN (N'INTERLEAVED_EXECUTION_TVF', N'DISABLE_INTERLEAVED_EXECUTION_TVF');
+```
+
+**Limites importantes:** a execução intercalada melhora a estimativa de **quantidade de linhas**, não cria estatísticas ou histogramas sobre a tabela de retorno, não torna a lógica da mTVF visível ao otimizador e não elimina o custo de materializá-la. Portanto, uma iTVF continua sendo a opção preferida quando a regra de negócio puder ser expressa em um único `SELECT`. Não confunda este recurso com *Table Variable Deferred Compilation* (SQL Server 2019/compatibilidade 150), que trata variáveis de tabela declaradas na consulta, não o resultado de uma mTVF.
+
 **Gargalo de cardinalidade:** Quando uma mTVF retorna milhares de registros reais, mas o otimizador estima de antemão apenas 100, os operadores subsequentes (joins, ordenação, agregação) são dimensionados de forma incorreta. Isso gera concessões de memória insuficientes (memory grant underestimates), vazamentos de memória para o TempDB e estratégias de joins ineficientes.
 
 **Regra geral:** Adote sistematicamente as Inline TVFs, exceto em cenários de processamentos imperativos complexos em múltiplos passos impossíveis de serem modelados em um único `SELECT`.

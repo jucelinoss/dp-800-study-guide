@@ -156,7 +156,36 @@ The key difference between inline TVFs (ITVFs) and multi-statement TVFs (MSTVFs)
 
 - Populates a table variable through multiple statements; the body is a black box
 - Optimizer uses a **fixed row count estimate**: 1 row (SQL Server 2012 and earlier) or 100 rows (SQL Server 2014–2016)
-- SQL Server 2019+ introduces **table variable deferred compilation**, which improves estimates but still requires a first execution
+- SQL Server 2017+ at compatibility level 140 can use **interleaved execution** for eligible queries to improve the estimate
+
+### Interleaved Execution for MSTVFs
+
+Interleaved execution is an **Intelligent Query Processing (IQP)** feature that addresses a specific MSTVF limitation: before it knows the size of the return table, the optimizer otherwise has to use a fixed cardinality guess. Starting with SQL Server 2017 at `COMPATIBILITY_LEVEL` 140 or higher, an eligible query can temporarily interrupt optimization to obtain that real value.
+
+The process is:
+
+1. The optimizer begins compiling the query and encounters a candidate MSTVF.
+2. Instead of immediately choosing the rest of the plan with the fixed guess, optimization pauses.
+3. SQL Server executes the subtree that materializes the MSTVF and captures its actual row count.
+4. Optimization resumes for operators **downstream** of the MSTVF — for example, `JOIN`, `Sort`, aggregates, and the memory grant — using that cardinality.
+
+This can replace an unsuitable `Nested Loops` choice with a `Hash Join`, size memory more appropriately, and reduce tempdb spills. The first execution that compiles the plan is important because that is when cardinality is observed. If the plan leaves cache, a new compilation repeats the process; `OPTION (RECOMPILE)` likewise creates a new plan for that execution.
+
+**Requirements and verification:** the database must use compatibility level 140+, interleaved execution must be enabled (the default), and the statement must be eligible. It is not guaranteed for every MSTVF or query context. The query must actually execute before the estimate can be revised; an estimated plan can only flag candidates through the `ContainsInterleavedExecutionCandidates` XML showplan attribute. In the actual plan, compare estimated and actual rows at the TVF operator and downstream operations.
+
+```sql
+-- Confirm the required compatibility level.
+SELECT name, compatibility_level
+FROM sys.databases
+WHERE name = DB_NAME();
+
+-- Check the configuration applicable to the installed version.
+SELECT name, value, value_for_secondary
+FROM sys.database_scoped_configurations
+WHERE name IN (N'INTERLEAVED_EXECUTION_TVF', N'DISABLE_INTERLEAVED_EXECUTION_TVF');
+```
+
+**Important limits:** interleaved execution improves the estimate of the **row count**; it does not create statistics or histograms over the return table, make the MSTVF body visible to the optimizer, or eliminate the cost of materializing it. An ITVF therefore remains preferable whenever the business rule can be expressed as a single `SELECT`. Do not confuse this feature with *Table Variable Deferred Compilation* (SQL Server 2019, compatibility level 150), which applies to table variables declared in a query, not to an MSTVF result.
 
 **Cardinality estimation problem:** When an MSTVF returns thousands of rows but the optimizer estimates 100, downstream operators (joins, sorts, aggregates) are sized incorrectly. This causes memory grant underestimates, spills to tempdb, and poor join strategies.
 
@@ -285,7 +314,7 @@ END;
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
 | Slow query with scalar function | Row-by-row execution, no parallelism | `Rewrite as inline TVF or inline the logic` |
-| mTVF performance poor | No statistics on table variable | Upgrade to SQL 2019+ (table variable deferred compilation) or use `OPTION (RECOMPILE)` |
+| mTVF performance poor | Inadequate cardinality estimate for the result | Rewrite as an iTVF where possible; otherwise, validate interleaved execution on SQL Server 2017+ at compatibility level 140 |
 | Cannot create index on computed column | Function not deterministic or missing SCHEMABINDING | Add `WITH SCHEMABINDING` and ensure all referenced objects use two-part names |
 | CROSS APPLY returns fewer rows than expected | Using CROSS APPLY instead of OUTER APPLY | Switch to OUTER APPLY to preserve rows where the TVF returns no results |
 
@@ -295,7 +324,7 @@ END;
 
 - Prefer **inline TVFs over scalar functions** for any set-based operation — ITVFs allow parallelism and optimizer inlining
 - Always add `WITH SCHEMABINDING` to functions used in computed columns, indexed views, or other schema-bound objects
-- Avoid MSTVFs for high-volume queries; if you must use them, add `OPTION (RECOMPILE)` or upgrade to SQL Server 2019+ to benefit from deferred compilation
+- Avoid MSTVFs for high-volume queries; if one is unavoidable, validate the actual plan and, on SQL Server 2017+ at compatibility level 140, check whether interleaved execution is available
 - Use **CROSS APPLY** (not a correlated subquery) when calling a TVF for each row of a driving table — it's cleaner and often faster
 - Test function determinism with `OBJECTPROPERTY` before relying on a UDF in an indexed computed column
 
@@ -307,7 +336,7 @@ END;
 >
 > - **Inline TVF is the preferred function type** — it's inlined by the optimizer
 > - Scalar functions **prevent parallelism** when used in DML or large queries
-> - Multi-statement TVFs have a fixed cardinality estimate (1 row) by default unless using deferred compilation (SQL 2019+)
+> - Multi-statement TVFs historically use fixed cardinality estimates: 1 row before SQL Server 2014 and 100 rows starting with it. SQL Server 2017+ at compatibility level 140 can use interleaved execution to obtain actual cardinality.
 > - `SCHEMABINDING` is required for a UDF to be used in an indexed computed column or indexed view
 > - `CROSS APPLY` returns only matched rows (like INNER JOIN); `OUTER APPLY` returns all left rows (like LEFT JOIN)
 
@@ -340,7 +369,7 @@ D. The TVF is missing a clustered index on its return table variable
 > [!success]- Answer
 > **B — The optimizer cannot see inside multi-statement TVFs and uses a fixed row count estimate**
 >
-> MSTVFs are a "black box" to the optimizer — it cannot see the SELECT logic inside and uses a fixed estimate (100 rows in SQL Server 2014–2016, 1 row in earlier versions). This causes cardinality misestimation and poor plan choices downstream. Consider rewriting as an inline TVF (ITVF) where possible. CROSS APPLY (C) is the correct join mechanism for TVFs but doesn't cause the row count issue.
+> MSTVFs are a "black box" to the optimizer — it cannot see the SELECT logic inside and historically uses a fixed estimate (100 rows starting with SQL Server 2014, 1 row in earlier versions). SQL Server 2017+ at compatibility level 140 can improve this estimate through interleaved execution. Consider rewriting as an inline TVF (ITVF) where possible. CROSS APPLY (C) is the correct join mechanism for TVFs but doesn't cause the row count issue.
 
 ---
 
@@ -356,6 +385,9 @@ D. The TVF is missing a clustered index on its return table variable
 
 - [User-Defined Functions](https://learn.microsoft.com/en-us/sql/relational-databases/user-defined-functions/user-defined-functions)
 - [Scalar UDF Inlining](https://learn.microsoft.com/en-us/sql/relational-databases/user-defined-functions/scalar-udf-inlining)
+- [Intelligent Query Processing and Interleaved Execution](https://learn.microsoft.com/en-us/sql/relational-databases/performance/intelligent-query-processing)
+- [Intelligent Query Processing Details: Interleaved Execution for MSTVFs](https://learn.microsoft.com/en-us/sql/relational-databases/performance/intelligent-query-processing-details)
+- [ALTER DATABASE SCOPED CONFIGURATION: INTERLEAVED_EXECUTION_TVF](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql)
 
 ---
 

@@ -12,19 +12,29 @@
 --   3. Impacto de Desempenho e Cardinalidade (Visibilidade pelo Otimizador)
 --   4. Operadores CROSS APPLY e OUTER APPLY com Funções de Tabela
 --   5. Schemabinding e Teste de Determinismo via OBJECTPROPERTY
---   6. Cenários Práticos de Projeto (Cálculo de Desconto Inline e Relatórios Hierárquicos)
+--   6. Benchmark com milhões de linhas: iTVF + CROSS APPLY, mTVF e Scalar UDF
 -- =================================================================================
 
 USE AdventureWorks2025;
 GO
 
--- Limpeza preventiva
+-- Limpeza preventiva. Os labs de Views e Functions compartilham as tabelas lab.Orders e
+-- lab.Customers; remova primeiro as views com SCHEMABINDING que podem impedir o DROP TABLE.
+DROP VIEW IF EXISTS lab.vw_ActiveCustomerRevenueIndexed;
+DROP VIEW IF EXISTS lab.vw_DailyCustomerRevenueIndexed;
+DROP VIEW IF EXISTS lab.vw_OrderSummaryIndexed;
+DROP VIEW IF EXISTS lab.vw_OrderSummaryIndexed_BadCount;
+DROP VIEW IF EXISTS lab.vw_OuterJoinIndexed;
+DROP VIEW IF EXISTS lab.vw_NonDeterministicView;
+
 IF EXISTS (SELECT * FROM sys.objects WHERE name = 'fn_FormatCustomerName' AND type IN ('FN', 'IF', 'TF'))
     DROP FUNCTION lab.fn_FormatCustomerName;
 IF EXISTS (SELECT * FROM sys.objects WHERE name = 'fn_GetCustomerOrdersInline' AND type IN ('FN', 'IF', 'TF'))
     DROP FUNCTION lab.fn_GetCustomerOrdersInline;
 IF EXISTS (SELECT * FROM sys.objects WHERE name = 'fn_GetCustomerOrdersMultiStatement' AND type IN ('FN', 'IF', 'TF'))
     DROP FUNCTION lab.fn_GetCustomerOrdersMultiStatement;
+IF EXISTS (SELECT * FROM sys.objects WHERE name = 'fn_GetCustomerLifetimeTotalScalar' AND type IN ('FN', 'IF', 'TF'))
+    DROP FUNCTION lab.fn_GetCustomerLifetimeTotalScalar;
 
 DROP TABLE IF EXISTS lab.OrderItems;
 DROP TABLE IF EXISTS lab.Orders;
@@ -84,7 +94,7 @@ GO
 -- tem o nó <UserDefinedFunction>.
 SELECT 
     name,
-    OBJECTPROPERTY(object_id, 'IsDeterministic') AS IsDeterministic,
+    OBJECTPROPERTY(o.object_id, 'IsDeterministic') AS IsDeterministic,
     sm.is_inlineable
 FROM sys.objects o
 JOIN sys.sql_modules sm ON o.object_id = sm.object_id
@@ -99,9 +109,10 @@ GO
 --   - INLINE TVF (iTVF): Retorna o resultado de um único comando `SELECT`. É transparente para o otimizador,
 --     que a expande como uma View Parametrizada, permitindo estatísticas precisas e execução paralela.
 --   - MULTI-STATEMENT TVF (mTVF): Popula explicitamente uma variável de tabela (`@Result TABLE`) em múltiplas etapas.
---     Continua menos transparente para o otimizador. No SQL Server 2025, consultas somente leitura elegíveis
---     podem usar interleaved execution para revisar a estimativa após materializar a mTVF; isso não transforma
---     a função em iTVF nem elimina todos os seus custos.
+--     Continua menos transparente para o otimizador. A partir do SQL Server 2017 com compatibilidade 140,
+--     a execução intercalada (*interleaved execution*) pode pausar a otimização, executar a mTVF e usar sua
+--     contagem real de linhas para otimizar os operadores posteriores (por exemplo, JOIN e memory grant).
+--     Ela exige uma consulta elegível, não torna a função uma iTVF e não elimina todos os seus custos.
 
 -- 1. Criar Inline TVF (Recomendado para Performance)
 CREATE FUNCTION lab.fn_GetCustomerOrdersInline (@CustomerID INT)
@@ -146,6 +157,30 @@ BEGIN
 END;
 GO
 
+-- 3. Preparar dados para comparar as duas funções com a mesma consulta chamadora.
+-- Charlie fica sem pedidos de propósito: isso também será usado na demonstração de APPLY.
+INSERT INTO lab.Customers (FirstName, LastName)
+VALUES ('Alice', 'Smith'), ('Bob', 'Jones'), ('Charlie', 'Brown');
+INSERT INTO lab.Orders (CustomerID, OrderDate)
+VALUES (1, '2025-01-10');
+INSERT INTO lab.OrderItems (OrderID, ProductName, Quantity, UnitPrice)
+VALUES (1, 'Teclado', 1, 150.00);
+GO
+
+-- 4. Comparação didática de desempenho: habilite o Plano de Execução Atual (Ctrl+M).
+-- As duas consultas retornam o mesmo resultado. A iTVF é expandida no plano; a mTVF
+-- retorna uma tabela materializada. Com compatibilidade 140+ e consulta elegível, a mTVF
+-- pode ter a estimativa revisada por execução intercalada, sem expor sua lógica interna.
+SELECT c.CustomerID, c.FirstName, fn.OrderID, fn.TotalAmount
+FROM lab.Customers AS c
+OUTER APPLY lab.fn_GetCustomerOrdersInline(c.CustomerID) AS fn;
+GO
+
+SELECT c.CustomerID, c.FirstName, fn.OrderID, fn.TotalAmount
+FROM lab.Customers AS c
+OUTER APPLY lab.fn_GetCustomerOrdersMultiStatement(c.CustomerID) AS fn;
+GO
+
 
 -- =================================================================================
 -- PARTE 3: OPERADORES APPLY (CROSS APPLY VS OUTER APPLY)
@@ -155,12 +190,6 @@ GO
 --     tabela à esquerda e retorna apenas as linhas em que a função produziu ao menos um resultado.
 --   - OUTER APPLY: Funciona de forma análoga a um `LEFT JOIN`. Retorna todas as linhas da tabela à esquerda,
 --     preenchendo com NULL nos campos da função quando ela não retornar registros.
-
--- Inserir dados de teste
-INSERT INTO lab.Customers (FirstName, LastName) VALUES ('Alice', 'Smith'), ('Bob', 'Jones'), ('Charlie', 'Brown');
-INSERT INTO lab.Orders (CustomerID, OrderDate) VALUES (1, '2025-01-10');
-INSERT INTO lab.OrderItems (OrderID, ProductName, Quantity, UnitPrice) VALUES (1, 'Teclado', 1, 150.00);
-GO
 
 -- -- [PONTO DE ATENÇÃO DP-800]
 -- CROSS APPLY: Charlie não tem pedidos, portanto NÃO APARECE no resultado
@@ -172,14 +201,6 @@ CROSS APPLY lab.fn_GetCustomerOrdersInline(c.CustomerID) fn;
 SELECT c.CustomerID, c.FirstName, fn.OrderID, fn.TotalAmount
 FROM lab.Customers c
 OUTER APPLY lab.fn_GetCustomerOrdersInline(c.CustomerID) fn;
-GO
-
--- Comparação didática: habilite o Plano de Execução Atual (Ctrl+M) e compare a iTVF com a mTVF.
--- A iTVF é expandida na consulta; a mTVF retorna uma tabela materializada. Em SQL Server 2025,
--- uma consulta somente leitura pode mostrar interleaved execution e estimativa revisada para a mTVF.
-SELECT c.CustomerID, c.FirstName, fn.OrderID, fn.TotalAmount
-FROM lab.Customers AS c
-OUTER APPLY lab.fn_GetCustomerOrdersMultiStatement(c.CustomerID) AS fn;
 GO
 
 
@@ -197,15 +218,179 @@ GO
 -- PARTE 5: CENÁRIOS PRÁTICOS DE PROJETO
 -- =================================================================================
 
---- CENÁRIO 1: Cálculo de Desconto Progressivo Inline em Relatório de Vendas
--- Em vez de chamar uma função escalar dentro do SELECT em milhões de registros,
--- utiliza-se um Inline TVF combinado com CROSS APPLY para performance ideal.
+-- CENÁRIO 1: Benchmark de alta volumetria — iTVF + CROSS APPLY vs. mTVF e Scalar UDF
+-- Objetivo: comparar três formas de obter o total de pedidos por cliente com o MESMO resultado:
+--   A. Recomendada: iTVF com CROSS APPLY. A lógica interna participa do plano chamador.
+--   B. Evitar em alta volumetria: mTVF com CROSS APPLY. A função é invocada por cliente e
+--      materializa uma variável de tabela; o plano externo não enxerga sua lógica.
+--   C. Evitar em consultas orientadas a conjuntos: Scalar UDF não-inlined, executada por cliente.
+--
+-- AVISO: a configuração padrão insere aproximadamente 1.000.000 de pedidos e 2.000.000
+-- de itens. Ajuste as duas variáveis se o ambiente tiver pouco espaço, log ou tempo de CPU.
+-- Execute em um banco de laboratório; esta carga apaga os objetos lab no início do script.
 
-SELECT 
+DECLARE @BenchmarkCustomerCount INT = 100000;
+DECLARE @OrdersPerCustomer INT = 10;
+DECLARE @FirstBenchmarkCustomerID INT = CONVERT(INT, IDENT_CURRENT(N'lab.Customers')) + 1;
+
+-- Gera clientes de forma set-based. sys.all_objects é usado apenas como fonte de números.
+;WITH Numbers AS
+(
+    SELECT TOP (@BenchmarkCustomerCount)
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS Number
+    FROM sys.all_objects AS a
+    CROSS JOIN sys.all_objects AS b
+)
+INSERT INTO lab.Customers (FirstName, LastName)
+SELECT
+    CONCAT(N'Cliente', Number),
+    CONCAT(N'Benchmark', Number)
+FROM Numbers;
+
+-- Cada cliente novo recebe @OrdersPerCustomer pedidos: 100.000 x 10 = 1.000.000 por padrão.
+INSERT INTO lab.Orders (CustomerID, OrderDate, Status)
+SELECT
     c.CustomerID,
-    lab.fn_FormatCustomerName(c.FirstName, c.LastName) AS CustomerNameFormatted,
-    ord.OrderID,
-    ord.TotalAmount
-FROM lab.Customers c
-CROSS APPLY lab.fn_GetCustomerOrdersInline(c.CustomerID) ord;
+    DATEADD(DAY, -((c.CustomerID * @OrdersPerCustomer + n.OrderSequence) % 730), CONVERT(DATE, '2025-12-31')),
+    N'Active'
+FROM lab.Customers AS c
+CROSS JOIN
+(
+    SELECT TOP (@OrdersPerCustomer)
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS OrderSequence
+    FROM sys.all_objects
+) AS n
+WHERE c.CustomerID >= @FirstBenchmarkCustomerID;
+
+-- Dois itens por pedido: 2.000.000 de itens para a configuração padrão.
+INSERT INTO lab.OrderItems (OrderID, ProductName, Quantity, UnitPrice)
+SELECT
+    o.OrderID,
+    CONCAT(N'Produto ', i.ItemSequence),
+    i.ItemSequence,
+    CONVERT(DECIMAL(18,2), 10.00 * i.ItemSequence)
+FROM lab.Orders AS o
+CROSS JOIN (VALUES (1), (2)) AS i(ItemSequence)
+WHERE o.CustomerID >= @FirstBenchmarkCustomerID;
 GO
+
+-- Índices alinhados aos predicados e joins das TVFs. Crie-os APÓS a carga para evitar
+-- manter índices durante os milhões de INSERTs.
+CREATE INDEX IX_Orders_CustomerID_OrderID
+ON lab.Orders (CustomerID, OrderID)
+INCLUDE (OrderDate, Status);
+
+CREATE INDEX IX_OrderItems_OrderID
+ON lab.OrderItems (OrderID)
+INCLUDE (Quantity, UnitPrice);
+GO
+
+-- Atualize estatísticas para que a iTVF tenha informação representativa ao ser expandida.
+UPDATE STATISTICS lab.Orders IX_Orders_CustomerID_OrderID;
+UPDATE STATISTICS lab.OrderItems IX_OrderItems_OrderID;
+
+SELECT
+    (SELECT COUNT_BIG(*) FROM lab.Customers) AS Customers,
+    (SELECT COUNT_BIG(*) FROM lab.Orders) AS Orders,
+    (SELECT COUNT_BIG(*) FROM lab.OrderItems) AS OrderItems;
+GO
+
+-- Scalar UDF propositalmente não-inlined: é usada somente para demonstrar o custo RBAR.
+-- INLINE = OFF requer SQL Server 2019+; remova essa opção apenas se estiver em versão anterior.
+CREATE FUNCTION lab.fn_GetCustomerLifetimeTotalScalar (@CustomerID INT)
+RETURNS DECIMAL(38,2)
+WITH SCHEMABINDING, INLINE = OFF
+AS
+BEGIN
+    DECLARE @Total DECIMAL(38,2);
+
+    SELECT @Total = SUM(oi.Quantity * oi.UnitPrice)
+    FROM lab.Orders AS o
+    INNER JOIN lab.OrderItems AS oi
+        ON oi.OrderID = o.OrderID
+    WHERE o.CustomerID = @CustomerID;
+
+    RETURN @Total;
+END;
+GO
+
+-- Habilite o Plano de Execução Atual (Ctrl+M). Rode cada consulta pelo menos duas vezes
+-- e alterne a ordem entre as execuções: a primeira inclui aquecimento de cache. Compare:
+--   * CPU e leituras lógicas nas mensagens de STATISTICS IO/TIME;
+--   * linhas estimadas x reais; e
+--   * presença de Table-valued function / UserDefinedFunction no plano.
+-- Cada consulta retorna apenas UMA linha de resumo para que o envio de 100.000 linhas ao
+-- SSMS não mascare o custo do banco. A e B devem retornar o mesmo número de pedidos e total.
+SET STATISTICS IO, TIME ON;
+GO
+
+-- FASE 1 — COMPARATIVO PRINCIPAL: iTVF x mTVF com aproximadamente 1 milhão de pedidos.
+-- A. RECOMENDADA: a iTVF é expandida e o otimizador pode escolher o plano para o conjunto inteiro.
+SELECT
+    COUNT_BIG(*) AS OrdersReturned,
+    SUM(ord.TotalAmount) AS GrandTotal
+FROM lab.Customers AS c
+CROSS APPLY lab.fn_GetCustomerOrdersInline(c.CustomerID) AS ord
+WHERE c.CustomerID >= 4
+OPTION (RECOMPILE);
+GO
+
+-- B. NÃO RECOMENDADA EM ALTA VOLUMETRIA: mesmo resultado, mas uma mTVF é chamada por cliente.
+-- No plano, observe a estimativa do operador Table-valued function e quantas execuções ele recebe.
+SELECT
+    COUNT_BIG(*) AS OrdersReturned,
+    SUM(ord.TotalAmount) AS GrandTotal
+FROM lab.Customers AS c
+CROSS APPLY lab.fn_GetCustomerOrdersMultiStatement(c.CustomerID) AS ord
+WHERE c.CustomerID >= 4
+OPTION (RECOMPILE);
+GO
+
+-- FASE 2 — REFERÊNCIA ADICIONAL: Scalar UDF não-inlined em modo RBAR.
+-- C. Mesmo GrandTotal, mas a função escalar é invocada uma vez para cada cliente novo.
+SELECT
+    COUNT_BIG(*) AS CustomersProcessed,
+    SUM(lab.fn_GetCustomerLifetimeTotalScalar(c.CustomerID)) AS GrandTotal
+FROM lab.Customers AS c
+WHERE c.CustomerID >= 4
+OPTION (RECOMPILE);
+GO
+
+SET STATISTICS IO, TIME OFF;
+GO
+
+
+-- =================================================================================
+-- MANUTENÇÃO E LIMPEZA (OPCIONAL)
+-- =================================================================================
+/*
+-- Execute este bloco ao terminar o laboratório. A ordem preserva a remoção das
+-- dependências schema-bound antes das tabelas compartilhadas entre os labs.
+DROP VIEW IF EXISTS lab.vw_ActiveCustomerRevenueIndexed;
+DROP VIEW IF EXISTS lab.vw_DailyCustomerRevenueIndexed;
+DROP VIEW IF EXISTS lab.vw_OrderSummaryIndexed;
+DROP VIEW IF EXISTS lab.vw_OrderSummaryIndexed_BadCount;
+DROP VIEW IF EXISTS lab.vw_OuterJoinIndexed;
+DROP VIEW IF EXISTS lab.vw_NonDeterministicView;
+
+DROP FUNCTION IF EXISTS lab.fn_GetCustomerLifetimeTotalScalar;
+DROP FUNCTION IF EXISTS lab.fn_GetCustomerOrdersMultiStatement;
+DROP FUNCTION IF EXISTS lab.fn_GetCustomerOrdersInline;
+DROP FUNCTION IF EXISTS lab.fn_FormatCustomerName;
+
+DROP TABLE IF EXISTS lab.OrderItems;
+DROP TABLE IF EXISTS lab.Orders;
+DROP TABLE IF EXISTS lab.Customers;
+*/
+
+-- =================================================================================================
+-- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
+-- =================================================================================================
+-- CREATE FUNCTION, UDFs escalares, iTVFs, mTVFs e SCHEMABINDING:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/statements/create-function-transact-sql?view=sql-server-ver17
+-- Inlining de UDF escalar e validação pelo plano:
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/user-defined-functions/scalar-udf-inlining?view=sql-server-ver17
+-- Execução intercalada para TVFs de múltiplas instruções:
+-- https://learn.microsoft.com/pt-br/sql/relational-databases/performance/intelligent-query-processing-details?view=sql-server-ver17
+-- Operadores APPLY:
+-- https://learn.microsoft.com/pt-br/sql/t-sql/queries/from-transact-sql?view=sql-server-ver17
