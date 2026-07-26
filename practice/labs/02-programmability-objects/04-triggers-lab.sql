@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS lab.Orders;
 DROP TABLE IF EXISTS lab.Customers;
 GO
 
+
 -- Table structure for testing
 CREATE TABLE lab.Products (
     ProductID INT IDENTITY(1,1) PRIMARY KEY,
@@ -217,3 +218,15 @@ EXEC sp_settriggerorder
     @order = 'First',
     @stmttype = 'UPDATE';
 GO
+
+-- =================================================================================================
+-- OFFICIAL MICROSOFT LEARN REFERENCES
+-- =================================================================================================
+-- CREATE TRIGGER, AFTER and INSTEAD OF triggers:
+-- https://learn.microsoft.com/en-us/sql/t-sql/statements/create-trigger-transact-sql?view=sql-server-ver17
+-- inserted and deleted logical tables:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/triggers/use-the-inserted-and-deleted-tables?view=sql-server-ver17
+-- DDL triggers and EVENTDATA():
+-- https://learn.microsoft.com/en-us/sql/relational-databases/triggers/ddl-triggers?view=sql-server-ver17
+-- Trigger firing order with sp_settriggerorder:
+-- https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-settriggerorder-transact-sql?view=sql-server-ver17

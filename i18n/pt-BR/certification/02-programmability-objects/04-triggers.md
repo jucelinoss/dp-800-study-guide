@@ -94,7 +94,7 @@ END;
 > [!important] Cuidado de Performance: Triggers rodam na mesma transação
 >
 > - Todos os DML Triggers (seja AFTER ou INSTEAD OF) executam **dentro da mesma transação do comando que os disparou**.
-> - Qualquer lock ou retenção de recursos realizada dentro do trigger estenderá o tempo de lock da transação principal, podendo causar sérios problemas de concorrência e bloqueios (blocking). Keep triggers short!
+> - Como o trigger só termina junto com a transação principal, qualquer consulta demorada, loop ou espera dentro dele mantém locks e outros recursos por mais tempo. Isso aumenta a chance de *blocking*, deadlocks e degradação de concorrência. Portanto, mantenha o trigger curto, com lógica *set-based*; para trabalho pesado, grave o evento em uma fila/tabela e processe-o de forma assíncrona.
 
 ### INSTEAD OF Triggers
 
@@ -351,11 +351,11 @@ WHERE object_id = OBJECT_ID('trg_Orders_Audit');
 
 ## Melhores Práticas (Best Practices)
 
-- **Sempre assuma DMLs multi-linhas**: As tabelas virtuais `inserted` e `deleted` conterão múltiplos registros em operações em massa (bulk inserts/updates). Escreva códigos que operem em conjuntos, nunca em linha única.
-- **Evite lógicas pesadas**: Os gatilhos rodam síncronos e bloqueiam a conclusão das transações dos usuários.
-- **Adote `SET NOCOUNT ON`**: Evita o retorno de resultados espúrios de contagem ao cliente, economizando rede e problemas em APIs.
-- **Evite recursividade de gatilhos**: Desligue via `ALTER DATABASE SET RECURSIVE_TRIGGERS OFF` para prevenir travamentos em loop.
-- **Testes rigorosos em Logon Triggers**: Um erro simples pode travar conexões de todos os usuários. Sempre garanta uma rota alternativa de bypass para logins SA e DAC.
+- **Sempre assuma DMLs multi-linhas**: `inserted` e `deleted` podem conter zero, uma ou milhares de linhas em uma única instrução. Código baseado em variáveis escalares, `TOP (1)` ou loops pode ignorar linhas e corromper regras de negócio; prefira uma única operação *set-based* que trate todo o conjunto.
+- **Mantenha a lógica curta**: O trigger participa da transação do DML que o disparou. Consultas lentas, loops e esperas prolongam locks, aumentam *blocking* e deadlocks e atrasam a confirmação da operação do usuário. Para trabalho pesado, registre o evento e processe-o de forma assíncrona.
+- **Adote `SET NOCOUNT ON`**: Cada DML interno pode emitir mensagens de “N linhas afetadas”. Elas não são o resultado de negócio, aumentam tráfego e podem confundir clientes, APIs ou procedures que esperam uma única contagem; `NOCOUNT` elimina esse ruído.
+- **Evite recursividade de gatilhos**: Um DML executado pelo próprio trigger pode dispará-lo novamente e repetir a cadeia até o limite de aninhamento ou até uma falha. Projete para não atualizar a mesma tabela sem necessidade e, quando a regra exigir, controle a recursividade com `ALTER DATABASE SET RECURSIVE_TRIGGERS OFF` e verificações explícitas.
+- **Teste Logon Triggers com rigor**: Eles executam antes de a sessão do usuário ser estabelecida. Um erro de sintaxe, uma dependência indisponível ou um `ROLLBACK` indevido pode bloquear praticamente todos os logins; mantenha uma rota de recuperação, como DAC e uma conta administrativa excluída da regra.
 
 ---
 

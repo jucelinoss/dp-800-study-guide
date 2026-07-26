@@ -9,6 +9,26 @@ tags:
   - instead-of
 ---
 
+> [!info] 🗺️ Quick Navigation Index
+>
+> - 📍 [1. Overview](#overview)
+> - 📍 [2. DML Triggers](#dml-triggers)
+>   - 🔹 [AFTER Triggers](#after-triggers)
+>   - 🔹 [INSTEAD OF Triggers](#instead-of-triggers)
+>   - 🔹 [INSTEAD OF Triggers on Views](#instead-of-triggers-on-views)
+> - 📍 [3. DDL and Logon Triggers](#ddl-triggers)
+>   - 🔹 [DDL Triggers](#ddl-triggers)
+>   - 🔹 [Trigger Execution Order](#trigger-execution-order)
+>   - 🔹 [Logon Triggers](#logon-triggers)
+> - 📍 [4. Practical Application & Summary](#use-cases)
+>   - 🔹 [Use Cases](#use-cases)
+>   - 🔹 [Common Issues & Errors](#common-issues--errors)
+>   - 🔹 [Best Practices](#best-practices)
+>   - 🔹 [Exam Tips](#exam-tips)
+>   - 🔹 [Practice Question](#practice-question)
+
+---
+
 # Triggers
 
 ## Overview
@@ -71,6 +91,11 @@ END;
 | DELETE | Empty | Old rows |
 | UPDATE | `New values` | Old values |
 
+> [!important] Performance: triggers run in the same transaction
+>
+> - Every DML trigger, whether `AFTER` or `INSTEAD OF`, executes **in the same transaction as the statement that fired it**.
+> - Because the trigger completes only when the original transaction completes, slow queries, loops, and waits inside it retain locks and resources longer. This increases blocking, deadlock, and concurrency risks. Keep trigger logic short and set-based; queue heavy work for asynchronous processing.
+
 ### INSTEAD OF Triggers
 
 INSTEAD OF triggers replace the DML operation entirely — used on views or to intercept inserts with custom logic.
@@ -111,7 +136,7 @@ Key behaviors:
 - The trigger fires **instead of** the DML — the original statement never executes
 - You must explicitly write the INSERT/UPDATE/DELETE in the trigger body
 - Supported: INSTEAD OF INSERT, INSTEAD OF UPDATE, INSTEAD OF DELETE
-- Fires **before** constraint checking (unlike AFTER triggers)
+- Because the original DML statement is replaced, the relevant constraints are those evaluated by the write statements that the trigger explicitly executes.
 
 ```sql
 -- View joining two tables (not directly updatable)
@@ -230,9 +255,18 @@ SELECT name, is_recursive_triggers_on
 FROM sys.databases WHERE name = DB_NAME();
 ```
 
+> [!warning] Nested-trigger limit exceeded
+>
+> - SQL Server allows trigger nesting only up to a hard limit of **32 levels**.
+> - If a trigger on table A inserts into B, which fires another trigger on C, and so on beyond 32 levels—or if an indirect loop occurs—the Database Engine raises an error and rolls back the entire transaction.
+
 ---
 
 ## Logon Triggers
+
+> [!important] Availability
+>
+> Logon triggers are supported in SQL Server and Azure SQL Managed Instance. They aren't supported in Azure SQL Database or Microsoft Fabric.
 
 Logon triggers are server-scoped triggers that fire when a SQL Server login session is established (after authentication but before the session is fully open).
 
@@ -251,7 +285,7 @@ BEGIN
     DECLARE @Hour int = DATEPART(HOUR, GETDATE());
     DECLARE @Weekday int = DATEPART(WEEKDAY, GETDATE());
 
-    -- Weekday: 1=Sun, 7=Sat; block weekends and outside 08-18
+    -- DATEPART(WEEKDAY) depends on SET DATEFIRST; adjust these values to your server configuration.
     IF @Weekday IN (1, 7) OR @Hour < 8 OR @Hour >= 18
     BEGIN
         IF ORIGINAL_LOGIN() <> 'sa'  -- allow emergency SA access
@@ -262,6 +296,11 @@ BEGIN
     END;
 END;
 ```
+
+> [!caution] Critical lockout risk
+>
+> - A logic or syntax error in a logon trigger can **block every incoming SQL Server connection**, including administrative logins.
+> - If this happens, a `sysadmin` member can use the **Dedicated Administrator Connection (DAC)** or start the Database Engine in minimal configuration to disable or remove the trigger.
 
 ---
 
@@ -298,7 +337,7 @@ WHERE object_id = OBJECT_ID('trg_Orders_Audit');
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| Trigger fires once for multi-row DML | `inserted`/`deleted` tables have multiple rows | `Write set-based logic, not `SELECT TOP 1` or scalar variables` |
+| Trigger fails or processes only the first row in multi-row DML | Code assumes one row, using `SELECT TOP (1)` or scalar variables | Write set-based logic that processes every row in `inserted` and `deleted`. |
 | Recursive trigger loop | Trigger updates a table that triggers itself | Check `sys.triggers.is_recursive` or disable recursive triggers |
 | Performance degradation | Trigger runs synchronously on every DML | Move heavy work to async process (Service Broker, queue) |
 | Logon trigger locks everyone out | Faulty ROLLBACK logic in logon trigger | Connect via DAC (`admin:`) to disable or drop the trigger |
@@ -307,11 +346,11 @@ WHERE object_id = OBJECT_ID('trg_Orders_Audit');
 
 ## Best Practices
 
-- **Write set-based logic**: `inserted` and `deleted` can contain multiple rows — never assume single-row triggers
-- **Keep triggers short**: Heavy logic in triggers causes blocking; use async approaches (Service Broker) for long operations
-- **Use `SET NOCOUNT ON`**: Prevents extra result sets from being sent to the client and avoids unexpected row-count side effects
-- **Avoid recursive triggers**: Can cause infinite loops; disable with `ALTER DATABASE SET RECURSIVE_TRIGGERS OFF`
-- **Test logon triggers carefully**: A broken logon trigger can lock all users out; always preserve a DAC or `sa` bypass path
+- **Write set-based logic**: `inserted` and `deleted` can contain zero, one, or thousands of rows for one statement. Scalar variables, `TOP (1)`, and loops can silently skip rows and violate business rules; use one set-based operation that handles the full set.
+- **Keep triggers short**: A trigger participates in the transaction that fired it. Slow queries, loops, and waits hold locks longer, increasing blocking and deadlock risk and delaying the user's commit. Queue long-running work for asynchronous processing instead.
+- **Use `SET NOCOUNT ON`**: Every internal DML statement can emit an “N rows affected” message. These are not the business result, add network traffic, and can confuse clients, APIs, or procedures that expect one row count; `NOCOUNT` removes that noise.
+- **Avoid recursive triggers**: DML issued by a trigger can fire it again and repeat the chain until the nesting limit or a failure. Avoid updating the same table unnecessarily and, when required, control recursion with `ALTER DATABASE SET RECURSIVE_TRIGGERS OFF` and explicit checks.
+- **Test logon triggers carefully**: They execute before a user session is established. A syntax error, unavailable dependency, or inappropriate `ROLLBACK` can block almost all logins; keep a recovery path such as the DAC and an administrative account excluded from the rule.
 
 ---
 
