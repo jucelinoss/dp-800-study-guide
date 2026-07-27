@@ -341,7 +341,7 @@ Advantages: Managed search service with built-in RRF; scales independently of da
 | LLM "makes up" information | Context doesn't contain the answer | Add "Only answer from the provided context. Say I don't know if not found." |
 | Slow end-to-end latency | Embedding + search + LLM in sequence | Parallelize where possible; use ANN index; use faster model (gpt-4o-mini) |
 | Context too long for LLM | Too many chunks retrieved | Limit to 3–5 most relevant chunks; use smaller chunks |
-| Inconsistent answers | Non-deterministic LLM | ==Set `temperature=0` for factual Q&A== |
+| Inconsistent answers | Non-deterministic LLM | **Set `temperature=0` for factual Q&A** |
 
 ---
 

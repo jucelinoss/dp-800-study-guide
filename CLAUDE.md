@@ -104,7 +104,7 @@ Use callouts to break up dense text in topic files and cheat sheets. Standard ty
 - Use `> [!tip] What the Exam Tests` immediately after the `[!abstract]` callout, before the first `##` section
 - Use `> [!tip] Exam Tips` blocks instead of bare bullet lists for the **Exam Tips** section in topic files
 - Use `> [!warning]` to highlight traps covered in the **Common Issues** section
-- Highlight key terms in tables with `==text==` (Obsidian highlight syntax)
+- Highlight key terms in tables with `**text**` (GitHub-compatible Markdown)
 
 ### Diagrams & Images
 

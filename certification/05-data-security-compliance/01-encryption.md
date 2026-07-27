@@ -125,7 +125,7 @@ CREATE TABLE dbo.Patients (
 | Type | Operations Supported | Security Level |
 | :--- | :--- | :--- |
 | **DETERMINISTIC** | `=`, `IN`, `JOIN`, `GROUP BY` | Lower (same plaintext = same ciphertext) |
-| **RANDOMIZED** | None (value is opaque) | ==Higher (same plaintext = different ciphertext)== |
+| **RANDOMIZED** | None (value is opaque) | **Higher (same plaintext = different ciphertext)** |
 
 > [!warning] Common Mistake
 > TDE and Always Encrypted are often confused on the exam. TDE: server DOES see plaintext (it decrypts to run queries). Always Encrypted: server NEVER sees plaintext (encryption/decryption happens in the client driver). The key differentiator in exam scenarios is whether the database administrator (DBA) should be prevented from seeing the data.

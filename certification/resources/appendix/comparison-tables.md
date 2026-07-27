@@ -236,7 +236,7 @@ Always Encrypted supports two encryption types. The choice depends on whether yo
 | Feature | Deterministic | Randomized |
 |---------|--------------|-----------|
 | **Same input produces same output** | Yes — identical plaintext → identical ciphertext | No — identical plaintext → different ciphertext each time |
-| **Equality search** | ==Supported (`WHERE col = @param`)` | `Not supported== |
+| **Equality search** | **Supported (`WHERE col = @param`)** | **Not supported** |
 | **Range queries** | Not supported | Not supported (use secure enclaves) |
 | **GROUP BY / DISTINCT** | Supported | Not supported |
 | **Joins on encrypted columns** | Supported (both columns must use same key) | Not supported |

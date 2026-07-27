@@ -333,7 +333,7 @@ OPTION(USE HINT('ENABLE_QUERY_OPTIMIZER_HOTFIXES'));
 ## Common Issues & Errors
 
 - **Memory spills to tempdb**: `granted_memory_kb` much lower than `ideal_memory_kb` — increase grant hint or enable memory grant feedback (compat level 140+)
-- **Query Store goes READ_ONLY unexpectedly**: ==Storage cap reached — increase `MAX_STORAGE_SIZE_MB` or enable `SIZE_BASED_CLEANUP_MODE = AUTO`==
+- **Query Store goes READ_ONLY unexpectedly**: **Storage cap reached — increase `MAX_STORAGE_SIZE_MB` or enable `SIZE_BASED_CLEANUP_MODE = AUTO`**
 - **Plan regression after compat level change**: Use Query Store Regressed Queries report and `sp_query_store_force_plan` to restore the previous good plan
 - **Excessive parallelism on OLTP**: CXPACKET waits dominate — raise cost threshold for parallelism to 40–50 and consider MAXDOP 4 or lower at DB scope
 - **Automatic tuning not creating indexes**: `CREATE_INDEX` must be explicitly enabled; verify the feature is ON and check `sys.dm_db_tuning_recommendations` for blocked recommendations
