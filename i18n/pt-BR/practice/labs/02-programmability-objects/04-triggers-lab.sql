@@ -18,21 +18,29 @@
 USE AdventureWorks2025;
 GO
 
+-- Garante que o lab possa ser executado em uma base recém-restaurada, sem depender de outro script.
+IF SCHEMA_ID(N'lab') IS NULL
+    EXEC(N'CREATE SCHEMA lab');
+GO
+
 -- Limpeza preventiva
 IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_AuditProducts_MultiRow')
     DROP TRIGGER lab.trg_AuditProducts_MultiRow;
-IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_vw_OrderCustomerDetails_Insert')
-    DROP TRIGGER lab.trg_vw_OrderCustomerDetails_Insert;
+IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_ObserveProductUpdate')
+    DROP TRIGGER lab.trg_ObserveProductUpdate;
+IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_vw_TriggerOrderCustomerDetails_Insert')
+    DROP TRIGGER lab.trg_vw_TriggerOrderCustomerDetails_Insert;
 IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'trg_PreventTableDrop' AND parent_class = 0)
     DROP TRIGGER trg_PreventTableDrop ON DATABASE;
 
-IF EXISTS (SELECT * FROM sys.views WHERE name = 'vw_OrderCustomerDetails' AND schema_id = SCHEMA_ID('lab'))
-    DROP VIEW lab.vw_OrderCustomerDetails;
+IF EXISTS (SELECT * FROM sys.views WHERE name = 'vw_TriggerOrderCustomerDetails' AND schema_id = SCHEMA_ID('lab'))
+    DROP VIEW lab.vw_TriggerOrderCustomerDetails;
 
 DROP TABLE IF EXISTS lab.ProductAuditLog;
+DROP TABLE IF EXISTS lab.TriggerExecutionLog;
 DROP TABLE IF EXISTS lab.Products;
-DROP TABLE IF EXISTS lab.Orders;
-DROP TABLE IF EXISTS lab.Customers;
+DROP TABLE IF EXISTS lab.TriggerOrders;
+DROP TABLE IF EXISTS lab.TriggerCustomers;
 GO
 
 
@@ -53,13 +61,13 @@ CREATE TABLE lab.ProductAuditLog (
     ChangedBy NVARCHAR(128) DEFAULT SUSER_SNAME()
 );
 
-CREATE TABLE lab.Customers (
+CREATE TABLE lab.TriggerCustomers (
     CustomerID INT IDENTITY(1,1) PRIMARY KEY,
     CustomerName NVARCHAR(100) NOT NULL,
     Email NVARCHAR(100) UNIQUE NOT NULL
 );
 
-CREATE TABLE lab.Orders (
+CREATE TABLE lab.TriggerOrders (
     OrderID INT IDENTITY(1,1) PRIMARY KEY,
     CustomerID INT NOT NULL,
     TotalAmount DECIMAL(18,2) NOT NULL
@@ -124,42 +132,42 @@ GO
 --     permite desmembrar os dados da tabela virtual `inserted` e realizar o roteamento manual para cada tabela base.
 
 -- 1. View unindo Clientes e Pedidos (Não aceita INSERT direto)
-CREATE VIEW lab.vw_OrderCustomerDetails
+CREATE VIEW lab.vw_TriggerOrderCustomerDetails
 AS
 SELECT o.OrderID, o.TotalAmount, c.CustomerName, c.Email
-FROM lab.Orders o
-JOIN lab.Customers c ON o.CustomerID = c.CustomerID;
+FROM lab.TriggerOrders o
+JOIN lab.TriggerCustomers c ON o.CustomerID = c.CustomerID;
 GO
 
 -- 2. Criar Trigger INSTEAD OF INSERT na View
-CREATE TRIGGER lab.trg_vw_OrderCustomerDetails_Insert
-ON lab.vw_OrderCustomerDetails
+CREATE TRIGGER lab.trg_vw_TriggerOrderCustomerDetails_Insert
+ON lab.vw_TriggerOrderCustomerDetails
 INSTEAD OF INSERT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     -- Insere o cliente na tabela base se ele ainda não existir
-    INSERT INTO lab.Customers (CustomerName, Email)
+    INSERT INTO lab.TriggerCustomers (CustomerName, Email)
     SELECT DISTINCT i.CustomerName, i.Email
     FROM inserted i
-    WHERE NOT EXISTS (SELECT 1 FROM lab.Customers c WHERE c.Email = i.Email);
+    WHERE NOT EXISTS (SELECT 1 FROM lab.TriggerCustomers c WHERE c.Email = i.Email);
 
     -- Insere o pedido associando ao CustomerID correspondente
-    INSERT INTO lab.Orders (CustomerID, TotalAmount)
+    INSERT INTO lab.TriggerOrders (CustomerID, TotalAmount)
     SELECT c.CustomerID, i.TotalAmount
     FROM inserted i
-    JOIN lab.Customers c ON c.Email = i.Email;
+    JOIN lab.TriggerCustomers c ON c.Email = i.Email;
 END;
 GO
 
 -- Teste: Inserindo um registro direto na View Multi-Tabela!
-INSERT INTO lab.vw_OrderCustomerDetails (CustomerName, Email, TotalAmount)
+INSERT INTO lab.vw_TriggerOrderCustomerDetails (CustomerName, Email, TotalAmount)
 VALUES ('Daniela Souza', 'daniela@email.com', 850.00);
 
 -- Verifique os dados roteados para as tabelas base
-SELECT * FROM lab.Customers WHERE Email = 'daniela@email.com';
-SELECT * FROM lab.Orders;
+SELECT * FROM lab.TriggerCustomers WHERE Email = 'daniela@email.com';
+SELECT * FROM lab.TriggerOrders;
 GO
 
 
@@ -185,7 +193,7 @@ BEGIN
     DECLARE @ObjectName NVARCHAR(200) = @EventData.value('(/EVENT_INSTANCE/ObjectName)[1]', 'NVARCHAR(200)');
     DECLARE @LoginName NVARCHAR(200) = @EventData.value('(/EVENT_INSTANCE/LoginName)[1]', 'NVARCHAR(200)');
 
-    PRINT 'BLOQUEIO DDL: A exclusão da tabela ' + @ObjectName + ' foi bloqueada pelo usuário ' + @LoginName;
+    PRINT 'BLOQUEIO DDL: A exclusão da tabela ' + @ObjectName + ' foi bloqueada para o usuário ' + @LoginName;
     ROLLBACK; -- Cancela o comando DROP TABLE
 END;
 GO
@@ -209,14 +217,120 @@ GO
 -- =================================================================================
 -- PARTE 4: ORDENAÇÃO DE DISPARO (SP_SETTRIGGERORDER)
 -- =================================================================================
--- CONCEITOS E DEFINIÇÕES CHAVE:
---   - sp_settriggerorder: Permite definir explicitamente qual trigger executa em PRIMEIRO ('First')
---     ou em ÚLTIMO ('Last') lugar quando existem múltiplas triggers atreladas ao mesmo evento na tabela.
+-- O QUE ESTE EXPERIMENTO TORNA VISÍVEL:
+--   - Uma instrução DML pode disparar mais de uma trigger AFTER. Sem ordem explícita, NÃO confie
+--     na ordem de criação nem em um resultado observado em uma execução.
+--   - sp_settriggerorder reserva apenas uma posição FIRST e uma posição LAST para um evento DML
+--     de uma tabela. A ordem relativa das triggers entre essas posições não é especificada.
+--   - O log abaixo registra uma linha por disparo de trigger, para que o resultado de cada UPDATE
+--     seja inspecionado em vez de inferido.
+--   - Execute a Parte 1 antes desta. Ela cria a trigger de auditoria set-based usada abaixo.
 
-EXEC sp_settriggerorder 
-    @triggername = 'lab.trg_AuditProducts_MultiRow',
+DECLARE @AuditTrigger sysname = N'lab.trg_AuditProducts_MultiRow';
+
+IF OBJECT_ID(@AuditTrigger, N'TR') IS NULL
+    THROW 51040, 'A trigger lab.trg_AuditProducts_MultiRow não existe. Execute a Parte 1 antes da Parte 4.', 1;
+
+-- Esta tabela é separada intencionalmente de ProductAuditLog. ProductAuditLog responde
+-- "quais valores de produto mudaram?"; esta tabela responde "qual trigger executou primeiro?".
+CREATE TABLE lab.TriggerExecutionLog
+(
+    ExecutionID int IDENTITY(1,1) NOT NULL CONSTRAINT PK_TriggerExecutionLog PRIMARY KEY,
+    TriggerName sysname NOT NULL,
+    RowsAffected int NOT NULL,
+    LoggedAt datetime2(7) NOT NULL CONSTRAINT DF_TriggerExecutionLog_LoggedAt DEFAULT SYSDATETIME()
+);
+GO
+
+-- Recria a trigger de auditoria da Parte 1 com um efeito adicional observável.
+-- Seu comportamento de auditoria set-based permanece inalterado.
+ALTER TRIGGER lab.trg_AuditProducts_MultiRow
+ON lab.Products
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO lab.TriggerExecutionLog (TriggerName, RowsAffected)
+    SELECT N'lab.trg_AuditProducts_MultiRow', COUNT(*)
+    FROM inserted;
+
+    INSERT INTO lab.ProductAuditLog (ProductID, ActionType, OldPrice, NewPrice)
+    SELECT i.ProductID, 'UPDATE', d.Price, i.Price
+    FROM inserted AS i
+    JOIN deleted AS d ON i.ProductID = d.ProductID
+    WHERE i.Price <> d.Price;
+END;
+GO
+
+-- A segunda trigger AFTER UPDATE não realiza ação de negócio. Seu único objetivo é tornar
+-- a ordenação visível e mostrar por que uma ordem não configurada não é um contrato.
+CREATE TRIGGER lab.trg_ObserveProductUpdate
+ON lab.Products
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO lab.TriggerExecutionLog (TriggerName, RowsAffected)
+    SELECT N'lab.trg_ObserveProductUpdate', COUNT(*)
+    FROM inserted;
+END;
+GO
+
+-- Linha de base: execute uma vez e inspecione a sequência observada. Ela propositalmente NÃO é
+-- tratada como ordem padrão, pois o SQL Server não garante a ordem relativa neste ponto.
+TRUNCATE TABLE lab.TriggerExecutionLog;
+UPDATE lab.Products
+SET Price = Price + 0.01
+WHERE ProductID = 1;
+
+SELECT ExecutionID, TriggerName, RowsAffected, LoggedAt
+FROM lab.TriggerExecutionLog
+ORDER BY ExecutionID;
+GO
+
+-- Configure a trigger de auditoria como FIRST, repita exatamente o mesmo UPDATE e leia o log.
+-- Resultado esperado: AuditProducts_MultiRow tem ExecutionID = 1; a observadora executa depois.
+EXEC sys.sp_settriggerorder
+    @triggername = N'lab.trg_AuditProducts_MultiRow',
     @order = 'First',
     @stmttype = 'UPDATE';
+
+TRUNCATE TABLE lab.TriggerExecutionLog;
+UPDATE lab.Products
+SET Price = Price + 0.01
+WHERE ProductID = 1;
+
+SELECT ExecutionID, TriggerName, RowsAffected, LoggedAt
+FROM lab.TriggerExecutionLog
+ORDER BY ExecutionID;
+GO
+
+-- Agora mova a mesma trigger de auditoria para LAST e repita o UPDATE.
+-- Resultado esperado: ObserveProductUpdate tem ExecutionID = 1; AuditProducts_MultiRow fica por último.
+EXEC sys.sp_settriggerorder
+    @triggername = N'lab.trg_AuditProducts_MultiRow',
+    @order = 'Last',
+    @stmttype = 'UPDATE';
+
+TRUNCATE TABLE lab.TriggerExecutionLog;
+UPDATE lab.Products
+SET Price = Price + 0.01
+WHERE ProductID = 1;
+
+SELECT ExecutionID, TriggerName, RowsAffected, LoggedAt
+FROM lab.TriggerExecutionLog
+ORDER BY ExecutionID;
+GO
+
+-- Metadados de diagnóstico: após a última etapa, a trigger de auditoria é marcada como LAST no UPDATE.
+SELECT name,
+       OBJECTPROPERTYEX(object_id, N'ExecIsFirstUpdateTrigger') AS IsFirstUpdateTrigger,
+       OBJECTPROPERTYEX(object_id, N'ExecIsLastUpdateTrigger') AS IsLastUpdateTrigger
+FROM sys.triggers
+WHERE parent_id = OBJECT_ID(N'lab.Products')
+  AND name IN (N'trg_AuditProducts_MultiRow', N'trg_ObserveProductUpdate');
 GO
 
 -- =================================================================================================
