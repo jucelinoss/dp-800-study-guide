@@ -75,8 +75,16 @@ FROM sys.database_scoped_credentials
 WHERE name = 'AzureOpenAIManagedIdentity';
 GO
 
+-- Managed Identity não é credencial de API key. Para Azure OpenAI, o Learn documenta resourceid no SECRET; nunca inclua valor real em um script de lab.
 -- Exemplo conceitual da chamada de IA REST endpoint
 /*
+CREATE DATABASE SCOPED CREDENTIAL [https://contoso.openai.azure.com]
+WITH IDENTITY = 'Managed Identity',
+     SECRET = '{"resourceid":"https://cognitiveservices.azure.com"}';
+
+GRANT REFERENCES ON DATABASE SCOPED CREDENTIAL::[https://contoso.openai.azure.com]
+    TO AppRole;
+
 DECLARE @response NVARCHAR(MAX);
 EXEC sp_invoke_external_rest_endpoint
     @url = 'https://meuseguro.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-01',

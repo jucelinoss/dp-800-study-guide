@@ -121,3 +121,17 @@ SELECT
     'dab start --config dab-config.json',
     'Inicia o servidor runtime do DAB escutando as requisicoes HTTP';
 GO
+
+-- SCENARIO 2: Secret reference belongs to the deployment layer.
+-- DAB reads @env(...) from its environment/configuration. Azure Container Apps
+-- maps a stored secret into that environment variable with secretref:.
+SELECT
+    N'DAB config or dab init' AS LayerName,
+    N'@env(''MSSQL_CONNECTION_STRING'')' AS CorrectReference,
+    N'DAB reads the environment variable; do not hardcode a credential' AS Meaning
+UNION ALL
+SELECT
+    N'Azure Container Apps environment',
+    N'DATABASE_CONNECTION_STRING=secretref:connection-string',
+    N'Container Apps injects the secret into the environment variable';
+GO

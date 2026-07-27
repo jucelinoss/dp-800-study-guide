@@ -122,3 +122,9 @@ JOIN sys.database_principals dp ON pe.grantee_principal_id = dp.principal_id
 LEFT JOIN sys.objects o ON pe.major_id = o.object_id
 WHERE dp.name = 'mcp_service_user';
 GO
+
+--- CENÁRIO 2: Inventário de governança MCP
+SELECT N'Descoberta de schema' AS Proposito, N'VIEW DEFINITION' AS EscopoMinimo, N'Metadados somente leitura; auditar chamador e parâmetros' AS Governanca
+UNION ALL SELECT N'Consulta de catálogo', N'SELECT em view aprovada', N'Excluir dados sensíveis; registrar resultado e correlation ID'
+UNION ALL SELECT N'Ação DDL/DML', N'Não concedida por padrão', N'Exigir identidade separada, aprovação e controle de mudança em produção';
+GO

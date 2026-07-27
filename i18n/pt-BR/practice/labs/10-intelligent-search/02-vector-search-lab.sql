@@ -110,3 +110,10 @@ SELECT
     'Altissima velocidade computacional se os vetores forem normalizados',
     'Vetores pré-normalizados com L2 (VECTOR_NORMALIZE norm2)';
 GO
+
+--- CENÁRIO 2: Decisão de ranking híbrido
+SELECT N'RRF' AS Padrao, N'1/(60 + rank)' AS Formula, N'Listas de candidatos ranqueadas independentemente' AS QuandoUsar
+UNION ALL
+SELECT N'Score ponderado', N'(distance * 0.60) + ((1.0 - rank / 1000.0) * 0.40)', N'Somente após validar os scores; menor é melhor';
+GO
+-- RRF evita escalas incompatíveis. Quando a fórmula exige distância numérica, use VECTOR_DISTANCE; VECTOR_SEARCH é recuperação ANN.

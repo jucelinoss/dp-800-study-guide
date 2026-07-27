@@ -17,6 +17,14 @@
 USE AdventureWorks2025;
 GO
 
+-- PARTE 4: GATES DE DEPLOYMENT DE REFERÊNCIA
+SELECT 1 AS Etapa, N'Commit e validação de política de branch' AS Gate, N'Mudança versionada no projeto' AS Evidencia
+UNION ALL SELECT 2, N'Build e validação do DACPAC', N'Build e modelo válidos'
+UNION ALL SELECT 3, N'Testes e relatórios de drift/deploy', N'Artefatos de teste e relatório'
+UNION ALL SELECT 4, N'Revisão de script e aprovações', N'Revisão de perda de dados e aprovação'
+UNION ALL SELECT 5, N'Deploy e monitoração', N'Ambiente controlado e histórico de deploy';
+GO
+
 -- Limpeza preventiva
 DROP TABLE IF EXISTS lab.PipelineDeployHistory;
 GO

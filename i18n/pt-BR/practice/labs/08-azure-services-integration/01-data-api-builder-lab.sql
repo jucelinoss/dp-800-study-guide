@@ -121,3 +121,9 @@ SELECT
     'dab start --config dab-config.json',
     'Inicia o servidor runtime do DAB escutando as requisicoes HTTP';
 GO
+
+--- CENÁRIO 2: Referência de segredo por camada
+SELECT N'Configuração DAB ou dab init' AS Camada, N'@env(''MSSQL_CONNECTION_STRING'')' AS ReferenciaCorreta, N'DAB lê a variável de ambiente; não codifique credenciais' AS Significado
+UNION ALL
+SELECT N'Ambiente do Azure Container Apps', N'DATABASE_CONNECTION_STRING=secretref:connection-string', N'Container Apps injeta o segredo na variável de ambiente';
+GO

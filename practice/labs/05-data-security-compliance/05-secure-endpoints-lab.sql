@@ -76,7 +76,16 @@ WHERE name = 'AzureOpenAIManagedIdentity';
 GO
 
 -- Conceptual example of AI REST endpoint call
+-- Managed Identity is not an API-key credential. For Azure OpenAI, Learn documents
+-- the resource identifier in SECRET; do not place a real value in a lab script.
 /*
+CREATE DATABASE SCOPED CREDENTIAL [https://contoso.openai.azure.com]
+WITH IDENTITY = 'Managed Identity',
+     SECRET = '{"resourceid":"https://cognitiveservices.azure.com"}';
+
+GRANT REFERENCES ON DATABASE SCOPED CREDENTIAL::[https://contoso.openai.azure.com]
+    TO AppRole;
+
 DECLARE @response NVARCHAR(MAX);
 EXEC sp_invoke_external_rest_endpoint
     @url = 'https://meuseguro.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-01',

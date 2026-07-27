@@ -45,7 +45,7 @@ DECLARE @ProductsJson NVARCHAR(MAX);
 
 SELECT @ProductsJson = (
     SELECT TOP 3 ProductID AS id, Name AS name, ListPrice AS price
-    FROM SalesLT.Product
+    FROM Production.Product
     FOR JSON PATH
 );
 
@@ -157,3 +157,14 @@ SELECT
     'Rate Limit Exceeded (Limite de requisições/minuto atingido)',
     'Ler o cabecalho Retry-After e implementar tempo de espera no T-SQL';
 GO
+
+--- CENÁRIO 2: Gate de contrato da resposta
+DECLARE @RespostaEncapsulada nvarchar(max) = N'{"result":{"choices":[{"message":{"content":"Resposta fundamentada"}}]},"status":{"http":{"code":200}}}';
+SELECT JSON_VALUE(@RespostaEncapsulada, '$.status.http.code') AS CodigoHTTP,
+       JSON_VALUE(@RespostaEncapsulada, '$.result.choices[0].message.content') AS Conteudo,
+       CASE WHEN ISJSON(@RespostaEncapsulada) = 1 AND JSON_VALUE(@RespostaEncapsulada, '$.status.http.code') = N'200'
+                 AND JSON_VALUE(@RespostaEncapsulada, '$.result.choices[0].message.content') IS NOT NULL
+            THEN N'Aprovada para validação de schema e armazenamento rastreável'
+            ELSE N'Rejeitar ou repetir antes de processar o conteúdo' END AS DecisaoContrato;
+GO
+-- Em produção: valide JSON estruturado, registre correlation ID, retenha fontes da recuperação e nunca grave segredos.

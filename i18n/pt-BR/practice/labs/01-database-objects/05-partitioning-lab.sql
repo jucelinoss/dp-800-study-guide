@@ -303,6 +303,12 @@ GO
 DROP INDEX IX_OrdersPartitioned_NonAligned ON lab.OrdersPartitioned;
 GO
 
+-- 3. Matriz de decisão para retenção. SWITCH exige destino vazio e estruturalmente compatível; TRUNCATE PARTITION não permite arquivar os dados.
+SELECT N'DELETE' AS Operacao, N'Remove linhas selecionadas dentro da partição' AS QuandoUsar, N'Totalmente registrado; pode custar caro em lotes grandes' AS TradeOff
+UNION ALL SELECT N'TRUNCATE PARTITION', N'Descarta todas as linhas de uma partição conhecida', N'Rápido e minimamente registrado; não arquiva as linhas'
+UNION ALL SELECT N'SWITCH PARTITION', N'Move uma partição alinhada inteira para arquivo', N'Destino deve existir, estar vazio e atender aos requisitos de SWITCH';
+GO
+
 -- =================================================================================================
 -- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
 -- =================================================================================================

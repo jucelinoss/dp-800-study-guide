@@ -45,7 +45,7 @@ DECLARE @ProductsJson NVARCHAR(MAX);
 
 SELECT @ProductsJson = (
     SELECT TOP 3 ProductID AS id, Name AS name, ListPrice AS price
-    FROM SalesLT.Product
+    FROM Production.Product
     FOR JSON PATH
 );
 
@@ -157,3 +157,24 @@ SELECT
     'Rate Limit Exceeded (Limite de requisições/minuto atingido)',
     'Ler o cabecalho Retry-After e implementar tempo de espera no T-SQL';
 GO
+
+-- SCENARIO 2: Response-contract gate. Treat every model response as untrusted.
+-- Do not extract Content until the HTTP outcome, wrapper, and expected JSON shape
+-- have been checked. sp_invoke_external_rest_endpoint can wrap provider output in
+-- $.result; a direct provider path is not automatically the procedure's path.
+DECLARE @WrappedResponse nvarchar(max) = N'{
+  "result":{"choices":[{"message":{"content":"Grounded answer"}}]},
+  "status":{"http":{"code":200}}}';
+
+SELECT
+    JSON_VALUE(@WrappedResponse, '$.status.http.code') AS HttpCode,
+    JSON_VALUE(@WrappedResponse, '$.result.choices[0].message.content') AS Content,
+    CASE WHEN ISJSON(@WrappedResponse) = 1
+           AND JSON_VALUE(@WrappedResponse, '$.status.http.code') = N'200'
+           AND JSON_VALUE(@WrappedResponse, '$.result.choices[0].message.content') IS NOT NULL
+         THEN N'Approved for schema validation and traceable storage'
+         ELSE N'Reject or retry before parsing business content'
+    END AS ContractDecision;
+GO
+-- Production checklist: validate structured output, log a correlation ID, retain
+-- retrieval/source references, and store only approved fields. Never log secrets.

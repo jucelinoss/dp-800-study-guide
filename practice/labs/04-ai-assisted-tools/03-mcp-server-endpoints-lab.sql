@@ -122,3 +122,15 @@ JOIN sys.database_principals dp ON pe.grantee_principal_id = dp.principal_id
 LEFT JOIN sys.objects o ON pe.major_id = o.object_id
 WHERE dp.name = 'mcp_service_user';
 GO
+
+-- SCENARIO 2: Governance inventory. Capture the identity, scope, operation type,
+-- and audit expectation before enabling an MCP tool against a shared environment.
+SELECT N'Schema discovery' AS ToolPurpose, N'VIEW DEFINITION' AS MinimumScope,
+       N'Read-only metadata; audit caller and tool parameters' AS Governance
+UNION ALL
+SELECT N'Catalog lookup', N'SELECT on approved view',
+       N'Exclude sensitive columns; log outcome and correlation ID'
+UNION ALL
+SELECT N'DDL/DML action', N'Not granted by default',
+       N'Require separate identity, approval path, and production change control';
+GO

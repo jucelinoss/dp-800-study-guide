@@ -110,3 +110,19 @@ SELECT
     'Altissima velocidade computacional se os vetores forem normalizados',
     'Vetores pré-normalizados com L2 (VECTOR_NORMALIZE norm2)';
 GO
+
+-- SCENARIO 2: Hybrid ranking decision. RRF merges ranks and is safer when vector
+-- distance and full-text RANK have unrelated scales. A weighted formula is valid
+-- only when the numeric distance is available and both signals are normalized.
+SELECT
+    N'RRF' AS Pattern,
+    N'Rank only: 1/(60 + rank)' AS Formula,
+    N'Use when combining independent ranked candidate lists' AS UseCase
+UNION ALL
+SELECT
+    N'Weighted score',
+    N'(distance * 0.60) + ((1.0 - rank / 1000.0) * 0.40)',
+    N'Use only after validating score distributions; lower result is better';
+GO
+-- VECTOR_SEARCH is ANN retrieval. If a formula needs the actual numeric distance,
+-- calculate it with VECTOR_DISTANCE; do not pretend that ordered ANN output exposes it.

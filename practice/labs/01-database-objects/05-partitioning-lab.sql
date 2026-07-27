@@ -303,6 +303,22 @@ GO
 DROP INDEX IX_OrdersPartitioned_NonAligned ON lab.OrdersPartitioned;
 GO
 
+-- 3. Retention decision matrix. Choose an operation only when its scope matches
+-- the data boundary. SWITCH requires an empty, structurally compatible target;
+-- TRUNCATE PARTITION discards data and cannot archive it.
+SELECT N'DELETE' AS OperationName,
+       N'Remove selected rows inside a partition' AS AppropriateWhen,
+       N'Fully logged; can be expensive for large retention batches' AS TradeOff
+UNION ALL
+SELECT N'TRUNCATE PARTITION',
+       N'Discard all rows in a known partition',
+       N'Fast and minimally logged; rows cannot be archived'
+UNION ALL
+SELECT N'SWITCH PARTITION',
+       N'Move an entire aligned partition to an archive table',
+       N'Target must exist, be empty, and meet SWITCH requirements';
+GO
+
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES
 -- =================================================================================================

@@ -17,6 +17,17 @@
 USE AdventureWorks2025;
 GO
 
+-- PART 4: REFERENCE DEPLOYMENT GATES
+-- This is a safety sequence, not an engine-enforced workflow. It makes the
+-- ordering questions in the exam concrete: validate before a production change.
+SELECT 1 AS StepNumber, N'Commit and branch-policy validation' AS GateName,
+       N'Source-controlled project change' AS Evidence
+UNION ALL SELECT 2, N'Build and validate DACPAC', N'Build output and model validation'
+UNION ALL SELECT 3, N'Run tests and drift/deploy reports', N'Automated test and report artifacts'
+UNION ALL SELECT 4, N'Review script and approvals', N'Data-loss review and human approval'
+UNION ALL SELECT 5, N'Deploy and monitor', N'Controlled environment and deployment history';
+GO
+
 -- Preventive cleanup
 DROP TABLE IF EXISTS lab.PipelineDeployHistory;
 GO
