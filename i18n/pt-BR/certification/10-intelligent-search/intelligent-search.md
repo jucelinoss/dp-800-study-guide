@@ -39,7 +39,7 @@ mindmap
       Requer índice full-text
     Vector Search
       VECTOR_DISTANCE - ENN exato
-      VECTOR_SEARCH - ANN aproximado
+      WITH APPROXIMATE - ANN aproximado
       DiskANN - cosine, dot ou euclidean
     Hybrid Search
       Combina FTS + Vetores
@@ -66,7 +66,7 @@ flowchart TD
 | Arquivo | Tópico | Prioridade |
 | :--- | :--- | :--- |
 | [01-fulltext-search.md](./01-fulltext-search.md) | Índices de texto completo, CONTAINS, FREETEXT e predicados | Alta |
-| [02-vector-search.md](./02-vector-search.md) | Tipo de dados vetor, VECTOR_DISTANCE, VECTOR_SEARCH e índices | Alta |
+| [02-vector-search.md](./02-vector-search.md) | Tipo de dados vetor, VECTOR_DISTANCE, busca aproximada e índices | Alta |
 | [03-hybrid-search-rrf.md](./03-hybrid-search-rrf.md) | Busca híbrida, implementação de RRF e avaliação de desempenho | Alta |
 
 ## Conceitos Chave
@@ -76,7 +76,7 @@ flowchart TD
 - **Hybrid Search**: Combinação dos resultados de busca textual e busca vetorial para maior recall (abrangência).
 - **ANN (Approximate Nearest Neighbor)**: Busca aproximada ultra-rápida utilizando índices vetoriais (menor latência).
 - **ENN (Exact Nearest Neighbor)**: Busca de força-bruta (brute-force) comparando contra todos os vetores (maior precisão).
-- **VECTOR_SEARCH**: Função T-SQL integrada para realização de buscas de similaridade de vetores.
+- **WITH APPROXIMATE**: Solicita busca vetorial aproximada por um índice vetorial compatível.
 - **Reciprocal Rank Fusion (RRF)**: Algoritmo para fundir listas ranqueadas vindas de múltiplos métodos de busca.
 - **VECTOR_NORMALIZE**: Normaliza um vetor para comprimento unitário antes de realizar comparações.
 - **VECTORPROPERTY**: Retorna metadados sobre uma coluna de vetor.

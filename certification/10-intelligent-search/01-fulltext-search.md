@@ -13,7 +13,7 @@ tags:
 
 ## Overview
 
-Full-text search (FTS) enables linguistic searching of character-based data — matching words, phrases, proximity, and inflected forms. Unlike LIKE queries (which do character pattern matching), FTS uses an **inverted index** and understands language semantics (stems, synonyms, stop words). The key predicates are `CONTAINS` (precise term matching) and `FREETEXT` (natural language matching).
+Full-text search (FTS) enables linguistic searching of character-based data — matching words, phrases, proximity, and inflected forms. Unlike LIKE queries (which do character pattern matching), FTS uses an **inverted index** and language-specific word breaking, stemming, and stop words. Thesaurus synonyms are available only when mappings are configured. The key predicates are `CONTAINS` (precise term matching) and `FREETEXT` (natural language matching).
 
 > [!abstract]
 >
@@ -24,10 +24,22 @@ Full-text search (FTS) enables linguistic searching of character-based data — 
 > [!tip] What the Exam Tests
 >
 > - `CONTAINS` = **precision**: exact terms, prefix (`"data*"`), proximity (`NEAR`), weighted terms (`ISABOUT`)
-> - `FREETEXT` = **recall**: natural language query, inflections and synonyms, broader match
+> - `FREETEXT` = **recall**: natural language query and inflections; configured thesaurus mappings can broaden the match further
 > - `CONTAINSTABLE` / `FREETEXTTABLE` return a table with a `RANK` column (0–1000) — use when you need ranked results or want to join with other tables
 
 ---
+
+## Foundations: Linguistic Search Through an Inverted Index
+
+A full-text index does not scan every text looking for characters like a `LIKE` query. It builds an **inverted index**: for each analyzed term, it keeps a list of documents and positions where that term occurs. That is why it is suitable for finding words, phrases, and proximity across large text collections.
+
+Before indexing, the engine interprets text according to its language: it splits words, can relate inflected forms, and ignores common *stop words*. The query goes through similar analysis. This makes Full-Text Search richer than `LIKE`, but it is not meaning-based search: it still relies on terms and linguistic rules, not embeddings.
+
+Use `CONTAINS` when the application controls the syntax and needs precision — a phrase, prefix, Boolean operator, or proximity. `FREETEXT` accepts a natural-language phrase and broadens matching through inflections and, when mappings are configured, the thesaurus. When results must be ordered or combined with other data, `CONTAINSTABLE` and `FREETEXTTABLE` return keys and a `RANK`; that rank is FTS-specific and must not be compared directly with vector scores.
+
+> [!note] Important boundary
+>
+> Full-Text Search retrieves linguistic matches, not general semantic knowledge. “Cancel plan” might not retrieve “end subscription” when the terms are not related by language processing or a thesaurus. Use vector or hybrid search for that kind of intent.
 
 ## Full-Text Catalogs and Indexes
 

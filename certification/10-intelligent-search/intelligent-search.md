@@ -28,12 +28,12 @@ mindmap
       Requires full-text index
     Vector Search
       VECTOR_DISTANCE - exact ENN
-      VECTOR_SEARCH - approx ANN
-      DiskANN cosine + dot only
+      WITH APPROXIMATE - ANN
+      DiskANN cosine + dot + euclidean
     Hybrid Search
       FTS + Vector combined
       RRF = 1/(k + rank)
-      k=60 default
+      k=60 common convention
 ```
 
 ---
@@ -55,7 +55,7 @@ flowchart TD
 | File | Topic | Priority |
 | :--- | :--- | :--- |
 | [01-fulltext-search.md](01-fulltext-search.md) | Full-text indexes, CONTAINS, FREETEXT, predicates | High |
-| [02-vector-search.md](02-vector-search.md) | Vector data type, VECTOR_DISTANCE, VECTOR_SEARCH, indexes | High |
+| [02-vector-search.md](02-vector-search.md) | Vector data type, VECTOR_DISTANCE, approximate search, indexes | High |
 | [03-hybrid-search-rrf.md](03-hybrid-search-rrf.md) | Hybrid search, RRF implementation, performance evaluation | High |
 
 ## Key Concepts
@@ -65,7 +65,7 @@ flowchart TD
 - **Hybrid Search**: Combining full-text and vector search results for broader recall
 - **ANN (Approximate Nearest Neighbor)**: Fast approximate search using vector indexes (lower latency)
 - **ENN (Exact Nearest Neighbor)**: Brute-force search across all vectors (higher accuracy)
-- **VECTOR_SEARCH**: Built-in T-SQL function for vector similarity search
+- **WITH APPROXIMATE**: Requests approximate vector search through a compatible vector index
 - **Reciprocal Rank Fusion (RRF)**: Algorithm to merge ranked lists from multiple search methods
 - **VECTOR_NORMALIZE**: Normalizes a vector to unit length before comparison
 - **VECTORPROPERTY**: Returns metadata about a vector column

@@ -1,128 +1,146 @@
 -- =================================================================================
--- DP-800 - PRACTICAL LAB: VECTOR SEARCH AND EMBEDDING DISTANCE (VECTOR_DISTANCE)
--- Database: AdventureWorks2025 (or similar)
+-- DP-800 - HANDS-ON LAB: VECTOR SEARCH (VECTOR, ENN, AND ANN)
+-- Database: Azure SQL Database, SQL database in Fabric, or SQL Server 2025
 -- =================================================================================
--- SETUP NOTE: To run this and other lab scripts, you need to
--- restore the AdventureWorks database backup (OLTP version) available at:
--- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
--- =================================================================================
--- This script demonstrates vector storage and semantic similarity search in T-SQL:
---   1. Vector Property Storage and Inspection (`VECTORPROPERTY`)
---   2. Exact Nearest Neighbor (ENN) Distance Calculation with `VECTOR_DISTANCE` (Metrics: `cosine`, `euclidean`, `dot`)
---   3. Vector Normalization with `VECTOR_NORMALIZE(..., 'norm2')`
---   4. Approximate Nearest Neighbor (ANN via DiskANN) Indexing and the `VECTOR_SEARCH` Function
---   5. Practical Project Scenarios (Converting Distance to Similarity Score from 0 to 1)
+-- PREREQUISITES:
+--   - VECTOR and VECTOR_DISTANCE: SQL Server 2025, Azure SQL Database, or SQL database in Fabric.
+--   - VECTOR_SEARCH and CREATE VECTOR INDEX: preview features. SQL Server 2025 requires
+--     PREVIEW_FEATURES; the latest index version is available in Azure SQL Database and Fabric.
+--   - This lab uses four dimensions for readability. Production vectors must use the
+--     embedding model's dimension, such as VECTOR(1536).
 -- =================================================================================
 
 USE AdventureWorks2025;
 GO
 
--- Preventive cleanup
+IF OBJECT_ID(N'lab.VectorProducts', N'U') IS NOT NULL
+    DROP INDEX IF EXISTS IX_VectorProducts_DescriptionVector ON lab.VectorProducts;
 DROP TABLE IF EXISTS lab.VectorProducts;
 GO
 
--- Table Structure for Vector Storage (1536 dimensions)
 CREATE TABLE lab.VectorProducts (
-    ProductID INT PRIMARY KEY,
+    ProductID INT NOT NULL,
     ProductName NVARCHAR(100) NOT NULL,
     Description NVARCHAR(MAX) NOT NULL,
-    DescriptionVector NVARCHAR(MAX) NOT NULL -- Simulation in JSON / VARBINARY in standard T-SQL
+    DescriptionVector VECTOR(4) NOT NULL,
+    CONSTRAINT PK_lab_VectorProducts PRIMARY KEY (ProductID)
 );
 GO
 
--- Populate test data with simulated vectors
 INSERT INTO lab.VectorProducts (ProductID, ProductName, Description, DescriptionVector) VALUES
-(1, N'Capacete Ciclismo Pro', N'Capacete leve de alta protecao', N'[0.025, -0.038, 0.089, 0.120]'),
-(2, N'Capacete Urbano', N'Capacete para uso diario na cidade', N'[0.023, -0.035, 0.082, 0.115]'),
-(3, N'Bicicleta de Trilha', N'Bike mountain bike 24 marchas', N'[-0.085, 0.120, -0.045, -0.010]');
+(1, N'Pro Cycling Helmet', N'Lightweight helmet with high impact protection.', CAST(N'[0.025, -0.038, 0.089, 0.120]' AS VECTOR(4))),
+(2, N'Urban Helmet', N'Helmet for daily city use.', CAST(N'[0.023, -0.035, 0.082, 0.115]' AS VECTOR(4))),
+(3, N'Trail Bike', N'Mountain bike with 24 gears.', CAST(N'[-0.085, 0.120, -0.045, -0.010]' AS VECTOR(4))),
+(4, N'Bluetooth Headphones', N'Wireless headphones with noise cancellation.', CAST(N'[0.310, 0.180, -0.220, 0.040]' AS VECTOR(4)));
 GO
 
+-- float16 is a preview option on supported platforms. Validate its dimension limits
+-- and availability before using it: ALTER TABLE lab.VectorProducts ADD HalfVector VECTOR(1536, float16) NULL;
 
 -- =================================================================================
--- PART 1: EXACT NEAREST NEIGHBOR (ENN) DISTANCE QUERY
+-- PART 1: VECTOR, VECTORPROPERTY, AND NORMALIZATION
 -- =================================================================================
--- KEY CONCEPTS AND DEFINITIONS:
---   - VECTOR_DISTANCE: Calculates the mathematical distance between the query vector and stored vectors.
---   - COSINE METRIC: Returns values between 0 (identical direction vectors) and 2 (opposite). Ideal for text.
---   - COSINE SIMILARITY: Calculated as `1.0 - VECTOR_DISTANCE('cosine', v1, v2)`.
 
--- -- [DP-800 KEY POINT]
--- Simulated Semantic Search Example (Finding the product closest to the Cycling Helmet Pro vector)
-DECLARE @QueryVector NVARCHAR(MAX) = N'[0.025, -0.038, 0.089, 0.120]';
-
-SELECT 
-    ProductID,
-    ProductName,
-    Description,
-    -- Simulation of VECTOR_DISTANCE function in offline environment
-    CASE ProductID 
-        WHEN 1 THEN 0.0000 -- Zero distance (exact vector)
-        WHEN 2 THEN 0.0425 -- Very low distance (very close semantics)
-        ELSE 0.8950        -- High distance (completely different product)
-    END AS CosineDistance,
-    -- Conversion to Similarity Score (0.0 to 1.0)
-    1.0 - (CASE ProductID WHEN 1 THEN 0.0000 WHEN 2 THEN 0.0425 ELSE 0.8950 END) AS SimilarityScore
-FROM lab.VectorProducts
-ORDER BY CosineDistance ASC;
+SELECT ProductID,
+       VECTORPROPERTY(DescriptionVector, 'Dimensions') AS Dimensions,
+       VECTORPROPERTY(DescriptionVector, 'BaseType') AS BaseType
+FROM lab.VectorProducts;
 GO
 
+-- L2 normalization is necessary when dot product is used as a cosine approximation.
+-- VECTOR_DISTANCE('cosine', ...) itself does not require prior normalization.
+SELECT ProductID,
+       VECTOR_NORMALIZE(DescriptionVector, 'norm2') AS NormalizedVector
+FROM lab.VectorProducts;
+GO
 
--- =================================================================================
--- PART 2: APPROXIMATE VECTOR INDEXES (DISKANN AND VECTOR_SEARCH)
--- =================================================================================
--- KEY CONCEPTS AND DEFINITIONS:
---   - DISKANN: Vector index type optimized for disk-based storage and approximate graph search (ANN).
---   - VECTOR_SEARCH: Table function that consumes the DiskANN index to answer searches in sub-second time on tables with millions of rows.
-
--- -- [DP-800 KEY POINT]
--- DiskANN index creation structure (Reference syntax from official documentation)
-/*
-CREATE INDEX IX_VectorProducts_DescriptionVector
-ON lab.VectorProducts (DescriptionVector)
-USING DISKANN
-WITH (METRIC = 'cosine');
+/* Normalize persisted vectors only when the chosen model and metric require it.
+UPDATE lab.VectorProducts
+SET DescriptionVector = VECTOR_NORMALIZE(DescriptionVector, 'norm2');
 */
 GO
 
-
 -- =================================================================================
--- PART 3: PRACTICAL PROJECT SCENARIOS
+-- PART 2: ENN — EXACT SEARCH WITH VECTOR_DISTANCE
 -- =================================================================================
 
---- SCENARIO 1: Vector Distance Metric Selection Matrix
--- Architecture decision guide for vector search optimization.
+DECLARE @QueryVector VECTOR(4) = CAST(N'[0.025, -0.038, 0.089, 0.120]' AS VECTOR(4));
 
-SELECT 
-    'cosine' AS MetricaDistancia,
-    '0.0 (Identico) a 2.0 (Oposto)' AS IntervaloValores,
-    'Independe do tamanho da frase / magnitude do vetor' AS Vantagens,
-    'Busca semantica de texto, RAG e comparacao de artigos' AS CasoDeUsoIdeal
-UNION ALL
-SELECT 
-    'euclidean',
-    '0.0 a Infinito',
-    'Mede a distancia direta em linha reta entre os pontos no espaco',
-    'Dados de coordenadas geograficas, imagens e atributos fisicos'
-UNION ALL
-SELECT 
-    'dot',
-    'Inverso do Produto Escalar',
-    'Altissima velocidade computacional se os vetores forem normalizados',
-    'Vetores pré-normalizados com L2 (VECTOR_NORMALIZE norm2)';
+SELECT TOP (3)
+       ProductID,
+       ProductName,
+       VECTOR_DISTANCE('cosine', DescriptionVector, @QueryVector) AS CosineDistance,
+       1.0 - VECTOR_DISTANCE('cosine', DescriptionVector, @QueryVector) AS CosineSimilarity,
+       VECTOR_DISTANCE('euclidean', DescriptionVector, @QueryVector) AS EuclideanDistance,
+       VECTOR_DISTANCE('dot', DescriptionVector, @QueryVector) AS DotDistance
+FROM lab.VectorProducts
+WHERE DescriptionVector IS NOT NULL
+ORDER BY CosineDistance ASC;
 GO
 
--- SCENARIO 2: Hybrid ranking decision. RRF merges ranks and is safer when vector
--- distance and full-text RANK have unrelated scales. A weighted formula is valid
--- only when the numeric distance is available and both signals are normalized.
-SELECT
-    N'RRF' AS Pattern,
-    N'Rank only: 1/(60 + rank)' AS Formula,
-    N'Use when combining independent ranked candidate lists' AS UseCase
-UNION ALL
-SELECT
-    N'Weighted score',
-    N'(distance * 0.60) + ((1.0 - rank / 1000.0) * 0.40)',
-    N'Use only after validating score distributions; lower result is better';
+-- Real query embeddings must use the same model as persisted embeddings.
+/*
+DECLARE @RealQueryVector VECTOR(1536) = AI_GENERATE_EMBEDDINGS(
+    N'comfortable helmet for urban cycling' USE MODEL [AzureOpenAI_Embedding_Small]
+);
+*/
 GO
--- VECTOR_SEARCH is ANN retrieval. If a formula needs the actual numeric distance,
--- calculate it with VECTOR_DISTANCE; do not pretend that ordered ANN output exposes it.
+
+-- =================================================================================
+-- PART 3: ANN — VECTOR INDEX AND VECTOR_SEARCH (PREVIEW)
+-- =================================================================================
+-- ANN trades a small amount of recall for lower latency at scale. Vector indexes need
+-- at least 100 non-NULL vectors; these copies make the prerequisite visible.
+
+;WITH Numbers AS (
+    SELECT 5 AS Number
+    UNION ALL
+    SELECT Number + 1 FROM Numbers WHERE Number < 104
+)
+INSERT INTO lab.VectorProducts (ProductID, ProductName, Description, DescriptionVector)
+SELECT Number,
+       CONCAT(N'Test product ', Number),
+       N'Additional vector used by the approximate-index exercise.',
+       CAST(N'[0.025, -0.038, 0.089, 0.120]' AS VECTOR(4))
+FROM Numbers
+OPTION (MAXRECURSION 100);
+GO
+
+-- Run only on a platform where the preview is available.
+-- SQL Server 2025: ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
+/*
+CREATE VECTOR INDEX IX_VectorProducts_DescriptionVector
+ON lab.VectorProducts (DescriptionVector)
+WITH (METRIC = 'cosine', TYPE = 'DiskANN');
+
+DECLARE @ApproximateQuery VECTOR(4) = CAST(N'[0.025, -0.038, 0.089, 0.120]' AS VECTOR(4));
+
+SELECT TOP (10) WITH APPROXIMATE
+       p.ProductID, p.ProductName, vs.distance AS CosineDistance
+FROM VECTOR_SEARCH(
+    TABLE = lab.VectorProducts AS p,
+    COLUMN = DescriptionVector,
+    SIMILAR_TO = @ApproximateQuery,
+    METRIC = 'cosine'
+) AS vs
+ORDER BY vs.distance;
+*/
+GO
+
+-- =================================================================================
+-- PART 4: DESIGN DECISIONS
+-- =================================================================================
+
+SELECT 'cosine' AS Metric, '0 (same direction) to 2 (opposite)' AS Range,
+       'Text embeddings, RAG, and documents' AS UseCase,
+       'No prior normalization required' AS Note
+UNION ALL
+SELECT 'euclidean', '0 to infinity', 'Coordinates and attributes where magnitude matters',
+       'The ANN index and query must use the same metric'
+UNION ALL
+SELECT 'dot', 'Negative dot product as distance', 'L2-normalized vectors',
+       'Normalize first for cosine equivalence';
+GO
+
+-- Do not mix models, dimensions, or metrics in one search space.
+-- Use ENN for small sets and validation; use ANN to reduce latency at scale.

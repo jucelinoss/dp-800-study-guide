@@ -51,6 +51,14 @@ O Hybrid Search combina a full-text search (correspondência por palavras-chave)
 
 ---
 
+## Fundamentos: duas formas de evidência, uma lista final
+
+Full-text e busca vetorial respondem a sinais diferentes. A primeira favorece termos exatos, códigos, frases e regras linguísticas; a segunda favorece intenção e significado aproximado. Uma mesma pergunta pode precisar dos dois: um usuário pode escrever o nome exato de uma política e, ao mesmo tempo, usar uma formulação diferente daquela armazenada no documento.
+
+O problema é que os scores não têm a mesma escala nem o mesmo significado. Um `RANK` de Full-Text Search é produzido pelo mecanismo linguístico; uma distância ou similaridade vetorial vem de uma métrica matemática. Somá-los diretamente cria pesos arbitrários. O **Reciprocal Rank Fusion (RRF)** resolve isso ignorando os valores brutos e combinando apenas a posição de cada item nas listas: aparecer nas primeiras posições de uma ou das duas fontes aumenta sua pontuação final.
+
+RRF não cria relevância do nada. Ele só reorganiza candidatos recuperados pelas buscas individuais. Portanto, escolha um número razoável de candidatos de cada fonte, aplique filtros de segurança antes da fusão e avalie com perguntas e resultados esperados (*ground truth*). Se a lista final traz resultados ruins, investigue primeiro a qualidade do índice, dos embeddings, dos chunks e das consultas de origem antes de ajustar `k`.
+
 ## Quando Usar Cada Tipo de Busca
 
 | Cenário | Melhor Abordagem |
@@ -58,7 +66,7 @@ O Hybrid Search combina a full-text search (correspondência por palavras-chave)
 | Busca de código de produto exato (SKU-123) | Apenas full-text (palavras-chave) |
 | Query em linguagem natural, intenção vaga | Apenas vetorial |
 | Query curta com termos específicos e significado semântico | Híbrida (ambas) |
-| Expansão de acrônimo conhecido | Full-text (FORMSOF) |
+| Formas flexionadas ou sinônimos configurados no thesaurus | Full-text (`FORMSOF`) |
 | Busca multilíngue | Vetorial (embeddings lidam com tradução) |
 | Requisito de alto recall (não perder nada relevante) | Híbrida |
 
@@ -121,17 +129,17 @@ BEGIN
 
     -- Passo 3: Resultados de busca vetorial com rank
     VectorResults AS (
-        SELECT
+        SELECT TOP (50) WITH APPROXIMATE
             vs.ProductId,
             vs.distance AS VectorDistance,
-            ROW_NUMBER() OVER (ORDER BY vs.distance ASC) AS VectorRank
+            ROW_NUMBER() OVER (ORDER BY vs.distance) AS VectorRank
         FROM VECTOR_SEARCH(
-            TABLE = dbo.Products AS p,
+            TABLE = dbo.Products,
             COLUMN = DescriptionVector,
             SIMILAR_TO = @query_vector,
-            METRIC = 'cosine',
-            TOP_N = 50
+            METRIC = 'cosine'
         ) AS vs
+        ORDER BY vs.distance
     ),
 
     -- Passo 4: Combinar com RRF
@@ -290,7 +298,7 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 | :--- | :--- |
 | Índice vetorial (DiskANN) | Maior — milissegundos vs segundos para ANN |
 | Índice FTS | Maior — instantâneo vs full table scan |
-| Reduzir TOP_N em VECTOR_SEARCH | Menor — menos candidatos |
+| Reduzir `TOP (N)` aproximado | Menor — menos candidatos |
 | Reduzir limite de resultados FTS | Menor — avaliação FTS mais rápida |
 | Pré-normalizar embeddings | Menor — pula VECTOR_NORMALIZE no tempo de query |
 
@@ -301,7 +309,7 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 A constante `k` controla quanto as posições de alto rank importam:
 
 ```sql
--- k=60 (padrão): padrão, reduz impacto dos primeiros ranks
+-- k=60 (convenção comum): reduz impacto dos primeiros ranks
 -- k=1: primeiro rank domina (ponderação extrema para rank 1)
 -- k=100: pontuação mais uniforme entre ranks
 
@@ -331,8 +339,8 @@ k maior → distribuição mais uniforme entre ranks
 | Uma lista sempre domina | k muito pequeno; uma lista muito maior | Aumente k; garanta que ambas as listas retornem número similar de candidatos |
 | FTS não retorna nada | Stop words removeram todos os termos da query | Adicione fallback: se FTS vazio, use apenas vetorial |
 | RRFScore NULL | FULL OUTER JOIN sem resultado FTS | Use `ISNULL(..., 0)` em torno dos componentes de pontuação RRF |
-| Hybrid search lento | Sem índice vetorial | Crie índice DiskANN; use `VECTOR_SEARCH` |
-| Baixo recall | TOP_N muito pequeno em cada busca | Aumente o pool de candidatos (ex: TOP_N = 100) antes do top-10 final |
+| Hybrid search lento | Sem índice vetorial compatível | Crie índice DiskANN; use `WITH APPROXIMATE` |
+| Baixo recall | Quantidade aproximada de candidatos muito pequena | Aumente `TOP (N)` antes do top-10 final |
 
 ---
 
@@ -341,7 +349,7 @@ k maior → distribuição mais uniforme entre ranks
 > [!tip] Dicas para o Exame
 >
 > - RRF usa **ranks**, não pontuações brutas — isso o torna invariante a escala e robusto a diferentes sistemas de pontuação
-> - `k=60` é a constante RRF padrão; k menor pondera mais os primeiros ranks
+> - `k=60` é uma convenção comum de RRF; em T-SQL, trate-o como parâmetro a validar no corpus
 > - `FULL OUTER JOIN` é essencial — um documento pode aparecer em apenas um dos dois result sets
 > - O hybrid search melhora o **recall** (encontra mais itens relevantes) comparado a usar apenas uma abordagem
 > - A busca vetorial lida com similaridade semântica; a full-text lida com palavras-chave exatas — nenhuma sozinha é ótima para busca em produção
@@ -362,7 +370,7 @@ k maior → distribuição mais uniforme entre ranks
 RRF funde **ranks** e evita escalas incompatíveis. Fórmula ponderada requer
 distância numérica e normalização de `RANK`: `(distance * 0.60) + ((1.0 - rank /
 1000.0) * 0.40)`. Se a fórmula precisa da distância, use `VECTOR_DISTANCE`, não
-`VECTOR_SEARCH`.
+`WITH APPROXIMATE`.
 
 ## Tópicos Relacionados
 

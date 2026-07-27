@@ -44,7 +44,7 @@ tags:
 
 ## Visão Geral
 
-A Full-Text Search (FTS) habilita a busca linguística de dados baseados em caracteres — correspondendo palavras, frases, proximidade e formas flexionadas. Diferente de queries `LIKE` (que fazem correspondência de padrões de caracteres), a FTS usa um **índice invertido** e entende semântica de idioma (radicais, sinônimos, stop words). Os predicados principais são `CONTAINS` (correspondência precisa de termos) e `FREETEXT` (correspondência em linguagem natural).
+A Full-Text Search (FTS) habilita a busca linguística de dados baseados em caracteres — correspondendo palavras, frases, proximidade e formas flexionadas. Diferente de queries `LIKE` (que fazem correspondência de padrões de caracteres), a FTS usa um **índice invertido**, separação de palavras, radicalização e stop words por idioma. Sinônimos do thesaurus só participam quando seus mapeamentos são configurados. Os predicados principais são `CONTAINS` (correspondência precisa de termos) e `FREETEXT` (correspondência em linguagem natural).
 
 > [!abstract]
 >
@@ -55,10 +55,22 @@ A Full-Text Search (FTS) habilita a busca linguística de dados baseados em cara
 > [!tip] O Que o Exame Testa
 >
 > - `CONTAINS` = **precisão**: termos exatos, prefixo (`"data*"`), proximidade (`NEAR`), termos ponderados (`ISABOUT`)
-> - `FREETEXT` = **recall**: query em linguagem natural, flexões e sinônimos, correspondência mais ampla
+> - `FREETEXT` = **recall**: query em linguagem natural e flexões; mapeamentos configurados do thesaurus podem ampliar a correspondência
 > - `CONTAINSTABLE` / `FREETEXTTABLE` retornam uma tabela com coluna `RANK` (0–1000) — use quando precisar de resultados ranqueados ou quiser fazer join com outras tabelas
 
 ---
+
+## Fundamentos: busca linguística por índice invertido
+
+Um índice full-text não percorre cada texto procurando caracteres como uma consulta `LIKE`. Ele cria um **índice invertido**: para cada termo analisado, mantém a lista de documentos e posições em que o termo ocorre. Por isso ele é apropriado para procurar palavras, frases e proximidade em grandes volumes de texto.
+
+Antes de indexar, o mecanismo interpreta o texto conforme o idioma: separa palavras, pode reduzir flexões a formas relacionadas e ignora *stop words* frequentes. A consulta passa pelo mesmo tipo de análise. Isso explica por que Full-Text Search é mais rica que `LIKE`, mas não é busca por significado: ela ainda depende de termos e regras linguísticas, não de embeddings.
+
+`CONTAINS` é indicado quando a aplicação controla a sintaxe e quer precisão — uma frase, prefixo, operador booleano ou proximidade. `FREETEXT` recebe uma frase em linguagem natural e amplia a correspondência por formas flexionadas e, quando houver mapeamentos configurados, pelo thesaurus. Quando o resultado precisa ser ordenado ou combinado com outros dados, `CONTAINSTABLE` e `FREETEXTTABLE` devolvem chaves e um `RANK`; esse rank é específico da FTS e não deve ser comparado diretamente com scores vetoriais.
+
+> [!note] Limite importante
+>
+> Full-Text Search recupera correspondência linguística, não conhecimento semântico geral. “Cancelar plano” pode não recuperar “encerrar assinatura” se os termos não forem relacionados pelo idioma/thesaurus. Para esse tipo de intenção, considere busca vetorial ou híbrida.
 
 ## Catálogos e Índices Full-Text
 

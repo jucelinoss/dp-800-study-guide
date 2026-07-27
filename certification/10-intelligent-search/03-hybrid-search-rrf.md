@@ -22,11 +22,19 @@ Hybrid search combines full-text search (keyword matching) with vector search (s
 
 > [!tip] What the Exam Tests
 >
-> - **RRF formula**: `score = Σ 1/(k + rank)` for each result set; `k = 60` default; higher score = more relevant
+> - **RRF formula**: `score = Σ 1/(k + rank)` for each result set; `k = 60` is a common convention, not a T-SQL default; higher score = more relevant
 > - RRF is a **rank-combination algorithm** — it combines the ranks of results from multiple sources, not their raw scores
 > - Hybrid search outperforms single-method when queries mix exact keywords and semantic meaning
 
 ---
+
+## Foundations: Two Kinds of Evidence, One Final List
+
+Full-text and vector search respond to different signals. The former favors exact terms, codes, phrases, and linguistic rules; the latter favors intent and approximate meaning. A single question can need both: a user might type the exact name of a policy while phrasing the rest differently from the document.
+
+The problem is that their scores have neither the same scale nor the same meaning. A Full-Text Search `RANK` is produced by the linguistic engine; a vector distance or similarity comes from a mathematical metric. Adding them directly creates arbitrary weights. **Reciprocal Rank Fusion (RRF)** solves this by ignoring raw values and combining only an item's position in each list: appearing near the top of one or both sources raises its final score.
+
+RRF does not create relevance by itself. It only reorders candidates retrieved by the individual searches. Therefore, choose a reasonable candidate count from each source, apply security filters before fusion, and evaluate with real queries and expected results (*ground truth*). If the final list is poor, investigate the indexes, embeddings, chunks, and source queries before tuning `k`.
 
 ## When to Use Each Search Type
 
@@ -35,7 +43,7 @@ Hybrid search combines full-text search (keyword matching) with vector search (s
 | Exact product code search (SKU-123) | Full-text (keyword) only |
 | Natural language query, vague intent | Vector only |
 | Short query with specific terms and semantic meaning | Hybrid (both) |
-| Known acronym expansion | Full-text (FORMSOF) |
+| Inflectional forms or configured thesaurus synonyms | Full-text (`FORMSOF`) |
 | Multi-lingual search | Vector (embeddings handle translation) |
 | High-recall requirement (don't miss relevant) | Hybrid |
 
@@ -79,9 +87,9 @@ BEGIN
 
     -- Step 1: Generate query embedding
     DECLARE @query_vector VECTOR(1536);
-    SELECT @query_vector = CAST(
-        PREDICT(MODEL = [MyEmbeddingModel],
-                DATA = (SELECT @query_text AS input_text)) AS VECTOR(1536));
+    SELECT @query_vector = AI_GENERATE_EMBEDDINGS(
+        @query_text USE MODEL [MyEmbeddingModel]
+    );
 
     -- Step 2: Full-text search results with rank
     WITH FTSResults AS (
@@ -94,17 +102,17 @@ BEGIN
 
     -- Step 3: Vector search results with rank
     VectorResults AS (
-        SELECT
+        SELECT TOP (50) WITH APPROXIMATE
             vs.ProductId,
             vs.distance AS VectorDistance,
-            ROW_NUMBER() OVER (ORDER BY vs.distance ASC) AS VectorRank
+            ROW_NUMBER() OVER (ORDER BY vs.distance) AS VectorRank
         FROM VECTOR_SEARCH(
-            TABLE = dbo.Products AS p,
+            TABLE = dbo.Products,
             COLUMN = DescriptionVector,
             SIMILAR_TO = @query_vector,
-            METRIC = 'cosine',
-            TOP_N = 50
+            METRIC = 'cosine'
         ) AS vs
+        ORDER BY vs.distance
     ),
 
     -- Step 4: Combine with RRF
@@ -155,9 +163,9 @@ DECLARE @rrf_k        INT = 60;
 DECLARE @top_n        INT = 10;
 
 -- Generate embedding
-SELECT @query_vector = CAST(
-    PREDICT(MODEL = [MyEmbeddingModel],
-            DATA = (SELECT @query_text AS input_text)) AS VECTOR(1536));
+SELECT @query_vector = AI_GENERATE_EMBEDDINGS(
+    @query_text USE MODEL [MyEmbeddingModel]
+);
 
 WITH FTSResults AS (
     SELECT
@@ -256,7 +264,7 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 | :--- | :--- |
 | Vector index (DiskANN) | `Major — milliseconds vs seconds for ANN` |
 | FTS index | Major — instant vs full table scan |
-| Reduce TOP_N in VECTOR_SEARCH | Minor — fewer candidates |
+| Reduce approximate `TOP (N)` | Minor — fewer candidates |
 | Reduce FTS result limit | Minor — faster FTS evaluation |
 | Pre-normalize embeddings | Minor — skip VECTOR_NORMALIZE at query time |
 
@@ -267,7 +275,7 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 The `k` constant controls how much high-rank positions matter:
 
 ```sql
--- k=60 (default): standard, reduces impact of top ranks
+-- k=60 (common convention): reduces impact of top ranks
 -- k=1: top rank dominates (extreme weighting to rank 1)
 -- k=100: more uniform scoring across ranks
 
@@ -297,8 +305,8 @@ Larger k → more uniform distribution across ranks
 | One list always dominates | k too small; one list much larger | `Increase k; ensure both lists return similar numbers of candidates` |
 | FTS returns nothing | Stop words removed all query terms | Add fallback: if FTS empty, use vector-only |
 | NULL RRFScore | FULL OUTER JOIN with no FTS result | Use `ISNULL(..., 0)` around RRF score components |
-| Slow hybrid search | No vector index | Create DiskANN index; use `VECTOR_SEARCH` |
-| Poor recall | TOP_N too small in each search | Increase candidate pool (e.g., TOP_N = 100) before final top-10 |
+| Slow hybrid search | No compatible vector index | Create a DiskANN vector index; use `WITH APPROXIMATE` |
+| Poor recall | Approximate candidate count too small | Increase `TOP (N)` before the final top-10 |
 
 ---
 
@@ -317,14 +325,14 @@ ORDER BY (VectorDistance * 0.60)
        + ((1.0 - FullTextRank / 1000.0) * 0.40) ASC;
 ```
 
-Do not use `VECTOR_SEARCH` when the business formula itself needs the returned
-distance value; it is an ANN retrieval interface, while the formula needs a
-materialized numeric distance.
+For a weighted formula, materialize a numeric distance and validate its
+distribution. `WITH APPROXIMATE` with `VECTOR_SEARCH` is appropriate only when
+approximate retrieval is acceptable for that formula.
 
 > [!tip] Exam Tips
 >
 > - RRF uses **ranks**, not raw scores — this makes it scale-invariant and robust to different scoring systems
-> - `k=60` is the standard RRF constant; lower k weights top ranks more heavily
+> - `k=60` is a common RRF convention; in a T-SQL implementation it is a parameter to validate against the corpus
 > - `FULL OUTER JOIN` is essential — a document may appear in only one of the two result sets
 > - Hybrid search improves **recall** (finds more relevant items) compared to using only one approach
 > - Vector search handles semantic similarity; full-text handles exact keywords — neither alone is optimal for production search

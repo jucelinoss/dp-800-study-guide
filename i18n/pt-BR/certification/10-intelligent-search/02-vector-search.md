@@ -21,7 +21,7 @@ tags:
 >   - 🔹 [Distância Euclidiana (L2)](#distância-euclidiana-l2)
 >   - 🔹 [Distância Dot Product](#distância-dot-product)
 >   - 🔹 [Comparação de Métricas de Distância](#comparação-de-métricas-de-distância)
-> - 📍 [6. VECTOR_SEARCH — Approximate Nearest Neighbor](#vector-search-approximate-nearest-neighbor)
+> - 📍 [6. Approximate Nearest Neighbor com WITH APPROXIMATE](#approximate-nearest-neighbor-com-with-approximate)
 > - 📍 [7. Índice Vetorial (DiskANN)](#índice-vetorial-diskann)
 >   - 🔹 [Opções do Índice DiskANN](#opções-do-índice-diskann)
 >   - 🔹 [Quando o Optimizer Usa o Índice Vetorial](#quando-o-optimizer-usa-o-índice-vetorial)
@@ -41,28 +41,36 @@ tags:
 
 ## Visão Geral
 
-A busca vetorial encontra linhas cujos embeddings vetoriais são matematicamente similares a um vetor de query. Isso habilita a busca semântica — encontrando conteúdo conceitualmente relacionado mesmo quando palavras-chave exatas não correspondem. O SQL Database no Fabric e o Azure SQL suportam busca vetorial nativa com o tipo de dado `VECTOR`, a função `VECTOR_DISTANCE` e a função `VECTOR_SEARCH` com indexação de approximate nearest neighbor (ANN) via DiskANN.
+A busca vetorial encontra linhas cujos embeddings vetoriais são matematicamente similares a um vetor de query. Isso habilita a busca semântica — encontrando conteúdo conceitualmente relacionado mesmo quando palavras-chave exatas não correspondem. O SQL Database no Fabric e o Azure SQL suportam busca vetorial nativa com o tipo de dado `VECTOR`, a função `VECTOR_DISTANCE` e índices ANN DiskANN.
 
 > [!abstract]
 >
-> - Aborda o tipo de dado VECTOR, VECTOR_DISTANCE (busca exata), VECTOR_SEARCH (busca aproximada) e indexação DiskANN
+> - Aborda o tipo de dado VECTOR, VECTOR_DISTANCE (busca exata), `WITH APPROXIMATE` (busca ANN) e indexação DiskANN
 > - A busca vetorial habilita queries de similaridade semântica — encontrando conteúdo conceitualmente relacionado, não apenas correspondências de palavras-chave
 > - Tópicos-chave para o exame: distinção ENN vs ANN, escolher a métrica de distância correta, requisito de VECTOR_NORMALIZE
 
 > [!tip] O Que o Exame Testa
 >
 > - `VECTOR_DISTANCE('cosine', v1, v2)` = **exato** nearest neighbor (ENN) — compara todas as linhas; use quando precisão > velocidade
-> - `VECTOR_SEARCH(TABLE, VECTOR(col), JSON_ARRAY(query_vector), top_n)` = **aproximado** (ANN) via DiskANN — mais rápido em escala
-> - DiskANN suporta métricas `cosine`, `dot` e `euclidean` — a métrica do índice **deve corresponder** à métrica usada em `VECTOR_SEARCH`
+> - `SELECT TOP (N) WITH APPROXIMATE ... FROM VECTOR_SEARCH(...)` = **aproximado** (ANN) via DiskANN — mais rápido em escala
+> - DiskANN suporta métricas `cosine`, `dot` e `euclidean` — a métrica do índice **deve corresponder** ao `VECTOR_DISTANCE` da query aproximada
 
 > [!note] Status em 2026
 >
 > - `VECTOR` e `VECTOR_DISTANCE` — **GA** no SQL Server 2025 e Azure SQL Database.
-> - `VECTOR_SEARCH`, `VECTOR_NORMALIZE`, `VECTORPROPERTY` — **preview público** no SQL Server 2025, Azure SQL Database e SQL database no Microsoft Fabric. Totalmente testável no exame.
-> - **Índice vetorial DiskANN** — **preview público** no SQL Server 2025, Azure SQL Database, Azure SQL Managed Instance e SQL database no Fabric. SQL Server 2025 requer adicionalmente `PREVIEW_FEATURES = ON`. Espere questões sobre correspondência de métricas.
-> - **Vetores de meia precisão (`float16`)** — preview; reduz armazenamento pela metade no mesmo número de dimensões. O limite documentado do tipo `VECTOR` é **1.998** dimensões.
+> - `VECTOR_SEARCH` e índices vetoriais são recursos em **preview**. `VECTOR_NORMALIZE` e `VECTORPROPERTY` são funções vetoriais; confirme a disponibilidade da plataforma antes de usar recursos de preview em produção.
+> - **Índice vetorial DiskANN** — **preview público**. A versão mais recente está disponível atualmente no Azure SQL Database e SQL database no Microsoft Fabric; no SQL Server 2025 preview, `PREVIEW_FEATURES = ON` é obrigatório.
+> - **Vetores de meia precisão (`float16`)** — preview; reduz armazenamento pela metade e suporta até **3.996** dimensões, contra **1.998** para `float32`.
 
 ---
+
+## Fundamentos: recuperar vizinhos por significado
+
+Busca vetorial começa com um modelo de embedding: ele converte o texto de cada documento e a pergunta do usuário em vetores de mesma dimensão. A consulta não procura palavras; ela mede quais vetores são os **vizinhos mais próximos** do vetor da pergunta. Proximidade costuma refletir significado semelhante, mas não garante que o resultado seja factualmente correto nem autorizado para o usuário.
+
+A métrica define o que “próximo” significa. Cosseno compara direção; euclidiana compara distância geométrica; dot product depende também da magnitude. O modelo, a preparação dos vetores e o índice precisam usar uma combinação compatível. Interprete a saída pelo ordenamento e pela métrica escolhida: um score de cosseno não pode ser comparado diretamente a uma distância euclidiana, nem a um `RANK` de Full-Text Search.
+
+Primeiro aplique filtros estruturados importantes — por exemplo, tenant, idioma, produto ou permissão — e então recupere os `k` melhores vetores do conjunto permitido. A busca exata avalia todos os candidatos e é referência de qualidade; ANN acelera coleções grandes aceitando que, em alguns casos, o vizinho matematicamente ideal pode não aparecer. Sempre avalie a qualidade com perguntas reais e texto original dos chunks, não somente com a latência da consulta.
 
 ## Tipo de Dado VECTOR
 
@@ -167,11 +175,11 @@ ORDER BY EuclideanDistance ASC;
 
 ### Distância Dot Product
 
-Mede similaridade como o produto escalar (inner product) de dois vetores. Quando os vetores estão normalizados, é equivalente ao cosine similarity:
+Retorna o **produto escalar negativo** como indicador de distância. Quando os vetores estão normalizados em L2, ordenar por essa distância equivale a ordenar por similaridade cosseno:
 
 ```sql
--- Dot product: para vetores normalizados, menor = menos similar (inverso do cosine sim)
--- Nota: computa o produto escalar negativo como "distância"
+-- Distância dot product: para vetores normalizados, menor = mais similar
+-- A função computa o produto escalar negativo como "distância"
 SELECT TOP 10
     p.ProductId,
     p.ProductName,
@@ -186,21 +194,21 @@ ORDER BY DotDistance ASC;
 | :--- | :--- | :--- | :--- |
 | `cosine` | 1 - cos(θ) | 0 a 2 | Embeddings de texto, similaridade baseada em direção |
 | `euclidean` | √Σ(a-b)² | 0 a ∞ | Dados espaciais/geométricos, vetores normalizados |
-| `dot` | 1 - Σ(aᵢ×bᵢ) | -∞ a +∞ | Quando os vetores já estão normalizados em L2 |
+| `dot` | -Σ(aᵢ×bᵢ) | -∞ a +∞ | Quando os vetores já estão normalizados em L2 |
 
 **Regra geral:** Use `cosine` para embeddings de texto — ele é invariante à magnitude do vetor, que varia pelo comprimento do documento.
 
 ---
 
-## VECTOR_SEARCH — Approximate Nearest Neighbor
+## Approximate Nearest Neighbor com `WITH APPROXIMATE`
 
-`VECTOR_SEARCH` usa um índice vetorial (DiskANN) para realizar busca approximate nearest neighbor (ANN) — muito mais rápida que a busca exata para tabelas grandes.
+Use `WITH APPROXIMATE` com `TOP` e `VECTOR_SEARCH` para solicitar busca ANN por um índice DiskANN compatível. O parâmetro legado `TOP_N` permanece apenas para compatibilidade com versões anteriores de índices.
 
 ```sql
--- Busca ANN usando VECTOR_SEARCH (requer um índice vetorial)
+-- Busca ANN com a sintaxe atual (requer índice vetorial compatível)
 DECLARE @query_vector VECTOR(1536) = CAST('[...]' AS VECTOR(1536));
 
-SELECT TOP 10
+SELECT TOP (10) WITH APPROXIMATE
     p.ProductId,
     p.ProductName,
     vs.distance AS CosineDistance
@@ -208,18 +216,12 @@ FROM VECTOR_SEARCH(
     TABLE = dbo.Products AS p,
     COLUMN = DescriptionVector,
     SIMILAR_TO = @query_vector,
-    METRIC = 'cosine',
-    TOP_N = 50           -- recuperar os 50 candidatos principais do índice
+    METRIC = 'cosine'
 ) AS vs
-ORDER BY vs.distance ASC
-FETCH FIRST 10 ROWS ONLY;
+ORDER BY vs.distance;
 ```
 
-O parâmetro `TOP_N` controla quantos candidatos o índice ANN retorna — um valor maior aumenta o recall ao custo de performance.
-
-> [!important] TOP_N vs TOP Clause
->
-> `TOP_N = 50` controla quantas candidatas o **índice ANN** retorna internamente. O `TOP 10` na query externa filtra o resultado final. Para boa qualidade de recuperação, use `TOP_N` maior que o número de resultados finais desejados — ex: `TOP_N = 50` para retornar 10 ao usuário.
+`TOP (N)` controla quantos vizinhos aproximados são retornados. Avalie recall e latência com queries representativas, sem presumir uma quantidade universal de candidatos.
 
 ---
 
@@ -255,11 +257,15 @@ WHERE object_id = OBJECT_ID('dbo.Products')
 
 ### Quando o Optimizer Usa o Índice Vetorial
 
-O índice vetorial é usado automaticamente por `VECTOR_SEARCH` — **não** é usado por `VECTOR_DISTANCE` em uma cláusula `ORDER BY` regular (que sempre faz busca exata/ENN).
+`WITH APPROXIMATE` solicita busca aproximada. O otimizador escolhe um índice DiskANN compatível ou kNN conforme as características da query; use `FORCE_ANN_ONLY` apenas quando for justificável forçar ANN. Um `ORDER BY VECTOR_DISTANCE(...)` regular continua exato e não usa o índice vetorial.
+
+> [!important] Requisito mínimo de dados
+>
+> Um índice vetorial atual exige pelo menos **100 linhas com vetores não NULL**. Insira dados suficientes antes de `CREATE VECTOR INDEX`; os índices novos mantêm mudanças automaticamente após o commit.
 
 > [!caution] Métrica do Índice deve Corresponder à Métrica da Query
 >
-> Se você criar o índice com `METRIC = 'cosine'` mas usar `VECTOR_SEARCH(..., METRIC = 'euclidean')`, o otimizador **não usará o índice** e fará silenciosamente um scan completo (ENN). Essa é uma armadilha de performance clássica — sempre certifique-se de que a métrica do índice corresponde à métrica da query.
+> Se você criar o índice com `METRIC = 'cosine'` mas calcular `VECTOR_DISTANCE('euclidean', ...)` na query aproximada, o índice não será compatível. Sempre certifique-se de que a métrica do índice corresponde à métrica da query.
 
 ---
 
@@ -276,7 +282,7 @@ flowchart TD
 
 | | ANN (Aproximado) | ENN (Exato) |
 | :--- | :--- | :--- |
-| **Sintaxe (atual)** | `SELECT TOP (N) ... ORDER BY VECTOR_DISTANCE(...) WITH APPROXIMATE` | `SELECT TOP (N) ... ORDER BY VECTOR_DISTANCE(...)` (sem `WITH APPROXIMATE`) |
+| **Sintaxe (atual)** | `SELECT TOP (N) WITH APPROXIMATE ... FROM VECTOR_SEARCH(...)` | `SELECT TOP (N) ... ORDER BY VECTOR_DISTANCE(...)` |
 | **Sintaxe (legada)** | `VECTOR_SEARCH(... TOP_N=N)` TVF — depreciada em índices mais novos | `VECTOR_DISTANCE` em `ORDER BY` |
 | **Precisão** | Pode perder alguns vizinhos próximos | Top-K exato garantido |
 | **Performance** | Sub-segundo em milhões de linhas | Scan linear — lento em tabelas grandes |
@@ -291,17 +297,15 @@ SELECT TOP 10
 FROM dbo.Products
 ORDER BY dist ASC;
 
--- ANN (Approximate Nearest Neighbor) — usa índice DiskANN
--- Ligeiramente menos preciso, mas muito rápido
-SELECT TOP 10
-    p.ProductId, p.ProductName,
-    vs.distance
+-- ANN (Approximate Nearest Neighbor) — usa índice DiskANN compatível
+SELECT TOP (10) WITH APPROXIMATE
+    vs.ProductId, vs.ProductName,
+    vs.distance AS dist
 FROM VECTOR_SEARCH(
-    TABLE = dbo.Products AS p,
+    TABLE = dbo.Products,
     COLUMN = DescriptionVector,
     SIMILAR_TO = @query,
-    METRIC = 'cosine',
-    TOP_N = 10
+    METRIC = 'cosine'
 ) AS vs
 ORDER BY vs.distance;
 ```
@@ -310,7 +314,7 @@ ORDER BY vs.distance;
 
 ## Convertendo Similaridade em Distância
 
-`VECTOR_DISTANCE('cosine', ...)` retorna uma **distância** (0 = idêntico, 2 = oposto). Para expressar como pontuação de similaridade (0 a 1):
+`VECTOR_DISTANCE('cosine', ...)` retorna uma **distância** (0 = idêntico, 2 = oposto). `1 - distância` é a similaridade cosseno e vai de **-1 a 1**:
 
 ```sql
 SELECT
@@ -335,20 +339,19 @@ DECLARE @user_query NVARCHAR(500) = 'comfortable headphones for long meetings';
 DECLARE @query_vector VECTOR(1536);
 
 -- Passo 2: Encontrar produtos semanticamente similares
-SELECT TOP 10
+SELECT TOP (10) WITH APPROXIMATE
     p.ProductId,
     p.ProductName,
     p.Description,
     vs.distance AS SemanticDistance,
-    1.0 - vs.distance AS SemanticSimilarity
+    1.0 - vs.distance AS CosineSimilarity
 FROM VECTOR_SEARCH(
     TABLE = dbo.Products AS p,
     COLUMN = DescriptionVector,
     SIMILAR_TO = @query_vector,
-    METRIC = 'cosine',
-    TOP_N = 10
+    METRIC = 'cosine'
 ) AS vs
-ORDER BY vs.distance ASC;
+ORDER BY vs.distance;
 ```
 
 ---
@@ -368,8 +371,8 @@ ORDER BY vs.distance ASC;
 | :--- | :--- | :--- |
 | `Cannot use VECTOR_DISTANCE on NULL` | Vetor NULL na coluna | Adicione `WHERE DescriptionVector IS NOT NULL` |
 | Erro de incompatibilidade de dimensão | Dimensão do vetor de query ≠ dimensão da coluna | Garanta que o embedding de query usa o mesmo modelo que os embeddings armazenados |
-| Resultados ANN diferem do ENN | Esperado — ANN é aproximado | Aumente `TOP_N` em VECTOR_SEARCH para maior recall |
-| Índice vetorial não usado | Usando `VECTOR_DISTANCE` em ORDER BY, não `VECTOR_SEARCH` | Use a função `VECTOR_SEARCH` para aproveitar o índice |
+| Resultados ANN diferem do ENN | Esperado — ANN é aproximado | Avalie recall e quantidade de candidatos com queries representativas |
+| Índice vetorial não usado | Sem índice compatível ou o otimizador escolhe kNN | Use `TOP (N) WITH APPROXIMATE` com `VECTOR_SEARCH`; avalie se `FORCE_ANN_ONLY` é justificável |
 | Resultados de busca ruins | Embeddings não normalizados, usando dot product | Ou normalize os vetores ou use a métrica `cosine` |
 
 ---
@@ -379,8 +382,8 @@ ORDER BY vs.distance ASC;
 > [!tip] Dicas para o Exame
 >
 > - `VECTOR_DISTANCE('cosine', ...)` retorna uma **distância** (menor = mais similar) — não uma pontuação de similaridade
-> - `VECTOR_SEARCH` usa o índice DiskANN (ANN); `VECTOR_DISTANCE` em ORDER BY é sempre ENN (exato)
-> - A métrica do índice vetorial (`cosine`, `euclidean`, `dot`) deve corresponder à métrica usada em `VECTOR_SEARCH`
+> - `WITH APPROXIMATE` com `VECTOR_SEARCH` solicita ANN; `VECTOR_DISTANCE` em ORDER BY regular é sempre ENN (exato)
+> - A métrica do índice vetorial (`cosine`, `euclidean`, `dot`) deve corresponder à métrica passada a `VECTOR_SEARCH`
 > - `VECTOR(1536)` armazena 1536 × 4 bytes = 6KB por linha — leve isso em conta no planejamento de armazenamento
 > - `VECTOR_NORMALIZE` com `'norm2'` normaliza para comprimento unitário — necessário antes de usar dot product como cosine similarity
 
@@ -389,7 +392,7 @@ ORDER BY vs.distance ASC;
 ## Principais Conclusões
 
 - Tipo de dado `VECTOR` armazena arrays de ponto flutuante de dimensão fixa
-- `VECTOR_DISTANCE` computa distâncias exatas; `VECTOR_SEARCH` usa ANN para busca aproximada escalável
+- `VECTOR_DISTANCE` computa distâncias exatas; `WITH APPROXIMATE` com `VECTOR_SEARCH` solicita ANN para busca aproximada escalável
 - Crie um índice DiskANN na coluna vetorial para habilitar busca ANN rápida
 - Use distância cosseno para embeddings de texto; ela é robusta a diferenças na magnitude do vetor
 
