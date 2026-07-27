@@ -493,6 +493,12 @@ D. Habilitar o cache com tempo de expiração (TTL) nulo.
 
 ---
 
+## Autorização do GraphQL no Fabric
+
+**Run Queries and Mutations** concede Execute na API; View/Edit não bastam para
+consultar dados. Com saved credential, ela fornece acesso à fonte; com SSO, o
+chamador também precisa de read/write apropriado no datasource.
+
 ## Tópicos Relacionados
 
 - [01-Construtor de APIs de Dados (DAB)](./01-data-api-builder.md)

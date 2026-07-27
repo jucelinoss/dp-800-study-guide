@@ -331,7 +331,7 @@ SELECT * FROM Ranked WHERE dr <= 3;
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
 | Infinite recursion in CTE | Missing/incorrect termination condition | Add `WHERE` in recursive member; use `MAXRECURSION` |
-| Wrong running total | Missing `ROWS UNBOUNDED PRECEDING` | `Default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` — can cause unexpected results with ties` |
+| Wrong running total | Missing `ROWS UNBOUNDED PRECEDING` | Default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`; ties can produce unexpected results. |
 | `LAST_VALUE` returns current row | Default frame ends at current row | Add `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING` |
 | CTE runs slower when referenced twice | No materialization; query runs CTE logic multiple times | Replace with `#temp table` to force materialization |
 
@@ -399,6 +399,18 @@ D. CTEs are limited to 100 rows by default
 ---
 
 ## Official Documentation
+
+## Ordered tokenization with `STRING_SPLIT`
+
+On SQL Server 2022+ and compatible Azure SQL services, pass `1` as the third
+argument to request the `ordinal` column. Always order by `ordinal` when output
+sequence matters; a relational result set has no guaranteed order otherwise.
+
+```sql
+SELECT value, ordinal
+FROM STRING_SPLIT(N'red,green,blue', N',', 1)
+ORDER BY ordinal;
+```
 
 - [WITH common_table_expression (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/queries/with-common-table-expression-transact-sql)
 - [Window Functions (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/queries/select-over-clause-transact-sql)

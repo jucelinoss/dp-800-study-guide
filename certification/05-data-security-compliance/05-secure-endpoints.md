@@ -304,6 +304,27 @@ Microsoft Defender for SQL provides two capabilities under a single plan:
 
 ## Exam Tips
 
+## Managed Identity for REST endpoints: credential contract
+
+For `sp_invoke_external_rest_endpoint`, a Managed Identity credential is not an
+API-key credential. The `SECRET` identifies the protected resource or application
+that receives the token. For an Azure OpenAI endpoint, the documented resource ID
+is `https://cognitiveservices.azure.com`.
+
+```sql
+CREATE DATABASE SCOPED CREDENTIAL [https://contoso.openai.azure.com]
+WITH IDENTITY = 'Managed Identity',
+     SECRET = '{"resourceid":"https://cognitiveservices.azure.com"}';
+
+GRANT REFERENCES ON DATABASE SCOPED CREDENTIAL::[https://contoso.openai.azure.com]
+    TO AppRole;
+```
+
+The credential name must match the request URL's protocol, host, and applicable
+path rules. On SQL Server 2025, enable server-scoped database credentials before
+using this pattern. Azure SQL and SQL Server also differ in identity setup; verify
+the target platform before copying deployment scripts.
+
 > [!tip] Exam Tips
 >
 > - `DATABASE SCOPED CREDENTIAL` with `IDENTITY = 'Managed Identity'` is the correct syntax for passwordless model calls
@@ -356,6 +377,7 @@ D. Enable Managed Identity authentication to replace password-based access
 - [Managed Identity for SQL Database](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-azure-ad-user-assigned-managed-identity)
 - [DAB Authentication](https://learn.microsoft.com/en-us/azure/data-api-builder/authentication-azure-ad)
 - [Database Scoped Credentials](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-database-scoped-credential-transact-sql)
+- [sp_invoke_external_rest_endpoint](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-invoke-external-rest-endpoint-transact-sql)
 - [Azure SQL Firewall Rules](https://learn.microsoft.com/en-us/azure/azure-sql/database/firewall-configure)
 - [Azure Private Link for SQL](https://learn.microsoft.com/en-us/azure/azure-sql/database/private-endpoint-overview)
 - [Microsoft Defender for SQL](https://learn.microsoft.com/en-us/azure/azure-sql/database/azure-defender-for-sql)

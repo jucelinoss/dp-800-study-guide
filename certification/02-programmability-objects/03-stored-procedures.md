@@ -361,7 +361,7 @@ OPTION(OPTIMIZE FOR (@CustomerID UNKNOWN));
 | Parameter sniffing | Cached plan optimized for first parameter value | Use `OPTION (RECOMPILE)` or `OPTIMIZE FOR` |
 | Nested transaction issues | Committing a savepoint vs outer transaction | Track `@@TRANCOUNT`; use `SAVE TRANSACTION` for nested |
 | `SET NOCOUNT ON` missing | Verbose row count messages sent to client | Always add `SET NOCOUNT ON` in procedures |
-| SQL injection via dynamic SQL | User input concatenated into query string | `Use `sp_executesql` with parameters; `QUOTENAME` for object names` |
+| SQL injection via dynamic SQL | User input concatenated into query string | Use `sp_executesql` with parameters; use `QUOTENAME` for object names. |
 | Natively compiled proc errors | Using unsupported T-SQL features | Check In-Memory OLTP supported surface area docs |
 
 ---
@@ -426,6 +426,20 @@ D. Modify the internal code to run the search using `EXEC` instead of `sp_execut
 ---
 
 ## Official Documentation
+
+## Inspect a procedure result contract
+
+Use `sys.sp_describe_first_result_set` when a caller needs metadata for the first
+result set without executing the procedure's business operation.
+
+```sql
+EXEC sys.sp_describe_first_result_set
+    @tsql = N'EXEC Sales.uspGetWhereUsedProductID @StartProductID = 1, @CheckDate = NULL';
+```
+
+This is useful for integration validation and generated clients. It describes only
+the first result set and can fail when SQL Server cannot statically determine the
+result shape, for example with some dynamic SQL paths.
 
 - [Stored Procedures (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/stored-procedures/stored-procedures-database-engine)
 - [EXECUTE AS (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/statements/execute-as-transact-sql)

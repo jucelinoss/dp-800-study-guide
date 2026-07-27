@@ -420,6 +420,12 @@ D. Modificar o código interno para executar a busca via comando `EXEC` em vez d
 
 ---
 
+## Inspecionar contrato de resultado
+
+`sys.sp_describe_first_result_set` retorna metadados do primeiro result set sem
+executar a operação de negócio. Pode falhar quando o SQL Server não determina
+estaticamente o formato, como em alguns caminhos de SQL dinâmico.
+
 ## Tópicos Relacionados
 
 - [02-Functions](./02-functions.md)

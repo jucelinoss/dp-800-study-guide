@@ -357,6 +357,13 @@ k maior → distribuição mais uniforme entre ranks
 
 ---
 
+## RRF versus score ponderado
+
+RRF funde **ranks** e evita escalas incompatíveis. Fórmula ponderada requer
+distância numérica e normalização de `RANK`: `(distance * 0.60) + ((1.0 - rank /
+1000.0) * 0.40)`. Se a fórmula precisa da distância, use `VECTOR_DISTANCE`, não
+`VECTOR_SEARCH`.
+
 ## Tópicos Relacionados
 
 - [01-Full-Text Search](./01-fulltext-search.md)

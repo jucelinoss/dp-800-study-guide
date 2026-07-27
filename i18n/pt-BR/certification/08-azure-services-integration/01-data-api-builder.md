@@ -489,6 +489,12 @@ D. Criar uma stored procedure no banco master para expor endpoints de rede do se
 
 ---
 
+## `@env()` e `secretref:` por camada
+
+Use `@env('MSSQL_CONNECTION_STRING')` no DAB para ler variável de ambiente. No
+Azure Container Apps, `secretref:connection-string` mapeia um segredo para essa
+variável. `secretref:` não substitui a expressão de connection string do DAB.
+
 ## Tópicos Relacionados
 
 - [02-Segurança e Filtros em Endpoints REST & GraphQL](./02-rest-graphql-endpoints.md)

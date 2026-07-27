@@ -293,7 +293,7 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS;  
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| Regex functions not found | Not available in SQL Server; only in Fabric/Azure SQL | Check platform compatibility before using |
+| Regex functions not found | The feature isn't available in the current engine version or update policy | Check the function's **Applies to** matrix and, for Azure SQL Managed Instance, its update policy |
 | Slow fuzzy join | Cross-join of large tables | Filter to candidate pairs first using cheaper predicates |
 | Unexpected REGEXP_LIKE result | Case sensitivity | Use `i` flag for case-insensitive: `REGEXP_LIKE(col, pattern, 'i')` |
 | SOUNDEX returns wrong matches | Non-English names | Use `EDIT_DISTANCE` or `JARO_WINKLER_DISTANCE` instead |
@@ -315,7 +315,7 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS;  
 
 > [!tip] Exam Tips
 >
-> - Regex and fuzzy functions are primarily tested in the context of **SQL databases in Microsoft Fabric**
+> - Regex and text-similarity functions are recent T-SQL features whose availability depends on platform and version: SQL Server 2025 (17.x), Azure SQL Database, Azure SQL Managed Instance, and Microsoft Fabric SQL services. For Managed Instance, check the update policy; text-similarity functions remain in *preview*. Always check the function's **Applies to** matrix before adopting it.
 > - `EDIT_DISTANCE` returns an absolute count; `EDIT_DISTANCE_SIMILARITY` returns a 0–100 percentage
 > - `JARO_WINKLER_DISTANCE` returns 0.0–1.0 (not 0–100) — note the different scale
 > - `SOUNDEX`/`DIFFERENCE` are standard T-SQL (not Fabric-only); `DIFFERENCE` score of 4 = most similar

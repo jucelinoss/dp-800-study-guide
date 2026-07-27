@@ -425,6 +425,13 @@ D. Membership no papel db_owner
 
 ---
 
+## Ciclo de vida e evidência operacional
+
+Mantenha deployment, dimensões, credencial, contrato e avaliação sob controle de
+mudança. Faça rollout gradual, compare qualidade/latência/custo/erros e planeje
+re-embedding e compatibilidade do índice ao trocar modelo. Monitore freshness,
+falhas de geração, recall/precision, latência e validação de resposta.
+
 ## Tópicos Relacionados
 
 - [02-Manutenção de Embeddings](./02-embedding-maintenance.md)

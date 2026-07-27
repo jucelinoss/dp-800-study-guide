@@ -439,11 +439,25 @@ GraphQL pagination response:
 | GraphQL `null` for nested relationship | Relationship not configured | Add `relationships` section to entity config |
 | `403 Forbidden` | Role not granted action | Verify `permissions` in entity config includes the user's role |
 | PUT returns 404 | PK value not in request body | PUT requires PK in URL; body provides the full new state |
-| Stored proc `GET` method not working | SP defaults to `post` | `Explicitly set `"methods": ["get"]` for read-only SPs` |
+| Stored proc `GET` method not working | SP defaults to `post` | Explicitly set `"methods": ["get"]` for read-only SPs. |
 
 ---
 
 ## Exam Tips
+
+## Fabric GraphQL authorization is separate from item visibility
+
+For Fabric API for GraphQL, **Run Queries and Mutations** grants Execute on the
+API. View/Edit permissions do not by themselves let a caller query data. The rest
+of the authorization depends on the connectivity model:
+
+| Configuration | API permission | Data-source permission |
+| :--- | :--- | :--- |
+| Saved credential | Run Queries and Mutations | Credential supplies source access |
+| SSO | Run Queries and Mutations | Caller also needs appropriate read/write access |
+
+Do not confuse this Fabric permission model with DAB entity `permissions`; they
+apply to different products and control planes.
 
 > [!tip] Exam Tips
 >
@@ -477,6 +491,7 @@ GraphQL pagination response:
 - [DAB REST Endpoints](https://learn.microsoft.com/en-us/azure/data-api-builder/rest)
 - [DAB GraphQL Endpoints](https://learn.microsoft.com/en-us/azure/data-api-builder/graphql)
 - [DAB Pagination](https://learn.microsoft.com/en-us/azure/data-api-builder/concept/api/pagination)
+- [Fabric GraphQL permissions](https://learn.microsoft.com/en-us/fabric/data-engineering/get-started-api-graphql)
 
 ---
 

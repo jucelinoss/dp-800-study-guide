@@ -335,6 +335,17 @@ A **non-aligned index** has a different partitioning scheme (or is not partition
 
 ## Exam Tips
 
+## Retention decision: DELETE, TRUNCATE PARTITION, or SWITCH
+
+| Requirement | Appropriate operation | Key constraint |
+| :--- | :--- | :--- |
+| Delete selected rows inside a partition | `DELETE` | Fully logged; can be expensive and block longer |
+| Discard every row in a known partition | `TRUNCATE TABLE ... WITH (PARTITIONS (...))` | Cannot archive the rows |
+| Move an entire partition to an archive table | `ALTER TABLE ... SWITCH PARTITION` | Target must exist, be empty, and meet alignment/schema requirements |
+
+Partition operations are not a blanket replacement for `DELETE`: choose them only
+when the retention boundary exactly matches the partition boundary.
+
 > [!tip] Exam Tips
 >
 > - **Partition function** defines the rules; **partition scheme** maps to filegroups

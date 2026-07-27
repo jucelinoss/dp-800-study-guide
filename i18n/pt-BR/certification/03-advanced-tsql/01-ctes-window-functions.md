@@ -422,6 +422,17 @@ D. O SQL Server limita a volumetria de retorno de CTEs a exatamente 100 linhas p
 
 ---
 
+## Tokenização ordenada com `STRING_SPLIT`
+
+No SQL Server 2022+ e Azure SQL compatível, passe `1` como terceiro argumento para
+solicitar `ordinal`. Ordene explicitamente por `ordinal` quando a sequência importar.
+
+```sql
+SELECT value, ordinal
+FROM STRING_SPLIT(N'red,green,blue', N',', 1)
+ORDER BY ordinal;
+```
+
 ## Tópicos Relacionados
 
 - [02-JSON Functions](./02-json-functions.md) *(Inglês apenas)*

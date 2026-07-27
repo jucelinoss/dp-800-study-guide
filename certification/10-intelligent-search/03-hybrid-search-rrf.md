@@ -304,6 +304,23 @@ Larger k → more uniform distribution across ranks
 
 ## Exam Tips
 
+## RRF versus a weighted score
+
+RRF fuses **ranks** and avoids comparing incompatible score scales. Use it as the
+default hybrid pattern. A weighted formula is a different design: it requires a
+numeric vector distance (lower is better) and normalization of the full-text
+`RANK` (higher is better) before combining them.
+
+```sql
+-- Illustrative only: validate score distributions on your corpus.
+ORDER BY (VectorDistance * 0.60)
+       + ((1.0 - FullTextRank / 1000.0) * 0.40) ASC;
+```
+
+Do not use `VECTOR_SEARCH` when the business formula itself needs the returned
+distance value; it is an ANN retrieval interface, while the formula needs a
+materialized numeric distance.
+
 > [!tip] Exam Tips
 >
 > - RRF uses **ranks**, not raw scores — this makes it scale-invariant and robust to different scoring systems

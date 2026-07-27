@@ -412,11 +412,32 @@ END;
 | `HTTP 400 Bad Request` | Prompt too long or malformed JSON | Check token count; validate JSON payload; escape special chars |
 | JSON parse error on response | Response is not valid JSON | Check `$.response.status.http.code` first; may be an HTML error page |
 | `QUOTENAME` returns NULL for inputs > 128 chars | `QUOTENAME` accepts `nvarchar(128)` — returns NULL (not a truncated value) for longer input | For long strings, use `REPLACE(@text, '"', '\"')` instead |
-| Inconsistent responses | Temperature > 0 | `Set `"temperature": 0` for factual/deterministic output` |
+| Inconsistent responses | Temperature > 0 | Set `"temperature": 0` for factual/deterministic output. |
 
 ---
 
 ## Exam Tips
+
+## Treat the model response as an untrusted contract
+
+Use a response variable, inspect the HTTP outcome, and only then parse the API
+payload. The wrapper returned by `sp_invoke_external_rest_endpoint` can place the
+provider response under `$.result`; do not assume that a direct provider path is
+also the SQL procedure's path.
+
+```sql
+DECLARE @response nvarchar(max);
+
+EXEC sys.sp_invoke_external_rest_endpoint
+    @url = @Url, @method = 'POST', @credential = [https://contoso.openai.azure.com],
+    @payload = @Payload, @response = @response OUTPUT;
+
+SELECT JSON_VALUE(@response, '$.result.choices[0].message.content') AS Content;
+```
+
+Production code must also validate the expected JSON shape, handle timeout/rate
+limit/error responses before extraction, log a correlation identifier, and persist
+only approved fields plus retrieval/source traceability.
 
 > [!tip] Exam Tips
 >

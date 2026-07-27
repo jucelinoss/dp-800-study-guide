@@ -341,7 +341,7 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS; -
 
 > [!tip] Dicas para a Prova
 >
-> - As funções de expressões regulares (POSIX Regex) e buscas difusas aproximadas (Levenshtein e Jaro-Winkler) são características cobradas sob o escopo de **SQL databases in Microsoft Fabric**.
+> - As funções de regex e de similaridade textual são recursos recentes do T-SQL, disponíveis conforme a plataforma e a versão: SQL Server 2025 (17.x), Azure SQL Database, Azure SQL Managed Instance e serviços SQL do Microsoft Fabric. No Managed Instance, confira a política de atualização; as funções de similaridade permanecem em *preview*. Verifique sempre a matriz **Aplica-se a** da função antes de adotá-la.
 > - A função `EDIT_DISTANCE` computa e retorna um número inteiro absoluto de edições; a `EDIT_DISTANCE_SIMILARITY` retorna um percentual na escala de 0 a 100.
 > - `JARO_WINKLER_DISTANCE` retorna uma distância `float`: menor valor significa maior similaridade.
 > - As funções `SOUNDEX`/`DIFFERENCE` são padrões clássicos do T-SQL (presentes em todas as edições do SQL Server); um score de `DIFFERENCE` igual a 4 denota similaridade fonética máxima.

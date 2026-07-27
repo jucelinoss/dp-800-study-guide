@@ -434,12 +434,20 @@ az containerapp create \
 | `Anonymous access denied` | Permission not set for anonymous role | Add `"role": "anonymous", "actions": ["read"]` to entity permissions |
 | `Key field not found` | `key-fields` doesn't match column name | Verify column name matches exactly; check `mappings` if renamed |
 | `Stored procedure parameter type mismatch` | Wrong type in `parameters` config | Use `"number"` for INT, `"string"` for VARCHAR |
-| Connection string in config file | Security risk | `Use `@env('VAR_NAME')` to reference environment variables` |
+| Connection string in config file | Security risk | Use `@env('VAR_NAME')` to reference environment variables. |
 | GraphQL introspection disabled in prod | `allow-introspection: false` | Set to `true` only in dev; keep `false` in production for security |
 
 ---
 
 ## Exam Tips
+
+## `@env()` and `secretref:` belong to different layers
+
+Use `@env('MSSQL_CONNECTION_STRING')` in DAB configuration or `dab init` to tell
+DAB to read an environment variable. In Azure Container Apps, use
+`secretref:connection-string` when mapping a Container Apps secret into that
+environment variable. The secret reference is deployment configuration, not a
+valid replacement for DAB's connection-string expression.
 
 > [!tip] Exam Tips
 >

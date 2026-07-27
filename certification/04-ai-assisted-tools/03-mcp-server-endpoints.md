@@ -294,7 +294,7 @@ MCP servers should return structured error objects rather than raw exceptions. A
 | Error | Cause | Resolution |
 | :--- | :--- | :--- |
 | `CONNECTION_TIMEOUT` | Firewall blocking, server cold start | Check firewall rules; retry |
-| `PERMISSION_DENIED` | Account lacks required permission | `Grant `SELECT` or `VIEW DEFINITION`` |
+| `PERMISSION_DENIED` | Account lacks required permission | Grant `SELECT` or `VIEW DEFINITION`. |
 | `INVALID_TOOL_INPUT` | Query fails JSON Schema validation | Check tool input schema |
 | `SERVER_NOT_FOUND` | Wrong package name or npx cache issue | Verify package name; clear npx cache |
 | `AUTH_FAILURE` | Expired token or wrong credentials | Refresh token or update connection string |
@@ -396,6 +396,24 @@ Azure SQL → Networking:
 ---
 
 ## Exam Tips
+
+## MCP governance checklist
+
+Treat each MCP tool as a production integration boundary. Before enabling it,
+define the permitted data scope, identity, operations, audit destination, and
+human approval path for destructive actions.
+
+| Control | Minimum practice |
+| :--- | :--- |
+| Identity | Managed identity or service principal; no embedded password |
+| Authorization | Least-privilege database role and allowlisted tools |
+| Data | Mask or exclude sensitive fields before tool exposure |
+| Audit | Record caller, tool, parameters, outcome, and correlation ID |
+| Change control | Require review for DDL/DML-capable tools and production targets |
+
+Read-only schema discovery and a production write tool should not share the same
+credential. AI assistance accelerates work; it does not replace security review,
+testing, or execution-plan review.
 
 > [!tip] Exam Tips
 >

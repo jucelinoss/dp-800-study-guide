@@ -365,6 +365,12 @@ D. Utilizar autenticação anônima desabilitando o firewall do Azure SQL.
 
 ---
 
+## Checklist de governança MCP
+
+Defina escopo de dados, identidade, operações, destino de auditoria e aprovação
+humana para ações destrutivas. Use menor privilégio, views sem dados sensíveis,
+logs de chamador/parâmetros/resultado e credenciais separadas para schema e escrita.
+
 ## Tópicos Relacionados
 
 - [02-Configuração do GitHub Copilot](./02-github-copilot-setup.md)

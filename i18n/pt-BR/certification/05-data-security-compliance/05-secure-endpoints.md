@@ -343,6 +343,13 @@ D. Exigir o tráfego por autenticações de Managed Identities desabilitando log
 
 ---
 
+## Managed Identity para endpoints REST
+
+Para `sp_invoke_external_rest_endpoint`, Managed Identity não é API key. O `SECRET`
+identifica o recurso protegido; para Azure OpenAI, o Learn usa
+`{"resourceid":"https://cognitiveservices.azure.com"}`. Conceda `REFERENCES` na
+credential ao principal que a usará e valide regras de URL/escopo e plataforma.
+
 ## Tópicos Relacionados
 
 - [03-Permissões & Acessos](./03-permissions-access.md)

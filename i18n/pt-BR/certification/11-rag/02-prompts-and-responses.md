@@ -506,6 +506,13 @@ END;
 
 ---
 
+## Resposta do modelo como contrato não confiável
+
+Confira o resultado HTTP antes do parsing. O wrapper de
+`sp_invoke_external_rest_endpoint` pode colocar a resposta em `$.result`; não
+presuma o caminho de uma chamada direta. Valide schema, trate erros antes da
+extração, registre correlation ID e mantenha rastreabilidade das fontes.
+
 ## Tópicos Relacionados
 
 - [01-Casos de Uso de RAG](./01-rag-use-cases.md)

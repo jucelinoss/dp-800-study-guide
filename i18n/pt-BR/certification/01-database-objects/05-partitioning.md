@@ -134,7 +134,7 @@ AS RANGE LEFT FOR VALUES (
 | Direção | O valor limite pertence à partição | Aplicação Típica |
 | :--- | :--- | :--- |
 | `RANGE LEFT` | Esquerda (inferior) (coluna <= limite) | Intervalos numéricos simples |
-| `RANGE RIGHT` | ==Direita (superior) (coluna >= limite)== | Intervalos de datas — o limite inicia o período novo |
+| `RANGE RIGHT` | **Direita (superior) (coluna >= limite)** | Intervalos de datas — o limite inicia o período novo |
 
 ### Partition Scheme
 
@@ -618,6 +618,14 @@ D. `ALTER PARTITION FUNCTION MERGE RANGE` sobre a partição mais antiga
 > O comando SWITCH reatribui páginas em nível de metadados, evitando a cópia e a exclusão linha a linha. A operação requer locks de esquema breves e depende de estruturas compatíveis entre origem e destino. A opção A (insert/delete) gera I/O massivo e bloqueios mais prolongados. A opção C não representa sintaxe T-SQL válida. O comando MERGE (D) apenas mescla as partições na função, sem transferir dados para uma tabela de histórico.
 
 ---
+
+## Retenção: DELETE, TRUNCATE PARTITION ou SWITCH
+
+`DELETE` remove linhas selecionadas e é totalmente registrado. `TRUNCATE TABLE ...
+WITH (PARTITIONS (...))` descarta toda uma partição, sem arquivá-la. `ALTER TABLE
+... SWITCH PARTITION` arquiva uma partição inteira, mas exige destino vazio e
+compatibilidade de schema/alinhamento. A fronteira de retenção deve coincidir com a
+partição.
 
 ## Tópicos Relacionados
 

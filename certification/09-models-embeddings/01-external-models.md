@@ -326,6 +326,19 @@ Model deployments are managed through Azure OpenAI Studio (or the Azure Portal):
 
 ## Exam Tips
 
+## Model lifecycle and operational evidence
+
+Registering an external model is only the start. Keep model name, deployment,
+dimensions, credential, input contract, and evaluation result under change control.
+Use a staged rollout: evaluate a candidate against a fixed test set, deploy to a
+small workload, compare quality/latency/cost/error rate, then promote or roll
+back. When replacing an embedding model, plan for re-embedding and vector-index
+compatibility rather than mixing dimensions in one vector column.
+
+For RAG, monitor embedding freshness, failed generations, retrieval recall or
+precision on a labelled set, latency, response-validation failures, and grounded
+answer quality. These metrics make a model change reversible and auditable.
+
 > [!tip] Exam Tips
 >
 > - `CREATE EXTERNAL MODEL` requires a `DATABASE SCOPED CREDENTIAL` — the API key is stored in the credential, not the model definition

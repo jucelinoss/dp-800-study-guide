@@ -340,12 +340,23 @@ sqlpackage /Action:Publish \
 | `BlockOnPossibleDataLoss` fails pipeline | Column dropped or type changed | Review change; migrate data in pre-deployment script first |
 | Key Vault secret not found | Service principal lacks Get/List permissions | Add SP to Key Vault access policy with `get` and `list` |
 | `Environment not configured` | No approval policy on environment | Go to Pipelines → Environments → configure approvals |
-| Drift detected on first run | DB was previously managed manually | ==Use `DropObjectsNotInSource=false` on first deployment; then clean up manually== |
+| Drift detected on first run | DB was previously managed manually | **Use `DropObjectsNotInSource=false` on first deployment; then clean up manually** |
 | `Authentication failed` in pipeline | Service connection not granted db_owner | Grant the service principal `db_owner` role in the target database |
 
 ---
 
 ## Exam Tips
+
+## Reference deployment sequence
+
+1. Commit the SQL project and run branch-policy validation.
+2. Build the DACPAC and validate the model.
+3. Run tests plus drift/deploy reports against the intended target.
+4. Review generated script, data-loss warnings, and required approvals.
+5. Deploy through the controlled environment and monitor the result.
+
+This is a reference safety sequence, not an assertion that every product forces
+one fixed pipeline layout. Keep reports and approvals as gates before production.
 
 > [!tip] Exam Tips
 >

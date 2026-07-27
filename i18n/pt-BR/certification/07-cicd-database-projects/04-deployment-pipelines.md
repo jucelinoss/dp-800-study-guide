@@ -374,6 +374,16 @@ D. `/Action:Script`
 
 ---
 
+## Sequência de deployment de referência
+
+1. Commit e validação de branch.
+2. Build e validação do DACPAC.
+3. Testes e relatórios de drift/deploy.
+4. Revisão do script, avisos e aprovações.
+5. Deploy controlado e monitoração.
+
+É uma sequência de segurança de referência, não uma imposição do produto.
+
 ## Tópicos Relacionados
 
 - [02-Projetos de Banco de Dados SQL](./02-sql-database-projects.md)
