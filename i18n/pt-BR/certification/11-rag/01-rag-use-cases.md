@@ -10,7 +10,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
 > - 📍 [2. Fluxo RAG em Um Relance](#fluxo-rag-em-um-relance)
 > - 📍 [3. O Padrão RAG](#o-padrão-rag)
@@ -41,7 +41,8 @@ tags:
 # Casos de Uso e Arquitetura de RAG
 
 ## Visão Geral
-O Retrieval-Augmented Generation (RAG) ancora as respostas de Large Language Models (LLMs) em dados de um banco de dados, reduzindo o risco de respostas não fundamentadas e tornando-as mais relevantes e atuais. Em vez de depender apenas do que o modelo "conhece" de seu treinamento, o RAG recupera contexto relevante de uma fonte de dados confiável e o inclui no prompt. O SQL Database no Fabric e o Azure SQL são backends naturais para RAG porque armazenam tanto dados estruturados quanto embeddings em um único lugar.
+
+O Retrieval-Augmented Generation (RAG) ancora as respostas de Large Language Models (LLMs) em dados de um banco de dados, reduzindo o risco de respostas não fundamentadas e tornando-as mais relevantes e atuais. Em vez de depender apenas do que o modelo "conhece" de seu treinamento, o RAG recupera contexto relevante de uma fonte de dados confiável e o inclui no prompt. O SQL Database no Fabric e o Azure SQL são backends naturais para RAG porque armazenam tanto dados estruturados quanto embeddings em um único lugar.
 
 > [!abstract]
 >
@@ -58,6 +59,14 @@ tags:
 RAG não garante que toda resposta será correta: recupere fontes relevantes, instrua o modelo a declarar quando a evidência for insuficiente e, quando aplicável, retorne citações para os chunks usados.
 
 ---
+
+## Fundamentos: recuperar evidência antes de gerar
+
+RAG não treina novamente o modelo nem altera seus pesos. Ele é um padrão de **recuperação em tempo de consulta**: transforma a pergunta em uma busca, seleciona poucos trechos relevantes e entrega esses trechos como evidência no prompt. O modelo de chat usa essa evidência para redigir a resposta, mas não substitui a etapa de recuperação.
+
+O valor do RAG vem de três propriedades: informações podem ser atualizadas na fonte sem treinar o modelo; a resposta pode apontar para a evidência usada; e a recuperação pode respeitar filtros de dados estruturados, como tenant, produto, data e permissões. O limite é igualmente importante: se o trecho correto não for recuperado, estiver desatualizado ou não couber no prompt, o modelo não terá uma base confiável para responder.
+
+Um desenho seguro separa responsabilidades: a busca recupera somente documentos que o usuário pode acessar; a aplicação monta o contexto com origem e metadados; e o modelo recebe instruções para responder apenas com a evidência disponível ou declarar insuficiência. Citações melhoram auditabilidade, mas não provam sozinhas que a interpretação do modelo está correta — avalie perguntas reais e suas fontes esperadas.
 
 ## Fluxo RAG em Um Relance
 
@@ -93,28 +102,28 @@ Para um walkthrough em T-SQL, combine as etapas deste capítulo com os exemplos 
 Pergunta do Usuário
      │
      ▼
-┌────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────┐
 │  RETRIEVE                                       │
 │  1. Embeder a pergunta do usuário (query vector)│
 │  2. Buscar no banco: vector + full-text         │
 │  3. Recuperar top-K chunks/registros relevantes │
-└────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────┘
      │ contexto recuperado (texto)
      ▼
-┌────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────┐
 │  AUGMENT                                        │
 │  4. Construir prompt:                           │
 │     - System message (instruções)               │
 │     - Context (dados recuperados)               │
 │     - Pergunta do usuário                       │
-└────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────┘
      │ prompt (system + context + question)
      ▼
-┌────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────┐
 │  GENERATE                                       │
-│  5. Chamar LLM (ex: GPT-4o-mini)               │
+│  5. Chamar LLM (ex: GPT-4o-mini)                │
 │  6. Retornar resposta ancorada ao usuário       │
-└────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -146,17 +155,17 @@ Pergunta do Usuário
 Caso de uso: Cliente pergunta "Qual é a minha política de devolução para eletrônicos?"
 
 Recuperar:
-- Full-text search em documentos de política por "electronics return"
+ - Full-text search em documentos de política por "devolução de eletrônicos"
 - Busca vetorial por chunks de política semanticamente similares
 
 Aumentar:
-- System: "Answer based only on the provided policy documents."
-- Context: [3 chunks de política mais relevantes]
-- User: "Qual é a minha política de devolução para eletrônicos?"
+- Sistema: "Responda somente com base nos documentos de política fornecidos."
+- Contexto: [3 chunks de política mais relevantes]
+- Usuário: "Qual é a minha política de devolução para eletrônicos?"
 
 Gerar:
-- "Based on our policy, electronics can be returned within 30 days
-   with original packaging. Opened items incur a 15% restocking fee."
+- "Segundo nossa política, eletrônicos podem ser devolvidos em até 30 dias
+   com a embalagem original. Itens abertos têm taxa de reposição de 15%."
 ```
 
 Estrutura de banco de dados:
@@ -178,14 +187,14 @@ CREATE TABLE dbo.PolicyChunks (
     CONSTRAINT PK_PolicyChunks PRIMARY KEY (ChunkId)
 );
 
-CREATE FULLTEXT INDEX ON dbo.PolicyChunks (ChunkText LANGUAGE 1033)
+CREATE FULLTEXT INDEX ON dbo.PolicyChunks (ChunkText LANGUAGE 1046)
 KEY INDEX PK_PolicyChunks ON PolicyCatalog;
 ```
 
 ### 2. Busca e Recomendações de Produtos
 
 ```text
-Caso de uso: Usuário digita "I need headphones for long video calls"
+Caso de uso: Usuário digita "Preciso de fones de ouvido para chamadas de vídeo longas"
 
 Recuperar:
 - Busca vetorial em descrições de produtos
@@ -193,28 +202,28 @@ Recuperar:
 - Top 5 produtos correspondentes
 
 Aumentar:
-- System: "You are a product advisor. Recommend from the provided products only."
-- Context: [nomes, preços, recursos chave dos top 5 resultados]
-- User: "I need headphones for long video calls"
+- Sistema: "Você é um consultor de produtos. Recomende apenas os produtos fornecidos."
+- Contexto: [nomes, preços e recursos-chave dos cinco principais resultados]
+- Usuário: "Preciso de fones de ouvido para chamadas de vídeo longas"
 
 Gerar:
-- "For long video calls, I recommend the Jabra Evolve2 55. It features..."
+- "Para chamadas de vídeo longas, recomendo o Jabra Evolve2 55. Ele oferece..."
 ```
 
 ### 3. Q&A em Documentos
 
 ```text
 Caso de uso: Busca interna em base de conhecimento
-"How do I configure SSO for our HR system?"
+"Como configuro o SSO para nosso sistema de RH?"
 
 Recuperar:
 - Busca vetorial em chunks de documentação de TI
 - Filtrar por doc_type = 'IT' or 'Security'
 
 Aumentar:
-- System: "Answer questions about IT procedures using the provided documentation."
-- Context: [etapas de procedimento relevantes e guias de configuração]
-- User: "How do I configure SSO for our HR system?"
+- Sistema: "Responda a perguntas sobre procedimentos de TI usando a documentação fornecida."
+- Contexto: [etapas de procedimento relevantes e guias de configuração]
+- Usuário: "Como configuro o SSO para nosso sistema de RH?"
 
 Gerar:
 - Resposta passo-a-passo ancorada na documentação de TI real
@@ -223,20 +232,20 @@ Gerar:
 ### 4. Assistente de Análise de Dados
 
 ```text
-Caso de uso: Usuário de negócios pergunta "Which products had the highest return rate last month?"
+Caso de uso: Usuário de negócios pergunta "Quais produtos tiveram a maior taxa de devolução no mês passado?"
 
 Recuperar:
 - Query SQL estruturada (não busca vetorial — são dados tabulares)
-- SELECT TOP 10 products by return_rate WHERE period = 'last_month'
+- SELECT TOP 10 produtos por taxa_de_devolucao WHERE periodo = 'ultimo_mes'
 
 Aumentar:
-- System: "You are a data analyst. Summarize the provided query results."
-- Context: [result set SQL como texto/JSON formatado]
-- User: "Which products had the highest return rate last month?"
+- Sistema: "Você é um analista de dados. Resuma os resultados da consulta fornecidos."
+- Contexto: [conjunto de resultados SQL como texto/JSON formatado]
+- Usuário: "Quais produtos tiveram a maior taxa de devolução no mês passado?"
 
 Gerar:
-- "Last month, wireless earbuds had the highest return rate at 8.3%,
-   followed by smart watches at 6.1%..."
+- "No mês passado, fones de ouvido sem fio tiveram a maior taxa de devolução, de 8,3%,
+   seguidos por relógios inteligentes, com 6,1%..."
 ```
 
 ---

@@ -53,6 +53,14 @@ tags:
 
 ---
 
+## Fundamentos: prompt é contexto e contrato, não só texto
+
+Depois que a busca recupera os chunks, o prompt é o contrato que define como o modelo deve usar essa evidência. A mensagem de sistema estabelece regras persistentes — papel, limites, formato e o que fazer quando faltar informação. A mensagem de usuário traz a pergunta e, conforme o desenho, o contexto recuperado. Nenhuma instrução no prompt cria permissão de acesso: filtros de segurança precisam ocorrer antes da recuperação.
+
+O contexto compete por espaço com instruções, pergunta e resposta dentro da janela de tokens do modelo. Enviar mais chunks não significa obter resposta melhor; trechos irrelevantes diluem a evidência e aumentam custo e latência. Recupere poucos candidatos de alta qualidade, preserve identificação/origem e defina um orçamento de tokens para o contexto e para a resposta.
+
+Por fim, trate toda saída do modelo como **dados não confiáveis**. Mesmo com RAG, ele pode omitir detalhes, interpretar mal uma fonte ou produzir JSON inválido. Valide a estrutura, limites e regras de negócio antes de persistir ou executar qualquer ação; use saída estruturada quando precisar de um contrato de resposta, mas ainda faça validação no SQL ou na aplicação.
+
 ## Sintaxe de sp_invoke_external_rest_endpoint
 
 ```sql
