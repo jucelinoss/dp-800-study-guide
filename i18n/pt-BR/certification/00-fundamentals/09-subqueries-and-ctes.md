@@ -236,7 +236,7 @@ DROP TABLE IF EXISTS #ProductSalesReport;
 
 Escreva uma consulta que retorne os 5 principais produtos por valor total de vendas usando uma CTE. Use o schema AdventureWorks: `Sales.SalesOrderDetail` (UnitPrice, OrderQty) e `Production.Product` (Name).
 
-> [!success]- Answer
+> [!success]- Resposta
 >
 > ```sql
 > WITH ProductRevenue AS (
@@ -255,7 +255,7 @@ Escreva uma consulta que retorne os 5 principais produtos por valor total de ven
 
 Você precisa de pedidos com total > 5000 E clientes que fizeram esses pedidos. Escreva uma consulta usando duas CTEs (uma para pedidos de alto valor, outra juntando ao Customer).
 
-> [!success]- Answer
+> [!success]- Resposta
 >
 > ```sql
 > WITH HighValueOrders AS (
@@ -276,14 +276,14 @@ Você precisa de pedidos com total > 5000 E clientes que fizeram esses pedidos. 
 
 Quando você escolheria uma tabela temporária local em vez de uma variável de tabela?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Escolha `#TempTable` quando: (a) o resultado intermediário tem mais de ~100 linhas e precisa de estatísticas precisas para o otimizador; (b) você precisa de índices secundários; (c) os dados devem persistir entre múltiplos lotes na mesma sessão. Escolha `@TableVariable` para conjuntos de lookup pequenos (10–50 linhas) dentro de um único procedimento onde a limpeza automática é conveniente.
 
 ### 4. Materialização de CTE
 
 Uma CTE é referenciada duas vezes em uma consulta. O SQL Server materializa o resultado uma vez ou o executa duas vezes?
 
-> [!success]- Answer
+> [!success]- Resposta
 > O SQL Server pode executar a definição da CTE **duas vezes** (uma por referência). Uma CTE é uma expressão lógica, não um resultado materializado. Se a definição for cara e referenciada múltiplas vezes, considere inserir em uma `#TempTable`.
 
 ## Próximos Passos

@@ -109,9 +109,17 @@ FROM REGEXP_SPLIT_TO_TABLE('a,b,,c', ',+');
 
 Fuzzy matching quantifies string similarity — useful for deduplication, data matching, and AI-assisted entity resolution.
 
+> [!info] How to interpret fuzzy-matching algorithms
+>
+> - They measure **spelling proximity**, not meaning. Semantically different names can look alike, while synonyms can look entirely different.
+> - A **distance** measures difference: `0` normally means equality and lower values are better. A **similarity** measures closeness: higher values are better.
+> - No threshold is universal. Calibrate it with real samples, review candidates before merging records, and combine the metric with supporting fields such as email, date of birth, or city.
+
 ### EDIT_DISTANCE (Levenshtein Distance)
 
 **Edit distance** returns the minimum number of single-character edits (insertions, deletions, substitutions) to transform one string to another.
+
+In practical terms, it answers: “how many small typing changes would make these two texts equal?” This makes it useful for simple misspellings, missing letters, and extra characters. Because it is an absolute measure, the same distance can be significant for a short name but insignificant for a long description.
 
 ```sql
 SELECT EDIT_DISTANCE('kitten', 'sitting');  -- Returns: 3
@@ -129,6 +137,8 @@ WHERE EDIT_DISTANCE(a.Name, b.Name) <= 2;
 
 Returns a similarity score from 0 (completely different) to 100 (identical) — normalized version of edit distance.
 
+Use it when compared texts can have different lengths. Its normalized score supports more understandable percentage thresholds — for example, reviewing candidates above 85 — without favoring short strings as strongly as an absolute distance does.
+
 ```sql
 SELECT EDIT_DISTANCE_SIMILARITY('Microsoft', 'Microsift');  -- Returns: ~89
 
@@ -140,22 +150,23 @@ JOIN dbo.Customers b ON a.CustomerId < b.CustomerId
 WHERE EDIT_DISTANCE_SIMILARITY(a.Name, b.Name) > 80;
 ```
 
-### JARO_WINKLER_DISTANCE
+### JARO_WINKLER_DISTANCE and JARO_WINKLER_SIMILARITY
 
-The Jaro-Winkler algorithm gives higher scores to strings that match from the beginning — well-suited for person names and short strings.
+The Jaro-Winkler algorithm gives more weight to strings that match from the beginning — well-suited for person names and short identifiers. `JARO_WINKLER_DISTANCE` returns a `float` where **lower is better**; `JARO_WINKLER_SIMILARITY` returns an integer from 0 to 100 where **higher is better**.
+
+The **Jaro** component considers matching characters and the order in which they occur. The **Winkler** adjustment adds weight when the strings share a prefix. Therefore, `"Maria Silva"` and `"Maria Silve"` generally score better than two strings that contain the same letters in a different order. It is a strong fit for short, manually entered names and identifiers; it should not be used to conclude that long or semantically related texts represent the same entity.
 
 ```sql
-SELECT JARO_WINKLER_DISTANCE('MARTHA', 'MARHTA');   -- Returns: ~0.9611
-SELECT JARO_WINKLER_DISTANCE('DWAYNE', 'DUANE');    -- Returns: ~0.8400
-SELECT JARO_WINKLER_DISTANCE('John Smith', 'Jon Smith'); -- Returns: ~0.9878
+SELECT JARO_WINKLER_DISTANCE('MARTHA', 'MARHTA') AS Distance,
+       JARO_WINKLER_SIMILARITY('MARTHA', 'MARHTA') AS Similarity;
 
 -- Deduplication: find potential duplicate contacts
 SELECT a.ContactId, a.FullName,
        b.ContactId AS MatchId, b.FullName AS MatchName,
-       JARO_WINKLER_DISTANCE(a.FullName, b.FullName) AS Similarity
+       JARO_WINKLER_DISTANCE(a.FullName, b.FullName) AS Distance
 FROM dbo.Contacts a
 JOIN dbo.Contacts b ON a.ContactId < b.ContactId
-WHERE JARO_WINKLER_DISTANCE(a.FullName, b.FullName) > 0.92;
+WHERE JARO_WINKLER_DISTANCE(a.FullName, b.FullName) < 0.08;
 ```
 
 > [!warning] Common Mistake
@@ -171,6 +182,8 @@ SOUNDEX and DIFFERENCE are built-in T-SQL functions available in SQL Server and 
 - **DIFFERENCE(string1, string2)**: compares the SOUNDEX codes of two strings and returns a score from 0 to 4, where 4 means most phonetically similar and 0 means least similar
 - **Use case**: fuzzy matching on names where spelling varies (e.g., "Smith" vs "Smyth"), matching imported data with inconsistent romanization
 - **Limitations**: English-centric algorithm; unreliable for non-Latin characters, non-English names, or languages with different phonetic rules
+
+Conceptually, `SOUNDEX` does not compare complete spelling: it reduces a word to a short phonetic signature. `DIFFERENCE` compares those signatures. This makes them inexpensive pre-filters — for example, grouping “Smith” and “Smyth” before applying a more precise metric — but unsuitable as the final decision for deduplication, particularly for Portuguese-language data.
 
 ```sql
 -- SOUNDEX examples

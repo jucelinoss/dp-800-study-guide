@@ -266,7 +266,7 @@ B. `LEFT JOIN` com `Customer` à esquerda<br>
 C. `RIGHT JOIN` com `Customer` à esquerda<br>
 D. `CROSS JOIN`
 
-> [!success]- Answer
+> [!success]- Resposta
 > **B.** Um left join preserva toda linha de sua entrada esquerda. Coloque `Customer` à esquerda quando clientes são o conjunto inicial necessário.
 
 ### 2. Posicionamento de filtro
@@ -278,7 +278,7 @@ B. Na cláusula `ON` do `LEFT JOIN`<br>
 C. Em `ORDER BY`<br>
 D. Não importa
 
-> [!success]- Answer
+> [!success]- Resposta
 > **B.** Um filtro do lado direito em `ON` controla correspondências enquanto preserva clientes esquerdos não correspondidos. Em `WHERE`, ele remove linhas estendidas com nulo.
 
 ### 3. Contagens inesperadas de linhas
@@ -290,7 +290,7 @@ B. A granularidade da consulta é uma linha por pedido<br>
 C. A chave primária está necessariamente quebrada<br>
 D. `DISTINCT` deve sempre ser adicionado
 
-> [!success]- Answer
+> [!success]- Resposta
 > **B.** O relacionamento um-para-muitos repete a linha do lado um para cada linha correspondente do lado muitos. Agregue ou use `EXISTS` apenas se a granularidade do resultado desejado for uma linha por cliente.
 
 ## Casos de Uso

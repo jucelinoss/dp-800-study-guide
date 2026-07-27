@@ -268,7 +268,7 @@ WHERE parent_object_id = OBJECT_ID(N'study.SalesOrder');
 
 Você tenta inserir um `SalesOrder` com `CustomerId = 999` em uma tabela onde nenhum cliente tem esse ID. Que erro você obtém? Como você o capturaria graciosamente em T-SQL?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Erro 547: violação de restrição de chave estrangeira. Capture com `BEGIN TRY...BEGIN CATCH` e inspecione `ERROR_NUMBER()`:
 >
 > ```sql
@@ -286,14 +286,14 @@ Você tenta inserir um `SalesOrder` com `CustomerId = 999` em uma tabela onde ne
 
 O que acontece quando você insere `NULL` em uma coluna definida como `CHECK (Value > 0)` e a coluna é anulável?
 
-> [!success]- Answer
+> [!success]- Resposta
 > O insert **é bem-sucedido**. Uma comparação com `NULL` avalia para `UNKNOWN`, que não é `FALSE`. A restrição `CHECK` apenas rejeita linhas onde o predicado avalia para `FALSE`. Adicione `NOT NULL` à coluna se um valor ausente também deve ser rejeitado.
 
 ### 3. UNIQUE e NULL
 
 Quantos valores `NULL` uma restrição `UNIQUE` pode aceitar no SQL Server?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Um `NULL`. O SQL Server trata `NULL` como um valor distinto para fins de unicidade. Se a coluna é anulável, uma única linha com `NULL` é permitida; uma segunda linha com `NULL` violaria a restrição.
 
 ### 4. Mal-entendido de DEFAULT
@@ -306,7 +306,7 @@ INSERT INTO study.Customer (CustomerName, IsActive) VALUES (N'Test', NULL);
 
 Qual é o valor de `IsActive` para a nova linha?
 
-> [!success]- Answer
+> [!success]- Resposta
 > `NULL`. O `DEFAULT` só se aplica quando a coluna é **omitida** da lista de colunas do `INSERT`. Passar explicitamente `NULL` insere `NULL` — e como a coluna é `NOT NULL`, este insert **falha**.
 
 ## Próximos Passos

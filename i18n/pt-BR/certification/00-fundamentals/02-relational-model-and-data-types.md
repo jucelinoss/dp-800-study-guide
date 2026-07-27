@@ -338,7 +338,7 @@ B. `SupportTicket`<br>
 C. Ambas as tabelas<br>
 D. Nenhuma tabela
 
-> [!success]- Answer
+> [!success]- Resposta
 > **B. `SupportTicket`** é a tabela do lado muitos. Cada ticket armazena o cliente ao qual pertence; um cliente pode ser referenciado por muitas linhas de ticket.
 
 ### 2. Seleção de tipo
@@ -350,7 +350,7 @@ B. `nvarchar(20)`<br>
 C. `decimal(12, 2)`<br>
 D. `bit`
 
-> [!success]- Answer
+> [!success]- Resposta
 > **C. `decimal(12, 2)`** é um tipo exato de escala fixa. Valores de ponto flutuante são aproximados e texto não carrega semântica numérica.
 
 ### 3. Valores ausentes
@@ -362,7 +362,7 @@ B. `Email <> NULL`<br>
 C. `Email IS NULL`<br>
 D. `Email = ''`
 
-> [!success]- Answer
+> [!success]- Resposta
 > **C. `Email IS NULL`** testa explicitamente o marcador de valor ausente. Uma string vazia é um valor de texto diferente e conhecido.
 
 ## Casos de Uso

@@ -231,21 +231,21 @@ GROUP BY c.CustomerID;
 
 Qual é a diferença entre `COUNT(*)` e `COUNT(ShipDate)` quando `ShipDate` é anulável?
 
-> [!success]- Answer
+> [!success]- Resposta
 > `COUNT(*)` retorna o número total de linhas. `COUNT(ShipDate)` retorna apenas o número de linhas onde `ShipDate` não é nulo. Se 100 linhas existem mas 10 têm `ShipDate` nulo, `COUNT(*)` = 100 e `COUNT(ShipDate)` = 90.
 
 ### 2. WHERE vs HAVING
 
 Você pode filtrar grupos usando `WHERE`? Pode filtrar linhas individuais usando `HAVING`?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Não para ambos. `WHERE` opera em linhas individuais **antes** do agrupamento e não pode referenciar resultados agregados. `HAVING` opera em grupos **após** a agregação e não pode filtrar linhas individuais pré-agrupamento sem também incluí-las no grupo.
 
 ### 3. Agregação condicional
 
 Escreva uma consulta que retorne cada produto com quantidade total vendida e quantidade total vendida em pedidos acima de $1.000.
 
-> [!success]- Answer
+> [!success]- Resposta
 >
 > ```sql
 > SELECT sod.ProductID,
@@ -260,7 +260,7 @@ Escreva uma consulta que retorne cada produto com quantidade total vendida e qua
 
 Você faz `LEFT JOIN` de Customer para SalesOrderHeader e depois `GROUP BY CustomerID`. O que uma linha de resultado representa? O que acontece se você usar `COUNT(*)` em vez de `COUNT(SalesOrderID)`?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Uma linha por cliente. `COUNT(*)` contaria a linha estendida com nulo para clientes sem pedidos (retornando 1 em vez de 0), o que é enganoso. Sempre use `COUNT(ChildID)` para contagens de filhos em agregações com left join.
 
 ## Próximos Passos

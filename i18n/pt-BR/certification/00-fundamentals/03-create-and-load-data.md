@@ -276,14 +276,14 @@ B. `ProductId`, `IsDiscontinued` e `CreatedAt`<br>
 C. `ProductName` e `UnitPrice`<br>
 D. Todas as colunas
 
-> [!success]- Answer
+> [!success]- Resposta
 > **B.** `ProductId` é gerado por `IDENTITY`; `IsDiscontinued` e `CreatedAt` têm defaults. `ProductName` e `UnitPrice` são `NOT NULL` sem defaults, então o insert deve fornecê-los.
 
 ### 2. Faça uma carga válida
 
 Escreva um insert para um produto chamado `Desk Lamp` custando `29.90` que solicite os valores padrão para as outras colunas.
 
-> [!success]- Answer
+> [!success]- Resposta
 >
 > ```sql
 > INSERT INTO study.Product (ProductName, UnitPrice)
@@ -296,7 +296,7 @@ Escreva um insert para um produto chamado `Desk Lamp` custando `29.90` que solic
 
 Você precisa de uma cópia descartável de duas colunas para uma consulta exploratória. Qual padrão é apropriado, e o que você deve lembrar depois?
 
-> [!success]- Answer
+> [!success]- Resposta
 > `SELECT INTO` é apropriado para a cópia descartável. Lembre-se de que ele não reproduz chaves, restrições, índices, defaults ou permissões da tabela fonte.
 
 ## Casos de Uso

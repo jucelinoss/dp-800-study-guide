@@ -264,7 +264,7 @@ B. `HAVING`<br>
 C. `ORDER BY`<br>
 D. `DISTINCT`
 
-> [!success]- Answer
+> [!success]- Resposta
 > **B. `HAVING`** filtra resultados agrupados; `WHERE` filtra linhas de entrada antes do agrupamento.
 
 ### 2. Relacionamentos ausentes
@@ -276,7 +276,7 @@ B. `INNER JOIN SalesOrder`<br>
 C. `NOT EXISTS (SELECT 1 FROM SalesOrder WHERE ...)`<br>
 D. `UNION ALL`
 
-> [!success]- Answer
+> [!success]- Resposta
 > **C.** `NOT EXISTS` expressa a ausência de uma linha relacionada e evita o comportamento `NULL` de `NOT IN`.
 
 ### 3. Diferença de listas
@@ -288,7 +288,7 @@ B. `INTERSECT`<br>
 C. `EXCEPT`<br>
 D. `CROSS JOIN`
 
-> [!success]- Answer
+> [!success]- Resposta
 > **C. `EXCEPT`** retorna linhas do primeiro resultado menos o segundo.
 
 ## Casos de Uso

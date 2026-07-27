@@ -192,28 +192,28 @@ Um índice nem sempre é a resposta. Considere pular um índice quando:
 
 Uma tabela tem uma chave primária em `CustomerId` (clustered padrão). Você cria um índice nonclustered em `Email`. Onde o índice nonclustered armazena seu localizador de linha no nível folha?
 
-> [!success]- Answer
+> [!success]- Resposta
 > O índice nonclustered armazena a chave clustered (`CustomerId`) como o localizador de linha. Para encontrar a linha completa, o SQL Server usa a chave clustered para navegar no índice clustered. Isso é chamado de **key lookup**.
 
 ### 2. Leituras lógicas
 
 Você executa uma consulta com `SET STATISTICS IO ON`. Antes de criar um índice, a consulta relata 1.200 leituras lógicas. Depois de criar um índice, relata 150 leituras lógicas. Este é um índice útil para esta consulta?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Sim. Uma redução de 1.200 para 150 leituras lógicas significa que o índice ajudou o SQL Server a encontrar linhas com menos I/O. O índice é benéfico para este padrão de consulta.
 
 ### 3. Conceito covering
 
 Qual é o mínimo necessário para um índice "cobrir" uma consulta que seleciona `OrderDate`, `TotalDue` e `Status` de `Sales.SalesOrderHeader` onde `OrderDate >= '2013-01-01'`?
 
-> [!success]- Answer
+> [!success]- Resposta
 > A chave do índice deve incluir `OrderDate` (para seek) e `INCLUDE TotalDue, Status` (para evitar key lookup). Como `Status` pode já estar no índice clustered, adicioná-lo a `INCLUDE` torna o índice covering para esta consulta.
 
 ### 4. Custo de escrita
 
 Por que adicionar um índice nonclustered diminui inserts na mesma tabela?
 
-> [!success]- Answer
+> [!success]- Resposta
 > Cada insert deve adicionar uma linha aos dados da tabela *e* atualizar cada índice nonclustered na tabela. Mais índices = mais trabalho por insert. Esta é a compensação fundamental leitura/escrita do design de índices.
 
 ## Próximos Passos

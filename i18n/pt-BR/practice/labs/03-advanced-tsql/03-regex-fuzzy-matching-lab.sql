@@ -6,12 +6,8 @@
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
--- Este script demonstra validações de padrão, limpeza de dados e correspondência aproximada:
---   1. Validação de Padrões: LIKE com Classes de Caracteres ([A-Z], [^0-9]) e Cláusula ESCAPE
---   2. Normalização e Limpeza: TRANSLATE vs REPLACE e STRING_SPLIT com Habilitação de Ordinal (SQL 2022+)
---   3. Correspondência Fonética: SOUNDEX e a Função DIFFERENCE (Escala 0 a 4)
---   4. Algoritmos de Fuzzy Matching: EDIT_DISTANCE (Levenshtein), SIMILARITY e JARO_WINKLER_DISTANCE
---   5. Cenários Práticos de Projeto (Deduplicação de Cadastros e Preparação de Dados para Embeddings/RAG)
+-- Este script demonstra validações de padrão, Regex, Full-Text Search, limpeza de dados e correspondência aproximada.
+-- Recursos opcionais (Regex, Full-Text Search e métricas fuzzy em preview) são verificados antes da execução.
 -- =================================================================================
 
 USE AdventureWorks2025;
@@ -23,7 +19,7 @@ GO
 
 -- Estrutura de Tabelas para Teste
 CREATE TABLE lab.RawContacts (
-    ContactID INT IDENTITY(1,1) PRIMARY KEY,
+    ContactID INT IDENTITY(1,1) CONSTRAINT PK_lab_RawContacts PRIMARY KEY,
     FullName NVARCHAR(100) NOT NULL,
     Phone NVARCHAR(50) NULL,
     ProductCode NVARCHAR(20) NULL
@@ -45,7 +41,9 @@ INSERT INTO lab.RawContacts (FullName, Phone, ProductCode) VALUES
 ('Alice Smith', '(11) 98765-4321', 'ABC-1234'),
 ('Bob Smyth', '11.98765.4321', 'XYZ-9999'),
 ('Charlie Brown', '11987654321', 'INVALID-12'),
-('David 50% Sale', 'N/A', 'OFF-50%');
+('David 50% Sale', 'N/A', 'OFF-50%'),
+('José Silva', '(11) 90000-0000', 'DEF-5678'),
+('Jose Silva', '(11) 90000-0001', 'GHI-9012');
 GO
 
 -- -- [PONTO DE ATENÇÃO DP-800]
@@ -60,24 +58,73 @@ FROM lab.RawContacts
 WHERE FullName LIKE '%\%%' ESCAPE '\';
 GO
 
--- 3. SQL Server 2025: a mesma regra com expressão regular.
--- REGEXP_LIKE requer nível de compatibilidade 170. Confirme antes de executar em outro banco:
--- SELECT compatibility_level FROM sys.databases WHERE name = DB_NAME();
+-- 3. Outros curingas e PATINDEX: sublinhado exige exatamente um caractere e [^0-9] nega uma classe.
 SELECT ContactID, ProductCode
 FROM lab.RawContacts
-WHERE REGEXP_LIKE(ProductCode, '^[A-Z]{3}-\d{4}$');
+WHERE ProductCode LIKE '___-____' AND ProductCode NOT LIKE '%[^A-Z0-9-]%';
+
+SELECT ContactID, ProductCode, PATINDEX('%[0-9][0-9][0-9][0-9]%', ProductCode) AS PosicaoDosQuatroDigitos
+FROM lab.RawContacts
+WHERE PATINDEX('%[0-9][0-9][0-9][0-9]%', ProductCode) > 0;
+
+-- 4. Unicode e collation: CI_AI encontra José e Jose; CS_AS encontra somente José.
+SELECT FullName
+FROM lab.RawContacts
+WHERE FullName = N'José Silva' COLLATE Latin1_General_100_CI_AI;
+
+SELECT FullName
+FROM lab.RawContacts
+WHERE FullName = N'José Silva' COLLATE Latin1_General_100_CS_AS;
 GO
 
 
 -- =================================================================================
--- PARTE 2: NORMALIZAÇÃO DE STRINGS COM TRANSLATE E STRING_SPLIT ORDINAL
+-- PARTE 2: FUNÇÕES REGEX (SQL SERVER 2025 / AZURE SQL / FABRIC)
+-- =================================================================================
+-- REGEXP_LIKE requer nível de compatibilidade 170. A verificação dinâmica evita erro de compilação
+-- em versões sem Regex e deixa o restante do lab executável.
+DECLARE @RegexDisponivel BIT = 0;
+
+BEGIN TRY
+    EXEC sys.sp_executesql N'SELECT REGEXP_LIKE(N''ABC-1234'', N''^[A-Z]{3}-\d{4}$'');';
+    SET @RegexDisponivel = 1;
+END TRY
+BEGIN CATCH
+    PRINT 'Regex nativo indisponível nesta instância ou nível de compatibilidade. A seção Regex será ignorada.';
+END CATCH;
+
+IF @RegexDisponivel = 1
+BEGIN
+    EXEC sys.sp_executesql N'
+        -- REGEXP_LIKE: validação de formato.
+        SELECT ContactID, ProductCode
+        FROM lab.RawContacts
+        WHERE REGEXP_LIKE(ProductCode, ''^[A-Z]{3}-\d{4}$'');
+
+        -- REGEXP_REPLACE: limpeza e normalização de espaços.
+        SELECT Phone, REGEXP_REPLACE(Phone, ''[^0-9]'', '''') AS ApenasDigitos,
+               REGEXP_REPLACE(N''  muitos   espaços  '', ''\s+'', '' '') AS EspacosNormalizados
+        FROM lab.RawContacts;
+
+        -- REGEXP_SUBSTR, REGEXP_INSTR e REGEXP_COUNT: extrair, localizar e contar padrões.
+        SELECT REGEXP_SUBSTR(N''Pedido #12345 e #67890'', ''[0-9]+'') AS PrimeiroPedido,
+               REGEXP_INSTR(N''Pedido #12345'', ''[0-9]+'') AS PosicaoDoPedido,
+               REGEXP_COUNT(N''2025-01-15 e 2025-02-20'', ''[0-9]{4}-[0-9]{2}-[0-9]{2}'') AS QuantidadeDeDatas;
+
+        -- Funções tabulares: SELECT * também exibe metadados de captura e posição quando aplicáveis.
+        SELECT * FROM REGEXP_MATCHES(N''one two three'', ''([a-z]+)'');
+        SELECT value, ordinal FROM REGEXP_SPLIT_TO_TABLE(N''a,b,,c'', '',+'');';
+END;
+GO
+
+
+-- =================================================================================
+-- PARTE 3: NORMALIZAÇÃO DE STRINGS COM TRANSLATE E REPLACE
 -- =================================================================================
 -- CONCEITOS E DEFINIÇÕES CHAVE:
 --   - TRANSLATE(string, chars_origem, chars_destino): Substitui caracteres individuais em uma única passagem.
 --     Evita encadeamento de múltiplos `REPLACE(REPLACE(REPLACE(...)))`.
 --     Requisito: `chars_origem` e `chars_destino` devem ter exatamente o mesmo comprimento!
---   - STRING_SPLIT(string, delimitador, 1): A partir do SQL Server 2022, o parâmetro `enable_ordinal = 1`
---     adiciona a coluna `ordinal` que preserva a posição original do item no vetor.
 
 -- 1. Normalizar números de telefone removendo parenteses, pontos e traços de uma só vez
 SELECT 
@@ -88,16 +135,9 @@ SELECT
 FROM lab.RawContacts;
 GO
 
--- 2. STRING_SPLIT com preservação de posição (SQL Server 2022+)
-DECLARE @tags NVARCHAR(200) = N'SQL,Azure,Database,Security,AI';
-
-SELECT value AS TagName, ordinal AS Posicao
-FROM STRING_SPLIT(@tags, ',', 1);
-GO
-
 
 -- =================================================================================
--- PARTE 3: CORRESPONDÊNCIA FONÉTICA (SOUNDEX E DIFFERENCE)
+-- PARTE 4: CORRESPONDÊNCIA FONÉTICA (SOUNDEX E DIFFERENCE)
 -- =================================================================================
 -- CONCEITOS E DEFINIÇÕES CHAVE:
 --   - SOUNDEX(): Converte uma string em um código fonético de 4 caracteres (uma letra + 3 números).
@@ -122,7 +162,7 @@ GO
 
 
 -- =================================================================================
--- PARTE 4: ALGORITMOS DE FUZZY MATCHING (DISTÂNCIA DE EDIÇÃO E SIMILARIDADE)
+-- PARTE 5: ALGORITMOS DE FUZZY MATCHING (DISTÂNCIA DE EDIÇÃO E SIMILARIDADE)
 -- =================================================================================
 -- CONCEITOS E DEFINIÇÕES CHAVE:
 --   - EDIT_DISTANCE (Levenshtein): Retorna o número absoluto de inserções, remoções e substituições de caracteres.
@@ -151,6 +191,17 @@ BEGIN
             JARO_WINKLER_DISTANCE(FullName, N''Alice Smith'') AS DistanciaJaroWinkler,
             JARO_WINKLER_SIMILARITY(FullName, N''Alice Smith'') AS SimilaridadeJaroWinkler
         FROM lab.RawContacts;';
+
+    EXEC sys.sp_executesql N'
+        -- Deduplicação: use limiares para reduzir candidatos antes de qualquer merge.
+        SELECT c1.ContactID AS ID1, c1.FullName AS Nome1,
+               c2.ContactID AS ID2, c2.FullName AS Nome2,
+               EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) AS SimilaridadeEdicao,
+               JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) AS DistanciaJaroWinkler
+        FROM lab.RawContacts AS c1
+        JOIN lab.RawContacts AS c2 ON c1.ContactID < c2.ContactID
+        WHERE EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) >= 80
+           OR JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) <= 0.20;';
 END
 ELSE
     PRINT 'PREVIEW_FEATURES está desabilitado; execute a instrução comentada acima para praticar as métricas fuzzy.';
@@ -158,7 +209,55 @@ GO
 
 
 -- =================================================================================
--- PARTE 5: CENÁRIOS PRÁTICOS DE PROJETO
+-- PARTE 6: FULL-TEXT SEARCH (CONTAINS E FREETEXT)
+-- =================================================================================
+-- A instalação do serviço, um catálogo existente e as permissões para criar o índice são verificados. A população é assíncrona:
+-- se a primeira consulta ainda não retornar linhas, aguarde o índice terminar de ser preenchido e execute novamente.
+IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') = 1
+BEGIN
+    DECLARE @CatalogoFullText SYSNAME;
+    DECLARE @ComandoFullText NVARCHAR(MAX);
+    SELECT TOP (1) @CatalogoFullText = name
+    FROM sys.fulltext_catalogs
+    ORDER BY is_default DESC, fulltext_catalog_id;
+
+    BEGIN TRY
+        IF @CatalogoFullText IS NULL
+            PRINT 'Não há catálogo Full-Text neste banco; a seção será ignorada.';
+        ELSE IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
+        BEGIN
+            SET @ComandoFullText = N'CREATE FULLTEXT INDEX ON lab.RawContacts (FullName LANGUAGE 1033)
+                KEY INDEX PK_lab_RawContacts ON ' + QUOTENAME(@CatalogoFullText) + N' WITH CHANGE_TRACKING AUTO;';
+            EXEC sys.sp_executesql @ComandoFullText;
+        END;
+
+        IF EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
+        BEGIN
+            -- As consultas também são dinâmicas: o otimizador só valida CONTAINS/FREETEXT
+            -- depois que o índice acaba de ser criado neste mesmo batch.
+            EXEC sys.sp_executesql N'
+                -- CONTAINS é uma busca estruturada: prefixo Smith*.
+                SELECT ContactID, FullName
+                FROM lab.RawContacts
+                WHERE CONTAINS(FullName, ''"Smith*"'');
+
+                -- FREETEXT delega a interpretação linguística ao mecanismo de Full-Text Search.
+                SELECT ContactID, FullName
+                FROM lab.RawContacts
+                WHERE FREETEXT(FullName, N''Alice Smith'');';
+        END;
+    END TRY
+    BEGIN CATCH
+        PRINT CONCAT('Full-Text Search não pôde ser configurado: ', ERROR_MESSAGE());
+    END CATCH;
+END
+ELSE
+    PRINT 'Full-Text Search não está instalado nesta instância; a seção será ignorada.';
+GO
+
+
+-- =================================================================================
+-- PARTE 7: CENÁRIOS PRÁTICOS DE PROJETO
 -- =================================================================================
 
 --- CENÁRIO 1: Deduplicação e Limpeza de Nomes antes da Vetorização (Embeddings para RAG)

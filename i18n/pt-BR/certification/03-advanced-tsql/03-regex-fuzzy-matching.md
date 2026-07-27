@@ -18,7 +18,7 @@ tags:
 >   - 🔹 [REGEXP_MATCHES & REGEXP_SPLIT_TO_TABLE](#regexp_matches--retornar-ocorrencias-como-tabela)
 > - 📍 [3. Fuzzy String Matching & Algoritmos](#funcoes-de-busca-difusa-fuzzy-string-matching-functions)
 >   - 🔹 [EDIT_DISTANCE & EDIT_DISTANCE_SIMILARITY](#edit_distance-distancia-de-levenshtein)
->   - 🔹 [JARO_WINKLER_DISTANCE](#jaro_winkler_distance)
+>   - 🔹 [JARO_WINKLER_DISTANCE & JARO_WINKLER_SIMILARITY](#jaro_winkler_distance-e-jaro_winkler_similarity)
 >   - 🔹 [SOUNDEX, DIFFERENCE & TRANSLATE](#funcoes-soundex-e-difference)
 > - 📍 [4. Filtros LIKE, Collation & Escolha de Função](#padroes-de-filtros-avancados-com-o-operador-like)
 >   - 🔹 [Operador LIKE Avançado](#padroes-de-filtros-avancados-com-o-operador-like)
@@ -116,7 +116,7 @@ SELECT REGEXP_COUNT('2025-01-15 e 2025-02-20', '[0-9]{4}-[0-9]{2}-[0-9]{2}') AS 
 
 ```sql
 -- Retorna uma tabela listando todas as ocorrências localizadas
-SELECT match_value
+SELECT *
 FROM REGEXP_MATCHES('one two three', '[a-z]+');
 -- Retorno (linhas): 'one', 'two', 'three'
 ```
@@ -141,9 +141,17 @@ As buscas difusas (fuzzy matching) quantificam numericamente o grau de similarid
 > - **EDIT_DISTANCE**: Retorna a contagem inteira e absoluta de modificações (inserções, remoções, trocas) para igualar as strings.
 > - **JARO_WINKLER_DISTANCE**: Retorna uma distância `float`; valores menores indicam maior similaridade. Dá preferência a correspondências no início da palavra.
 
+> [!info] Como interpretar algoritmos de busca difusa
+>
+> - Eles medem a **proximidade da escrita**, não o significado. Por exemplo, nomes semanticamente distintos podem parecer parecidos, e sinônimos podem parecer totalmente diferentes.
+> - Uma **distância** mede diferença: `0` normalmente significa igualdade e valores menores são melhores. Uma **similaridade** mede aproximação: valores maiores são melhores.
+> - O limiar ideal não é universal. Defina-o a partir de amostras reais, revise candidatos antes de mesclar cadastros e combine a métrica com campos auxiliares, como e-mail, data de nascimento ou cidade.
+
 ### EDIT_DISTANCE (Distância de Levenshtein)
 
 A **Edit Distance** computa o menor número de edições de caracteres individuais (como inserções, exclusões e substituições) necessário para transformar uma string em outra.
+
+Em termos práticos, o algoritmo responde: “quantos pequenos ajustes de digitação seriam necessários para tornar estes dois textos iguais?”. Por isso, é especialmente útil para erros simples de grafia, letras omitidas ou caracteres a mais. A medida absoluta cresce com o tamanho do texto: uma distância de 2 pode ser relevante para um nome curto, mas pouco relevante em uma descrição longa.
 
 ```sql
 SELECT EDIT_DISTANCE('kitten', 'sitting');  -- Retorno: 3
@@ -161,6 +169,8 @@ WHERE EDIT_DISTANCE(a.Name, b.Name) <= 2;
 
 Retorna um score de similaridade padronizado em escala de 0 (strings totalmente diferentes) a 100 (strings idênticas) — representa a versão normalizada de porcentagem da Edit Distance.
 
+Use-a quando os textos comparados puderem ter comprimentos diferentes. Ao normalizar o resultado, ela permite aplicar um limiar percentual mais compreensível — por exemplo, “avaliar manualmente candidatos com similaridade acima de 85” — sem favorecer indevidamente strings curtas.
+
 ```sql
 SELECT EDIT_DISTANCE_SIMILARITY('Microsoft', 'Microsift'); -- Retorno: ~89 (percentual)
 
@@ -172,19 +182,20 @@ JOIN dbo.Customers b ON a.CustomerId < b.CustomerId
 WHERE EDIT_DISTANCE_SIMILARITY(a.Name, b.Name) > 80;
 ```
 
-### JARO_WINKLER_DISTANCE
+### JARO_WINKLER_DISTANCE e JARO_WINKLER_SIMILARITY
 
-O algoritmo Jaro-Winkler confere pesos maiores para correspondências localizadas no início das strings comparadas — ideal para cruzamento de nomes próprios de pessoas ou identificadores de strings curtas.
+O algoritmo Jaro-Winkler confere pesos maiores para correspondências localizadas no início das strings comparadas — ideal para cruzamento de nomes próprios de pessoas ou identificadores de strings curtas. `JARO_WINKLER_DISTANCE` retorna um `float` em que **menor é melhor**; `JARO_WINKLER_SIMILARITY` retorna um inteiro de 0 a 100 em que **maior é melhor**.
+
+O componente **Jaro** observa caracteres coincidentes e a ordem em que aparecem nas duas strings. O ajuste **Winkler** acrescenta peso quando as strings compartilham o mesmo prefixo. Assim, `"Maria Silva"` e `"Maria Silve"` tendem a receber uma pontuação melhor do que duas strings com as mesmas letras embaralhadas. É uma boa escolha para nomes curtos, pessoas e identificadores digitados manualmente; não é indicado para concluir que dois textos longos ou semanticamente relacionados representam a mesma entidade.
 
 ```sql
-SELECT JARO_WINKLER_DISTANCE('MARTHA', 'MARHTA');   -- Retorno: ~0.9611
-SELECT JARO_WINKLER_DISTANCE('DWAYNE', 'DUANE');    -- Retorno: ~0.8400
-SELECT JARO_WINKLER_DISTANCE('John Smith', 'Jon Smith'); -- Retorno: ~0.9878
+SELECT JARO_WINKLER_DISTANCE('MARTHA', 'MARHTA') AS Distance,
+       JARO_WINKLER_SIMILARITY('MARTHA', 'MARHTA') AS Similarity;
 
 -- Localizar possíveis cadastros de contatos duplicados
 SELECT a.ContactId, a.FullName,
        b.ContactId AS MatchId, b.FullName AS MatchName,
-       JARO_WINKLER_DISTANCE(a.FullName, b.FullName) AS Similarity
+       JARO_WINKLER_DISTANCE(a.FullName, b.FullName) AS Distance
 FROM dbo.Contacts a
 JOIN dbo.Contacts b ON a.ContactId < b.ContactId
 WHERE JARO_WINKLER_DISTANCE(a.FullName, b.FullName) < 0.08;
@@ -199,6 +210,8 @@ As funções `SOUNDEX` e `DIFFERENCE` são recursos clássicos built-in do T-SQL
 - **SOUNDEX(texto)**: avalia como a palavra soa em inglês e retorna uma chave de 4 caracteres (uma letra seguida de três números).
 - **DIFFERENCE(texto1, texto2)**: realiza o cruzamento das duas chaves SOUNDEX de entrada e retorna um score na escala de 0 a 4 — onde o score 4 representa similaridade fonética máxima, e 0 representa nenhuma similaridade.
 - **Limitações**: o algoritmo adota regras fonéticas da língua inglesa — podendo falhar ou trazer distorções em palavras de outros idiomas, acentuações ou caracteres especiais não latinos.
+
+Conceitualmente, o `SOUNDEX` não compara a grafia completa: ele reduz uma palavra a uma pequena assinatura fonética. O `DIFFERENCE` compara essas assinaturas. Isso o torna barato e útil como pré-filtro de candidatos — por exemplo, reunir “Smith” e “Smyth” antes de aplicar uma métrica mais precisa —, mas inadequado como decisão final de deduplicação, especialmente para dados em português.
 
 ```sql
 -- SOUNDEX: chaves idênticas para pronúncias equivalentes
@@ -321,7 +334,7 @@ SELECT Name FROM Customers WHERE Name = N'José' COLLATE Latin1_General_CS_AS; -
 
 | Problema | Causa | Solução |
 | :--- | :--- | :--- |
-| Funções regex retornam erro de "objeto não localizado" | As funções de Regex são nativas do Fabric SQL / Azure SQL, mas ausentes no SQL Server clássico | Valide a plataforma do banco antes de empregar; adote o operador `LIKE` ou `PATINDEX` no SQL Server. |
+| Funções `REGEXP_*` retornam erro de objeto/função não reconhecida | A instância não oferece suporte a regex nativo (por exemplo, SQL Server anterior a 2025) ou `REGEXP_LIKE` é usado com nível de compatibilidade inferior a 170 | Verifique produto, versão e nível de compatibilidade. Em instâncias sem suporte, use `LIKE` ou `PATINDEX` para padrões simples. |
 | Lentidão severa em joins com buscas difusas (fuzzy joins) | Cruzamento cartesiano (Cross Join) comparando todas as linhas de tabelas grandes | Pré-filtre os dados aplicando filtros lógicos baratos antes (ex: mesma letra inicial, mesma faixa de tamanho de texto). |
 | SOUNDEX retorna palavras semanticamente diferentes | SOUNDEX atua exclusivamente baseado na fonética da pronúncia do inglês | Adote as funções `EDIT_DISTANCE` ou `JARO_WINKLER_DISTANCE`. |
 | Varredura completa da tabela (Scan) em vez de Seek com o operador LIKE | Busca iniciada com caractere curinga (ex: `'%texto%'`) | `Substitua a busca por Full-Text Search com a cláusula `CONTAINS` em tabelas com grande volumetria de dados`. |
@@ -392,6 +405,7 @@ D. Executar o filtro usando `TRANSLATE(Name, 'Smith', '     ') IS NULL`.
 - [REGEXP_LIKE (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/regexp-like-transact-sql)
 - [EDIT_DISTANCE (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/edit-distance-transact-sql)
 - [JARO_WINKLER_DISTANCE (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/jaro-winkler-distance-transact-sql)
+- [JARO_WINKLER_SIMILARITY (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/jaro-winkler-similarity-transact-sql)
 - [SOUNDEX (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/soundex-transact-sql)
 - [TRANSLATE (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/translate-transact-sql)
 
