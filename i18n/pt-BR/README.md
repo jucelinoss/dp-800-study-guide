@@ -16,6 +16,7 @@ caminho relativo para facilitar comparações e atualizações.
 ## Conteúdo disponível
 
 - [Teoria](./certification/dp-800-overview.md)
+- [Parte 0 — Fundamentos do SQL Server](./certification/00-fundamentals/fundamentals.md) (pré-requisito)
 - [Laboratórios práticos SQL](./practice/labs/)
 
 ## Status de sincronização

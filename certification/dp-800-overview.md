@@ -32,7 +32,8 @@ tags:
 
 ## How to Use This Guide
 
-1. **Topic files** (`01-topic-name.md`) — core study material with SQL examples, comparison tables, and practice questions. Start here.
+0. **New to SQL Server?** Complete [Part 0 — SQL Server Fundamentals](./00-fundamentals/fundamentals.md) first. It is optional preparation, not an exam domain.
+1. **Topic files** (`01-topic-name.md`) — core study material with SQL examples, comparison tables, and practice questions. Start here if you already know relational/T-SQL basics.
 2. **Section READMEs** — overview flowcharts and topic indexes. Use to orient before diving into a section.
 3. **Cheat sheets** (`resources/cheat-sheets/`) — compact quick-reference for exam day and review. Each ends with a `## Gotchas & Traps` section and a `## Before the Exam, I Can…` checklist. Use after studying a section to reinforce.
 4. **Practice questions** (`resources/practice-questions/`) — 60+ questions across the three domains (Domain 1: 18, Domain 2: 22, Domain 3: 20), with explanations. Use to test knowledge after each domain.
@@ -62,6 +63,12 @@ pie title Exam Domain Distribution
 ```
 
 ## Study Topics
+
+### Optional prerequisite — Part 0
+
+| Section | When to use it | Topics |
+| :--- | :--- | :--- |
+| [00-SQL Server Fundamentals](00-fundamentals/fundamentals.md) | Before Domain 1, if new to SQL | Relational model, DDL/DML, queries, JOINs, constraints, transactions, CTEs, indexes |
 
 ### Domain 1: Design and Develop Database Solutions (35–40%)
 
@@ -111,6 +118,10 @@ pie title Exam Domain Distribution
 | [Appendix](resources/appendix/appendix.md) | Glossary, comparison tables, error messages |
 
 ## Study Progress Tracker
+
+### Phase 0: SQL Server Fundamentals (optional)
+
+- [ ] Complete Part 0 lessons and `StudyDB` labs, or confirm existing SQL/T-SQL proficiency
 
 ### Phase 1: Database Design & T-SQL
 

@@ -82,6 +82,9 @@ This repo is the notes that got me through it. Now it's yours.
 - **Exam takers** preparing for DP-800 specifically — every topic file maps 1:1 to the official blueprint
 - **Anyone curious** about how Microsoft is bringing GenAI into the database layer
 
+> [!TIP]
+> **New to SQL Server or T-SQL?** Complete the optional [Part 0 — SQL Server Fundamentals](./certification/00-fundamentals/fundamentals.md) before starting the exam-mapped modules. It includes a small reusable database and ten runnable beginner labs.
+
 You don't need to be taking the exam to get value — the guide doubles as a reference for SQL Server 2025 vector features, MCP server integration, Data API Builder, and embedding maintenance patterns.
 
 ## What's covered
@@ -205,12 +208,13 @@ No problem. The guide also renders perfectly in:
 
 ## How to use this guide
 
-1. **Start at the [main overview](./certification/dp-800-overview.md)** — it has the full study path and a progress tracker.
-2. **Work through the 11 topic sections in order** — each topic file is 300–600 lines with examples, comparison tables, common-mistake callouts, and exam tips.
-3. **Hit the [cheat sheets](./certification/resources/cheat-sheets/cheat-sheets.md)** after each domain to consolidate.
-4. **Take the [practice questions](./certification/resources/practice-questions/practice-questions.md)** — aim for 70 %+ per domain before moving on. Or drill them adaptively in the **[live practice quiz](https://kengio.github.io/dp-800-study-guide/)** which surfaces what you've recently missed.
-5. **Sit the two [mock exams](./certification/resources/mock-exam/mock-exam-1.md) under timed conditions** when you think you're close — both are available as bank options in the [live quiz](https://kengio.github.io/dp-800-study-guide/) with a 70-minute timer.
-6. **Read [`final-review.md`](./certification/resources/final-review.md) the morning of the exam** — it's the 20-minute scan.
+1. **New to SQL? Start with [Part 0 — SQL Server Fundamentals](./certification/00-fundamentals/fundamentals.md)** — optional prerequisite lessons and runnable labs. Skip it if you can already model tables, write JOINs, and use transactions safely.
+2. **Start at the [main overview](./certification/dp-800-overview.md)** — it has the full study path and a progress tracker.
+3. **Work through the 11 topic sections in order** — each topic file is 300–600 lines with examples, comparison tables, common-mistake callouts, and exam tips.
+4. **Hit the [cheat sheets](./certification/resources/cheat-sheets/cheat-sheets.md)** after each domain to consolidate.
+5. **Take the [practice questions](./certification/resources/practice-questions/practice-questions.md)** — aim for 70 %+ per domain before moving on. Or drill them adaptively in the **[live practice quiz](https://kengio.github.io/dp-800-study-guide/)** which surfaces what you've recently missed.
+6. **Sit the two [mock exams](./certification/resources/mock-exam/mock-exam-1.md) under timed conditions** when you think you're close — both are available as bank options in the [live quiz](https://kengio.github.io/dp-800-study-guide/) with a 70-minute timer.
+7. **Read [`final-review.md`](./certification/resources/final-review.md) the morning of the exam** — it's the 20-minute scan.
 
 ## Study roadmap
 
@@ -322,6 +326,7 @@ Legend: ✅ done · 🔄 in progress / next up · ⏸ deferred until upstream GA
 
 | Resource | Description |
 | :--- | :--- |
+| [Part 0 — SQL Server Fundamentals](./certification/00-fundamentals/fundamentals.md) | Optional beginner prerequisite: relational model, T-SQL basics, safe DML, and 10 runnable labs |
 | [Start Studying →](./certification/dp-800-overview.md) | Main index with all 11 study sections and progress tracker |
 | [Cheat Sheets](./certification/resources/cheat-sheets/cheat-sheets.md) | Seven quick-reference guides for exam day |
 | [Practice Questions](./certification/resources/practice-questions/practice-questions.md) | 60+ domain-specific questions with explanations |
@@ -341,6 +346,7 @@ Legend: ✅ done · 🔄 in progress / next up · ⏸ deferred until upstream GA
 dp-800-study-guide/
 ├── certification/
 │   ├── dp-800-overview.md           # main entry point — start here
+│   ├── 00-fundamentals/              # optional SQL Server/T-SQL prerequisite path
 │   ├── 01-database-objects/         # tables, indexes, JSON, partitioning
 │   ├── 02-programmability-objects/  # views, functions, procedures, triggers
 │   ├── 03-advanced-tsql/            # CTEs, window functions, regex, graph
@@ -364,6 +370,7 @@ dp-800-study-guide/
 │       ├── anki/                    # spaced-repetition deck (130 cards) + import readme
 │       └── official-links.md        # Microsoft docs and exam registration
 ├── practice/                        # adaptive practice quiz — HTML/JS/CSS + build.py + JSON banks
+│   ├── labs/00-fundamentals/         # 10 runnable prerequisite labs using StudyDB
 │                                    # auto-deployed to GitHub Pages
 ├── i18n/                            # community translations — parallel tree per locale
 ├── .github/workflows/               # CI: markdownlint + lychee (lint.yml), Pages deploy (deploy-practice.yml)
