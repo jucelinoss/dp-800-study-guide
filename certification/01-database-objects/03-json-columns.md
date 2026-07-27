@@ -12,19 +12,19 @@ tags:
 
 ## Overview
 
-SQL Server and Azure SQL store JSON data as `nvarchar` columns, but provide native JSON functions, path expressions, and (in newer versions) a dedicated `json` data type with JSON indexes for efficient semi-structured data handling.
+SQL Server can store JSON text in `varchar` or `nvarchar` columns. Azure SQL Database and Azure SQL Managed Instance also make the native `json` type generally available under the SQL Server 2025 or Always-up-to-date update policy; in SQL Server 2025 (17.x), that type remains preview. This chapter focuses on choosing the storage model, enforcing valid documents, and indexing JSON-backed attributes efficiently.
 
 > [!abstract]
 >
-> - Covers JSON storage in NVARCHAR columns, all JSON functions, OPENJSON, FOR JSON, and indexing strategies
-> - JSON is not a native type — it is stored as NVARCHAR; validity checked with ISJSON()
-> - Key exam topics: JSON_VALUE vs JSON_QUERY vs OPENJSON, lax vs strict path mode, computed column indexes
+> - Choose between relational columns, `nvarchar` JSON documents, and the native `json` type.
+> - Enforce valid JSON at the database boundary and decide which JSON attributes require relational access paths.
+> - Index frequently queried JSON properties with computed columns; use the JSON-functions chapter to read and transform documents.
 
 > [!tip] What the Exam Tests
 >
-> - `JSON_VALUE` returns a **scalar**; `JSON_QUERY` returns an **object or array fragment** — use JSON_QUERY when the path points to an object
-> - `OPENJSON` without a WITH clause returns (key, value, type) rows; with a WITH clause returns typed columns
-> - Lax mode (default): path errors return NULL. Strict mode: path errors throw an error
+> - A JSON document is not a replacement for relational columns that need keys, constraints, joins, and frequent filtering.
+> - `ISJSON` and `CHECK` constraints protect document validity; they do not prove every business property is present.
+> - Computed-column indexes make a frequently filtered JSON attribute accessible to ordinary B-tree indexing.
 
 ---
 
@@ -39,103 +39,19 @@ CREATE TABLE dbo.Products (
     CHECK (ISJSON(Attributes) = 1)    -- Validate on insert/update
 );
 
--- Modern approach (SQL Server 2025+ / Azure SQL): native json type
+-- Native json type: generally available in eligible Azure SQL services;
+-- preview in SQL Server 2025 (17.x).
 CREATE TABLE dbo.Events (
-    EventId     int     NOT NULL PRIMARY KEY,
+    EventId     int     NOT NULL PRIMARY KEY CLUSTERED,
     Payload     json    NULL
 );
 ```
 
----
+## Accessing stored documents
 
-## JSON Path Expressions
+The storage decision and the query decision are separate. Store a flexible attribute set in `Attributes`, then use the appropriate T-SQL JSON function to extract, shred, filter, build, or modify its contents. Those functions, JSON paths, `OPENJSON`, path modes, and `FOR JSON` belong to [JSON Functions](../03-advanced-tsql/02-json-functions.md).
 
-JSON path expressions use `$` for the root and dot/bracket notation:
-
-```sql
--- $.property — access an object property
--- $[0] — access an array element
--- $.address.city — nested property
--- $.tags[0] — first element of array
-
-DECLARE @json nvarchar(max) = N'{
-    "name": "Widget",
-    "price": 9.99,
-    "tags": ["sale", "new"],
-    "supplier": { "id": 5, "name": "Acme" }
-}';
-
-SELECT
-    JSON_VALUE(@json, '$.name')               AS Name,
-    JSON_VALUE(@json, '$.price')              AS Price,
-    JSON_VALUE(@json, '$.tags[0]')            AS FirstTag,
-    JSON_VALUE(@json, '$.supplier.name')      AS Supplier;
-```
-
----
-
-## Key JSON Functions
-
-### Reading JSON
-
-```sql
--- JSON_VALUE: scalar value (string output)
-SELECT JSON_VALUE(Attributes, '$.color') FROM dbo.Products;
-
--- JSON_QUERY: returns a JSON fragment (object or array)
-SELECT JSON_QUERY(Attributes, '$.dimensions') FROM dbo.Products;
-
--- OPENJSON: parses JSON into rows
-SELECT *
-FROM OPENJSON(@json)
-WITH (
-    name    nvarchar(200)   '$.name',
-    price   decimal(10,2)  '$.price',
-    tags    nvarchar(max)   '$.tags' AS JSON
-);
-```
-
-> [!warning] Common Mistake
-> `JSON_VALUE(col, '$.product.specs')` returns NULL when `specs` is an object — not an error, and not the object. Use `JSON_QUERY(col, '$.product.specs')` to extract objects or arrays.
-
-### Building JSON
-
-```sql
--- JSON_OBJECT: construct a JSON object
-SELECT JSON_OBJECT('id': ProductId, 'name': Name) FROM dbo.Products;
-
--- JSON_ARRAY: construct a JSON array
-SELECT JSON_ARRAY(1, 'two', NULL, GETDATE());
-
--- JSON_ARRAYAGG: aggregate rows into a JSON array (SQL 2022+)
-SELECT JSON_ARRAYAGG(Name ORDER BY Name) FROM dbo.Products;
-
--- FOR JSON PATH: convert query results to JSON
-SELECT ProductId, Name, Attributes
-FROM dbo.Products
-FOR JSON PATH, ROOT('products');
-```
-
-### Modifying JSON
-
-```sql
--- JSON_MODIFY: update a value in a JSON string
-UPDATE dbo.Products
-SET Attributes = JSON_MODIFY(Attributes, '$.color', 'blue')
-WHERE ProductId = 1;
-```
-
-### Filtering JSON
-
-```sql
--- JSON_CONTAINS (SQL 2025+ / Azure SQL): check if JSON contains a value
-SELECT * FROM dbo.Products
-WHERE JSON_CONTAINS(Attributes, '"sale"', '$.tags') = 1;
-
--- Traditional approach using JSON_VALUE
-SELECT * FROM dbo.Products
-WHERE JSON_VALUE(Attributes, '$.color') = 'blue';
-```
+For this chapter, the important connection is that an access pattern determines the index design. If a query repeatedly filters by `$.color`, expose that scalar property as a computed column and index it rather than expecting SQL Server to efficiently search an unindexed document expression.
 
 ---
 
@@ -155,33 +71,39 @@ CREATE INDEX IX_Products_Color ON dbo.Products (Color);
 SELECT * FROM dbo.Products WHERE Color = 'blue';
 ```
 
-For the native `json` type, SQL Server supports JSON path indexes directly:
+The standard computed-column approach works with JSON text and the native
+`json` type. SQL Server 2025 (17.x) Preview also introduces `CREATE JSON
+INDEX` for a native `json` column. A JSON index requires a clustered primary
+key and is currently preview-only in SQL Server:
 
 ```sql
--- Native json type index (SQL Server 2025+ / Azure SQL)
-CREATE INDEX IX_Events_UserId
-ON dbo.Events (CAST(JSON_VALUE(Payload, '$.userId') AS int));
+CREATE JSON INDEX IX_Events_Payload
+ON dbo.Events (Payload)
+FOR ('$.userId');
 ```
 
 ---
 
 ## JSON Computed Columns for Indexing
 
-**Problem:** Using `JSON_VALUE` in a `WHERE` clause causes a table scan — the optimizer cannot index a JSON path expression directly.
+**Problem:** On a table without a suitable standard index or JSON index, filtering with `JSON_VALUE` can require scanning the table.
 
 > [!note] Table Scan vs Clustered Index Scan Equivalency
-> Filtering on a `JSON_VALUE(...)` expression without an index forces the engine to inspect every row in the table, executing `JSON_VALUE` for each record in memory.
+> Filtering on a `JSON_VALUE(...)` expression without a suitable index can force the engine to inspect every row and evaluate the expression.
+>
 > - **Heap table (no PK)**: Produces a **Table Scan** operator.
 > - **Clustered Index table (with PK)**: Produces a **Clustered Index Scan** operator.
-> 
+>
 > Functionally and performance-wise, **Table Scan** and **Clustered Index Scan** are equivalent in this context: both require a 100% full physical scan of every data page in the table. DBA terminology often uses "Table Scan" generically for any expensive 100% full table scan in contrast to a targeted **Index Seek**.
 
-**Solution:** Extract the JSON property into a **PERSISTED computed column**, then create an index on that column.
-
-PERSISTED computed columns are physically stored on disk (unlike virtual computed columns), which is required for indexing.
+**Solution:** Extract the JSON property into a computed column, then create an
+index on that column when it meets SQL Server's computed-column indexability
+requirements. A `PERSISTED` column physically stores the expression result and
+can be chosen when that storage/write trade-off is appropriate; it is not a
+universal prerequisite for indexing.
 
 ```sql
--- Add persisted computed column extracting from JSON
+-- Add a computed column extracting from JSON
 ALTER TABLE Orders
 ADD ShipCountry AS JSON_VALUE(ShippingJSON, '$.country') PERSISTED;
 
@@ -201,98 +123,6 @@ WHERE ShipCountry = 'UK';
 
 ---
 
-## JSON_ARRAYAGG and JSON_OBJECTAGG
-
-Available in SQL Server 2022 and Azure SQL, these aggregate functions build JSON output directly from rows without requiring `FOR JSON` workarounds.
-
-- **JSON_ARRAYAGG**: aggregates a column of values into a JSON array (like `STRING_AGG` but produces JSON)
-- **JSON_OBJECTAGG**: aggregates key-value row pairs into a single JSON object
-- **Use case**: build nested JSON results inline within a query
-
-```sql
--- JSON_ARRAYAGG: list of product names per category
-SELECT CategoryID,
-       JSON_ARRAYAGG(ProductName ORDER BY ProductName) AS ProductNames
-FROM Products
-GROUP BY CategoryID;
-
--- JSON_OBJECTAGG: build a property bag from rows
-SELECT OrderID,
-       JSON_OBJECTAGG(AttributeName: AttributeValue) AS Attributes
-FROM OrderAttributes
-GROUP BY OrderID;
-
--- Nested JSON: orders with line items aggregated
-SELECT o.OrderID, o.OrderDate,
-       JSON_ARRAYAGG(JSON_OBJECT(
-           'sku': li.SKU,
-           'qty': li.Quantity,
-           'price': li.UnitPrice
-       )) AS LineItems
-FROM Orders o
-JOIN LineItems li ON o.OrderID = li.OrderID
-GROUP BY o.OrderID, o.OrderDate;
-```
-
----
-
-## Strict vs Lax Mode in JSON Paths
-
-JSON path expressions support two modes that control how missing paths are handled.
-
-- **Lax mode (default)**: missing paths return `NULL` instead of raising an error
-- **Strict mode**: raises error 13608 if the specified path does not exist in the JSON
-- **When to use strict**: data validation and ETL pipelines where a missing property indicates bad or incomplete data
-
-```sql
-DECLARE @json NVARCHAR(MAX) = '{"name":"Alice","address":{"city":"Seattle"}}';
-
--- Lax (default): missing path returns NULL
-SELECT JSON_VALUE(@json, 'lax $.phone');         -- NULL, no error
-SELECT JSON_VALUE(@json, '$.phone');              -- NULL (lax is default)
-
--- Strict: missing path raises error
-SELECT JSON_VALUE(@json, 'strict $.phone');      -- Error 13608
-
--- Practical: validate required properties during import
-INSERT INTO Customers (Name, City)
-SELECT
-    JSON_VALUE(j.JsonData, 'strict $.name'),   -- fails fast if name missing
-    JSON_VALUE(j.JsonData, 'lax $.city')       -- OK if city missing
-FROM StagingJSON j
-WHERE IS_JSON(j.JsonData) = 1;
-```
-
----
-
-## JSON with OPENJSON and Schema Binding
-
-The `OPENJSON` function with the `WITH` clause shreds JSON into typed relational rows. Use the `AS JSON` modifier in the `WITH` clause to preserve nested objects or arrays as JSON fragments for further processing.
-
-```sql
-DECLARE @orderJSON NVARCHAR(MAX) = '{
-    "orderId": 1001,
-    "customer": "Alice",
-    "items": [{"sku":"A1","qty":2},{"sku":"B2","qty":1}]
-}';
-
--- Parse top-level properties
-SELECT * FROM OPENJSON(@orderJSON)
-WITH (
-    OrderId INT '$.orderId',
-    Customer NVARCHAR(100) '$.customer',
-    Items NVARCHAR(MAX) '$.items' AS JSON  -- AS JSON preserves the array
-);
-
--- Shred nested array with CROSS APPLY
-SELECT h.OrderId, li.SKU, li.Qty
-FROM (SELECT 1001 AS OrderId, @orderJSON AS Doc) h
-CROSS APPLY OPENJSON(h.Doc, '$.items')
-WITH (SKU NVARCHAR(20) '$.sku', Qty INT '$.qty') li;
-```
-
----
-
 ## Use Cases
 
 - **Product catalogs**: Variable attribute sets per product type stored as JSON
@@ -306,21 +136,19 @@ WITH (SKU NVARCHAR(20) '$.sku', Qty INT '$.qty') li;
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| `JSON_VALUE` returns NULL | Path does not exist or value is not scalar | `Use `JSON_QUERY` for objects/arrays; verify path` |
-| Slow JSON queries | No index on JSON property | Create PERSISTED computed column + index on the property |
+| Slow JSON queries | No index on a frequently queried JSON property | Create a computed column + index on the property |
 | `ISJSON` returns 0 | Malformed JSON in the column | Add CHECK constraint on insert; validate at application layer |
-| `OPENJSON` returns no rows | JSON is valid but path is wrong | Test path with `JSON_VALUE` first |
-| Error 13608 | Strict mode path not found | Switch to lax mode or fix the JSON to include the required property |
+| JSON query returns an unexpected result | Wrong path, mode, or function for the expected shape | Review path modes and `JSON_VALUE` versus `JSON_QUERY` in [02-JSON Functions](../03-advanced-tsql/02-json-functions.md) |
 
 ---
 
 ## Best Practices
 
-- Always add a `CHECK (ISJSON(col) = 1)` constraint on `nvarchar` columns that store JSON to reject malformed data at the database layer.
-- Use PERSISTED computed columns — not virtual ones — when you need to index a JSON property; virtual computed columns cannot be indexed.
-- Prefer `strict` mode in ETL and import pipelines to catch missing required properties early; use `lax` mode for optional fields.
-- Use `JSON_ARRAYAGG` / `JSON_OBJECTAGG` (SQL Server 2022+) for aggregating JSON inline instead of post-processing `FOR JSON PATH` results.
-- Shred JSON into relational columns at insert time when the data will be queried frequently; keep JSON for flexible or rarely queried attributes only.
+- Add `CHECK (ISJSON(col) = 1)` to `nvarchar` columns that must contain valid JSON.
+- Keep frequently filtered, joined, constrained, or security-sensitive attributes in relational columns when possible.
+- Use a computed column and an index when one JSON scalar is repeatedly searched.
+- Shred JSON into relational columns at ingestion when the values need durable relational access; keep JSON for flexible or rarely queried attributes.
+- Use the functions chapter to choose extraction, path-mode, and serialization behavior.
 
 ---
 
@@ -328,23 +156,19 @@ WITH (SKU NVARCHAR(20) '$.sku', Qty INT '$.qty') li;
 
 > [!tip] Exam Tips
 >
-> - `JSON_VALUE` returns scalars (strings); `JSON_QUERY` returns JSON objects or arrays
-> - `OPENJSON` with `WITH` clause provides typed output — preferred for structured parsing
-> - To filter efficiently on JSON properties, create a **PERSISTED computed column + index**
-> - `JSON_ARRAYAGG` and `JSON_CONTAINS` are newer functions — know which SQL Server version supports them
-> - Lax mode is the default; strict mode raises error 13608 on missing paths
-> - `AS JSON` in an `OPENJSON WITH` clause preserves nested arrays/objects as JSON strings
+> - Choose JSON storage only for flexible or document-shaped attributes; keep strongly relational facts relational.
+> - `ISJSON` validates document syntax, while additional rules are needed for required business properties.
+> - To filter efficiently on a JSON scalar, expose it through a computed column and index it.
+> - Function behavior (`JSON_VALUE`, `OPENJSON`, strict/lax paths, and JSON output) is tested in [JSON Functions](../03-advanced-tsql/02-json-functions.md).
 
 ---
 
 ## Key Takeaways
 
-- JSON is stored as `nvarchar` or the new native `json` type
-- Always validate JSON with `ISJSON` or a `CHECK` constraint
-- Index JSON properties via PERSISTED computed columns for query performance
-- `FOR JSON PATH` converts relational results to JSON for API responses
-- `JSON_ARRAYAGG` and `JSON_OBJECTAGG` (SQL Server 2022+) aggregate rows directly into JSON
-- Strict vs lax mode controls whether missing JSON paths raise an error or return NULL
+- JSON text can be stored in `varchar` or `nvarchar`; the native `json` type has platform-specific availability.
+- Valid JSON syntax is a storage-integrity concern; JSON functions are a query concern.
+- Computed-column indexes provide an ordinary relational access path to a frequently queried JSON scalar.
+- Function, path, parsing, and serialization patterns live in [JSON Functions](../03-advanced-tsql/02-json-functions.md).
 
 ---
 
@@ -354,16 +178,16 @@ A table has a JSON column `Metadata` and a query filters on `JSON_VALUE(Metadata
 
 A. Use FOR JSON PATH to reformat the data
 
-B. Add a PERSISTED computed column on `JSON_VALUE(Metadata, '$.region')` and index it
+B. Add a computed column on `JSON_VALUE(Metadata, '$.region')` and index it
 
 C. Switch to OPENJSON for better performance
 
 D. Enable JSON path strict mode
 
 > [!success]- Answer
-> **B — Add a PERSISTED computed column on `JSON_VALUE(Metadata, '$.region')` and index it**
+> **B — Add a computed column on `JSON_VALUE(Metadata, '$.region')` and index it**
 >
-> The optimizer cannot index a JSON path expression directly. A PERSISTED computed column materializes the extracted value, and an index on that column allows efficient seeks. OPENJSON (C) is for shredding arrays and doesn't help filter performance. Strict mode (D) changes error behavior, not query speed.
+> The optimizer cannot use an ordinary B-tree index on an unexposed JSON path expression. A computed column exposes the extracted value, and an index on that column can support the predicate when the expression and query are compatible. OPENJSON (C) is for shredding arrays and doesn't help filter performance. Strict mode (D) changes error behavior, not query speed.
 
 ---
 
@@ -377,8 +201,8 @@ D. Enable JSON path strict mode
 ## Official Documentation
 
 - [JSON Data in SQL Server](https://learn.microsoft.com/en-us/sql/relational-databases/json/json-data-sql-server)
-- [OPENJSON (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/openjson-transact-sql)
-- [FOR JSON (Transact-SQL)](https://learn.microsoft.com/en-us/sql/relational-databases/json/format-query-results-as-json-with-for-json-sql-server)
+- [JSON indexes](https://learn.microsoft.com/en-us/sql/relational-databases/json/index-json-data)
+- [CREATE JSON INDEX (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-json-index-transact-sql)
 
 ---
 

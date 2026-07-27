@@ -9,34 +9,11 @@ tags:
   - for-json
 ---
 
-> [!info] 🗺️ Índice de Navegação Rápida
-> 
-> - 📍 [1. Visão Geral (Overview)](#visao-geral-overview)
-> - 📍 [2. Lendo & Transformando JSON](#lendo-dados-json-reading-json)
->   - 🔹 [JSON_VALUE (Escalares)](#json_value--extracao-de-valores-escalares)
->   - 🔹 [JSON_QUERY (Objetos & Arrays)](#json_query--extracao-de-objetos-e-arrays)
->   - 🔹 [OPENJSON (Transformar em Linhas)](#openjson--transformar-json-em-linhas-rows)
-> - 📍 [3. Construindo & Modificando JSON](#construindo-dados-json-building-json)
->   - 🔹 [JSON_OBJECT & JSON_ARRAY](#json_object)
->   - 🔹 [JSON_ARRAYAGG & JSON_OBJECTAGG](#json_arrayagg)
->   - 🔹 [FOR JSON (PATH & AUTO)](#for-json-path)
->   - 🔹 [JSON_MODIFY & Filtragem (ISJSON, JSON_CONTAINS)](#modificando-dados-json-modifying-json)
-> - 📍 [4. Validação, Schemas & CROSS APPLY](#referencia-de-expressoes-de-caminho-json-json-path-expressions)
->   - 🔹 [JSON Path Expressions & Strict/Lax](#referencia-de-expressoes-de-caminho-json-json-path-expressions)
->   - 🔹 [JSON Aninhado com CROSS APPLY](#json-aninhado-com-cross-apply-nested-json)
->   - 🔹 [Validação de Schemas com CHECK Constraints](#padroes-de-validacao-de-schemas-json)
-> - 📍 [5. Aplicação Prática & Síntese](#casos-de-uso-use-cases)
->   - 🔹 [Casos de Uso](#casos-de-uso-use-cases)
->   - 🔹 [Problemas Comuns, Práticas & Exam Tips](#problemas-comuns-e-solucoes-common-issues)
->   - 🔹 [Questões de Prática](#questoes-de-pratica-practice-questions)
-
----
-
 # JSON Functions
 
 ## Visão Geral (Overview)
 
-O SQL Server disponibiliza um conjunto rico de funções JSON nativas para leitura, construção, modificação e filtragem de dados no formato JSON. Devido ao foco do exame DP-800 em dados semiestruturados, integrações de APIs e payloads de Inteligência Artificial, este assunto é fortemente cobrado.
+O SQL Server disponibiliza funções JSON para leitura, construção, modificação e filtragem. Este capítulo trata do uso operacional dessas funções; escolha do tipo de coluna, regra persistente de validação e estratégia de índice pertencem a [03-JSON Columns](../01-database-objects/03-json-columns.md).
 
 > [!abstract]
 >
@@ -46,9 +23,11 @@ O SQL Server disponibiliza um conjunto rico de funções JSON nativas para leitu
 
 > [!tip] O que o Exame Testa
 >
-> - `JSON_VALUE` = extrai apenas valores escalares (strings, números, booleanos); `JSON_QUERY` = extrai fragmentos de objetos ou arrays JSON. Se o caminho apontar para um objeto ou array e você usar `JSON_VALUE`, o retorno padrão será NULL.
+> - `JSON_VALUE` = extrai apenas valores escalares (strings, números, booleanos)
+> - `JSON_QUERY` = extrai fragmentos de objetos ou arrays JSON. Se o caminho apontar para um objeto ou array e você usar `JSON_VALUE`, o retorno padrão será NULL.
 > - A função `OPENJSON` sem a cláusula `WITH` retorna uma estrutura padrão chave/valor/tipo (key, value, type); quando acompanhada da cláusula `WITH`, retorna colunas tipadas e mapeadas correspondendo à estrutura do documento.
-> - A cláusula `FOR JSON PATH` combinada com aliases de colunas usando notação de ponto (`coluna AS 'objeto.propriedade'`) gera JSON aninhado customizado; `FOR JSON AUTO` gera o aninhamento baseando-se na estrutura e aliases das tabelas na consulta.
+> - `FOR JSON PATH` combinada com aliases de colunas usando notação de ponto (`coluna AS 'objeto.propriedade'`) gera JSON aninhado customizado.
+> - `FOR JSON AUTO` gera o aninhamento baseando-se na estrutura e aliases das tabelas na consulta.
 
 ---
 
@@ -95,6 +74,9 @@ SELECT
 >   - `0` = null, `1` = string, `2` = number, `3` = boolean, `4` = array, `5` = object.
 
 ### OPENJSON — Transformar JSON em Linhas (Rows)
+
+`OPENJSON` exige nível de compatibilidade 130 ou superior, salvo quando a
+configuração de escopo de banco correspondente o habilita em níveis menores.
 
 ```sql
 -- Padrão sem cláusula WITH: retorna chave-valor-tipo
@@ -243,7 +225,7 @@ SET @json = JSON_MODIFY(@json, '$.score', 9.5);
 -- Inserir uma nova propriedade
 SET @json = JSON_MODIFY(@json, '$.tier', 'gold');
 
--- Remover uma propriedade (atribuir NULL com cast explícito de tipo)
+-- No modo lax (padrão), NULL remove uma propriedade existente.
 SET @json = JSON_MODIFY(@json, '$.tier', NULL);
 
 -- Adicionar um novo valor ao final de um array (append)
@@ -290,11 +272,11 @@ WHERE ISJSON(Tags, ARRAY) = 1         -- deve ser obrigatoriamente um array JSON
 | `$.propriedade` | Propriedade no nó raiz principal. |
 | `$.a.b` | Propriedade aninhada dentro de outra. |
 | `$.array[0]` | Primeiro item dentro do array JSON. |
-| `$.array[*]` | Sintaxe de curinga de caminho SQL/JSON para recursos que a suportam; para transformar um array em linhas, use `OPENJSON(@json, '$.array')`. |
+| `$.array[*]` | Todos os elementos; preview, entrada do tipo nativo `json` e funções compatíveis apenas. |
 | `lax $.missing` | `Retorna NULL caso a chave não exista (padrão)`. |
 | `strict $.missing` | Retorna um erro de exceção caso a chave não exista. |
 
-O modo padrão de caminhos adotado por todas as funções JSON no SQL Server é o modo `lax`. Use o prefixo `strict` quando precisar que chaves ausentes disparem erros, o que é útil em fluxos de validação de carga de dados.
+O modo padrão de caminhos é `lax`. Use o prefixo `strict` quando uma chave ausente deve disparar erro. Curingas (`[*]`), intervalos e `last` são recursos preview do SQL Server 2025 (17.x), exigem entrada nativa `json` e funcionam em `JSON_QUERY`, `JSON_PATH_EXISTS` e `JSON_CONTAINS`; para expandir arrays de texto JSON em linhas, use `OPENJSON`.
 
 ---
 
@@ -330,40 +312,107 @@ A flag **`AS JSON`** na definição da cláusula `WITH` faz `OPENJSON` retornar 
 
 ---
 
-## Padrões de Validação de Schemas JSON
+## Acesso JSON e planos de execução
 
-### Validação com ISJSON em Constraints do tipo CHECK
+Funções JSON são expressões para o otimizador. A função escolhida e sua posição
+na consulta afetam quantos documentos precisam ser inspecionados, quantas linhas
+são produzidas e se um caminho de acesso existente pode ser usado. Analise o
+**plano de execução real** e as medições do volume de dados em questão: o
+operador resulta da consulta completa, estatísticas e índices disponíveis, não
+de uma garantia dada por uma função JSON.
+
+| Forma de acesso | Consequência típica no plano | Implicação prática |
+| :--- | :--- | :--- |
+| `JSON_VALUE(Document, '$.status')` no `WHERE`, sem acesso correspondente | Pode exigir scan das linhas candidatas e avaliação da função por linha | O custo cresce com o conjunto candidato; aplique antes um predicado relacional seletivo quando existir |
+| Mesma expressão com coluna computada indexada equivalente | O otimizador pode usar o índice; o plano pode mostrar `Index Seek` e, se faltarem colunas, `Key Lookup` | Mantenha expressão, caminho e tipo compatíveis; adicione colunas incluídas somente após medir |
+| `JSON_QUERY` na lista `SELECT` | Extrai fragmento para linhas que chegam a esse ponto; não cria, sozinho, chave escalar de busca | Use para retornar objetos/arrays, não como acesso principal para filtro seletivo |
+| `OPENJSON` / `CROSS APPLY OPENJSON` | Converte objeto ou array em linhas; arrays expandidos multiplicam linhas antes de joins, agregações e sorts | Restrinja linhas externas e caminho JSON antes de desmembrar; projete apenas campos necessários com `WITH` |
+| `FOR JSON` | Serializa o resultado relacional em JSON | Filtre, una, ordene e pagine o resultado relacional antes da serialização |
+
+### Correspondência com coluna computada
+
+O índice é definido no capítulo de colunas, mas a consulta não precisa nomear a
+coluna computada. Quando sua expressão `JSON_VALUE` é equivalente à definição,
+o SQL Server pode reconhecer a equivalência e usar o índice se isso for
+vantajoso.
 
 ```sql
--- Garantir a validação estrutural do JSON no momento da gravação
-ALTER TABLE Products
-ADD CONSTRAINT CK_ValidJSON CHECK (ISJSON(Attributes) = 1);
+-- A tabela tem ShipCountry AS JSON_VALUE(ShippingJSON, '$.country')
+-- e um índice em ShipCountry.
+SELECT OrderID, TotalAmount
+FROM dbo.Orders
+WHERE JSON_VALUE(ShippingJSON, '$.country') = N'US';
 ```
 
-### Validação em Processos de ETL — Detectar Linhas Inválidas
+O plano real pode usar `Index Seek` no índice da coluna computada, seguido de
+`Key Lookup` se as colunas projetadas não estiverem nele. Se a consulta retorna
+essas colunas com frequência, teste um índice com `INCLUDE`; não o adicione
+apenas para forçar um formato de plano. Alterar caminho, conversão ou collation
+pode impedir a correspondência com o índice.
+
+### Desmembramento: expansão de linhas é o custo central
+
+`OPENJSON` é adequado quando o consumidor precisa de linhas relacionais, mas
+não é um índice de filtro. Em `CROSS APPLY`, cada linha externa pode produzir
+zero, uma ou muitas linhas internas. Por exemplo, mil pedidos com vinte itens
+podem se tornar aproximadamente vinte mil linhas antes de um `JOIN`, `GROUP BY`
+ou `ORDER BY`, elevando CPU, memória, sorts e trabalho de join.
 
 ```sql
--- Identificar registros corrompidos ou incompletos na carga de staging
+SELECT o.OrderID, item.Sku, item.Qty
+FROM dbo.Orders AS o
+CROSS APPLY OPENJSON(o.OrderJson, '$.items')
+WITH (
+    Sku nvarchar(20) '$.sku',
+    Qty int          '$.qty'
+) AS item
+WHERE o.OrderDate >= '20260101'
+  AND JSON_VALUE(o.OrderJson, '$.status') = N'Closed';
+```
+
+O otimizador pode escolher outra ordem física de operações; a ordem textual dos
+predicados não garante a ordem no plano. A melhoria durável é ter um caminho de
+acesso para o predicado seletivo e uma projeção `OPENJSON` estreita. Compare
+linhas estimadas e reais ao redor de `APPLY` antes de mudar o modelo de dados.
+
+### Rotina curta de medição
+
+```sql
+SET STATISTICS IO, TIME ON;
+-- Execute a consulta com plano de execução real habilitado no SSMS ou ADS.
+-- Compare leituras lógicas, CPU, tempo, linhas estimadas/reais, seeks, scans,
+-- lookups e spills de sort.
+SET STATISTICS IO, TIME OFF;
+```
+
+Para a definição da coluna computada e as opções de índice, consulte
+[03-JSON Columns](../01-database-objects/03-json-columns.md).
+
+---
+
+## Validação durante consulta ou carga
+
+`ISJSON` distingue entrada malformada de documentos válidos. Em staging,
+primeiro identifique linhas rejeitadas com caminhos `lax`; depois de corrigi-las
+ou removê-las, use caminhos `strict` na carga quando uma propriedade precisa
+ser obrigatória.
+
+```sql
+-- Identificar JSON inválido ou documento incompleto sem interromper a triagem.
 SELECT src.RowID, src.JsonData
-FROM StagingTable src
-WHERE ISJSON(src.JsonData) = 0                               -- JSON inválido/malformado
-   OR JSON_VALUE(src.JsonData, 'strict $.id')   IS NULL      -- ausência de campo obrigatório (id)
-   OR JSON_VALUE(src.JsonData, 'strict $.name') IS NULL;
+FROM StagingTable AS src
+WHERE ISJSON(src.JsonData) = 0
+   OR JSON_VALUE(src.JsonData, '$.id') IS NULL
+   OR JSON_VALUE(src.JsonData, '$.name') IS NULL;
 
--- Contagem de linhas saudáveis vs inválidas
-SELECT
-    SUM(CASE WHEN ISJSON(JsonData) = 1 THEN 1 ELSE 0 END) AS ValidCount,
-    SUM(CASE WHEN ISJSON(JsonData) = 0 THEN 1 ELSE 0 END) AS InvalidCount
-FROM StagingTable;
+-- Após tratar rejeições, exigir a propriedade na carga.
+SELECT JSON_VALUE(JsonData, 'strict $.id') AS Id
+FROM StagingTable
+WHERE ISJSON(JsonData) = 1;
 ```
 
-### Validação por Tipo Estrutural (SQL Server 2022+)
-
-```sql
--- Rejeitar registros que não representem um objeto JSON puro (bloqueia arrays ou escalares soltos)
-ALTER TABLE Events
-ADD CONSTRAINT CK_PayloadIsObject CHECK (ISJSON(Payload, OBJECT) = 1);
-```
+Para `CHECK (ISJSON(...))`, regras persistentes de documento e escolha de
+tipo, consulte [03-JSON Columns](../01-database-objects/03-json-columns.md).
 
 ---
 
@@ -379,7 +428,7 @@ ADD CONSTRAINT CK_PayloadIsObject CHECK (ISJSON(Payload, OBJECT) = 1);
 
 | Problema | Causa | Solução |
 | :--- | :--- | :--- |
-| `JSON_VALUE` retorna NULL inesperado | O caminho não foi localizado no documento (lax mode) | `Valide o caminho declarado; mude para o modo `strict` para gerar um erro de depuração`. |
+| `JSON_VALUE` retorna NULL inesperado | O caminho não foi localizado no documento (modo lax) | Valide o caminho; use `strict` para obter um erro durante a depuração |
 | `JSON_QUERY` retorna NULL ao consultar string/número | Escalares não são aceitos pela função `JSON_QUERY` | Utilize `JSON_VALUE` para extrair escalares (strings/números) e `JSON_QUERY` para fragmentos (objetos/arrays). |
 | O resultado de `FOR JSON` gera aninhamento confuso | Falta de aliases de colunas usando notação de ponto | Declare aliases explícitos no formato `'nome.propriedade'` ao usar `FOR JSON PATH`. |
 | `CROSS APPLY OPENJSON` não retorna dados secundários | O campo aninhado não foi configurado com a flag `AS JSON` | Insira a instrução `AS JSON` na coluna do array secundário dentro da cláusula `WITH`. |
@@ -389,10 +438,11 @@ ADD CONSTRAINT CK_PayloadIsObject CHECK (ISJSON(Payload, OBJECT) = 1);
 
 ## Melhores Práticas (Best Practices)
 
-- Defina colunas JSON como `NVARCHAR(MAX)` associadas a uma CHECK constraint com a função `ISJSON` para impedir a gravação de strings inválidas.
+- Mantenha armazenamento, `CHECK (ISJSON(...))` persistente e desenho de caminhos de acesso em [03-JSON Columns](../01-database-objects/03-json-columns.md).
 - Prefira invocar `OPENJSON` com a cláusula estruturada `WITH` em vez de encadear múltiplos comandos isolados `JSON_VALUE` — a abertura do documento em passo único economiza CPU e tempo de parsing.
 - Adote o modo de caminho `strict` em processos de carga de dados e ETL para forçar erros visíveis caso propriedades críticas obrigatórias estejam ausentes.
-- Gere indexes sobre computed columns com base em campos JSON acessados com frequência em buscas e joins (ex: `INDEX IX ON Tabela (ComputedCol) WHERE ComputedCol IS NOT NULL`).
+- Use as funções de extração para formar a consulta e siga a orientação de coluna computada e índices quando a extração se tornar um caminho de acesso recorrente.
+- Trate `OPENJSON` como operador que expande linhas: filtre a entrada externa, projete um `WITH` estreito e valide as contagens no plano real.
 
 ---
 
@@ -414,6 +464,7 @@ ADD CONSTRAINT CK_PayloadIsObject CHECK (ISJSON(Payload, OBJECT) = 1);
 - `OPENJSON` é o motor mais eficiente para converter documentos de texto semiestruturados em tabelas relacionais normais.
 - A cláusula `FOR JSON` converte tabelas relacionais do banco em formato JSON para transmissões e integrações de rede.
 - A combinação de `CROSS APPLY OPENJSON` com a instrução `AS JSON` resolve lógicas de arrays JSON com múltiplos níveis de aninhamento.
+- A forma de acesso influencia o plano: índices de colunas computadas equivalentes podem evitar scans amplos, enquanto `OPENJSON` pode multiplicar linhas.
 
 ---
 
@@ -438,18 +489,26 @@ D. A string contendo o texto `'null'`.
 
 ---
 
+## Sintaxe de wrapper
+
+`FOR JSON PATH` oferece contrato previsível; `ROOT` adiciona objeto externo e
+`WITHOUT_ARRAY_WRAPPER` remove o array de um objeto. `WITH ARRAY_WRAPPER` pertence
+a `JSON_QUERY` com paths que retornam múltiplos valores; não é opção de `FOR JSON`.
+
 ## Tópicos Relacionados
 
 - [03-JSON Columns](../01-database-objects/03-json-columns.md)
-- [02-RAG Prompts and Responses](../11-rag/02-prompts-and-responses.md) *(Inglês apenas)*
+- [02-RAG Prompts and Responses](../11-rag/02-prompts-and-responses.md)
 
 ---
 
 ## Documentação Oficial
 
-- [JSON Functions (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/json-functions-transact-sql)
-- [OPENJSON (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/openjson-transact-sql)
-- [FOR JSON (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/json/format-query-results-as-json-with-for-json-sql-server)
+- [Funções JSON (Transact-SQL)](https://learn.microsoft.com/pt-br/sql/t-sql/functions/json-functions-transact-sql)
+- [OPENJSON (Transact-SQL)](https://learn.microsoft.com/pt-br/sql/t-sql/functions/openjson-transact-sql)
+- [FOR JSON (SQL Server)](https://learn.microsoft.com/pt-br/sql/relational-databases/json/format-query-results-as-json-with-for-json-sql-server)
+- [Expressões de caminho JSON](https://learn.microsoft.com/pt-br/sql/relational-databases/json/json-path-expressions-sql-server)
+- [Indexar dados JSON](https://learn.microsoft.com/pt-br/sql/relational-databases/json/index-json-data)
 
 ---
 

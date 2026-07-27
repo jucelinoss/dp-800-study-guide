@@ -13,12 +13,12 @@ tags:
 
 ## Overview
 
-SQL Server provides a comprehensive set of JSON functions for reading, constructing, modifying, and filtering JSON data. These are heavily tested in DP-800 given the exam's focus on semi-structured data and AI payloads.
+SQL Server provides a comprehensive set of JSON functions for reading, constructing, modifying, and filtering JSON data. These are heavily tested in DP-800 given the exam's focus on semi-structured data and AI payloads. This chapter covers the operational side of JSON; choose the column type, persistent validation rule, and index strategy in [03-JSON Columns](../01-database-objects/03-json-columns.md).
 
 > [!abstract]
 >
 > - Deep-dive into all T-SQL JSON functions: extraction, modification, parsing, and serialization
-> - JSON is stored as NVARCHAR — all functions operate on string representations
+> - JSON functions query and transform JSON documents stored in supported JSON-capable columns
 > - Key exam topics: JSON_VALUE vs JSON_QUERY, OPENJSON WITH clause, FOR JSON PATH vs AUTO, lax vs strict
 
 > [!tip] What the Exam Tests
@@ -66,6 +66,9 @@ SELECT
 > `JSON_VALUE(col, '$.product.specs')` silently returns NULL when `specs` is an object — this is lax mode default behavior. In strict mode, it would throw an error. The exam often presents both behaviors as answer choices: know which is default (lax = NULL, not error).
 
 ### OPENJSON — Parse to Rows
+
+`OPENJSON` requires database compatibility level 130 or higher (unless the
+relevant database-scoped configuration enables it at lower levels).
 
 ```sql
 -- Default: key-value pairs
@@ -122,7 +125,11 @@ SELECT JSON_ARRAY(1, 'two', NULL, GETDATE());
 -- [1,"two",null,"2025-06-15T10:00:00"]
 ```
 
-### JSON_ARRAYAGG (SQL Server 2022+)
+### JSON_ARRAYAGG
+
+`JSON_ARRAYAGG` is generally available in Azure SQL Database, Azure SQL Managed
+Instance under eligible update policies, and Fabric SQL workloads; it is preview
+in SQL Server 2025 (17.x).
 
 ```sql
 -- Aggregate rows into a JSON array grouped by category
@@ -143,7 +150,11 @@ FROM dbo.OrderLines
 GROUP BY OrderId;
 ```
 
-### JSON_OBJECTAGG (SQL Server 2022+)
+### JSON_OBJECTAGG
+
+`JSON_OBJECTAGG` has the same current availability as `JSON_ARRAYAGG`: generally
+available in the eligible Azure and Fabric services, and preview in SQL Server
+2025 (17.x).
 
 ```sql
 -- Aggregate key-value pairs into a single JSON object
@@ -205,7 +216,7 @@ SET @json = JSON_MODIFY(@json, '$.score', 9.5);
 -- Add new property
 SET @json = JSON_MODIFY(@json, '$.tier', 'gold');
 
--- Delete property (set to NULL with explicit NULL cast)
+-- In lax mode (the default), NULL deletes an existing property.
 SET @json = JSON_MODIFY(@json, '$.tier', NULL);
 
 -- Append to array
@@ -216,7 +227,7 @@ SET @json = JSON_MODIFY(@json, 'append $.tags', 'vip');
 
 ## Filtering with JSON
 
-### JSON_CONTAINS (SQL Server 2025+ / Azure SQL)
+### JSON_CONTAINS (SQL Server 2025 (17.x) Preview)
 
 ```sql
 -- Check if an array contains a value
@@ -241,19 +252,44 @@ WHERE ISJSON(Tags, ARRAY) = 1          -- must be a JSON array
 
 ---
 
-## JSON Path Expressions Quick Reference
+## JSON Path Expressions and Modes
 
 | Expression | Returns |
 | :--- | :--- |
 | `$.property` | Top-level property |
 | `$.a.b` | Nested property |
 | `$.array[0]` | First element of array |
-| `$.array[*]` | All array elements (OPENJSON) |
+| `$.array[*]` | All array elements; preview, native `json` input, and supported JSON functions only |
 | `lax $.missing` | `NULL if missing (default)` |
 | `strict $.missing` | Error if missing |
 
-Path mode defaults to `lax` in all JSON functions. Prefix with `strict` to
-convert missing-path NULLs into errors — useful for validation queries.
+Path mode defaults to `lax` in JSON path expressions. Prefix with `strict` to
+convert a missing-path result into an error — useful for validation queries.
+
+Array wildcards (`[*]`), ranges, and `last` are SQL Server 2025 (17.x) Preview
+features. They require native `json` input and are supported by `JSON_QUERY`,
+`JSON_PATH_EXISTS`, and `JSON_CONTAINS`; use `OPENJSON` to expand JSON text
+arrays into rows.
+
+### Choose the mode deliberately
+
+Use `lax` when a property is optional and a missing value should simply become
+`NULL`. Use `strict` when a query or ingestion step requires a property and a
+missing path must stop processing instead of being mistaken for an unknown
+value.
+
+```sql
+-- Optional attribute: missing discount becomes NULL.
+SELECT JSON_VALUE(Payload, '$.discountCode') AS DiscountCode
+FROM dbo.Events;
+
+-- Required attribute during ingestion: missing order id raises an error.
+SELECT JSON_VALUE(JsonData, 'strict $.orderId') AS OrderId
+FROM dbo.EventStaging;
+```
+
+`strict` changes error behavior only. It is not a persistent table rule and
+does not replace a `CHECK` constraint for documents written to a column.
 
 ---
 
@@ -287,40 +323,125 @@ array as a raw JSON fragment rather than a string, enabling the second
 
 ---
 
-## JSON Schema Validation Patterns
+## JSON Access and Execution Plans
 
-### IS_JSON as a CHECK Constraint
+JSON functions are ordinary expressions from the optimizer's perspective. The
+function chosen and where it appears in the query influence how many documents
+SQL Server has to inspect, how many rows are produced, and whether an existing
+access path can be used. Always inspect the **actual execution plan** and the
+runtime measurements for the data volume in question; an operator is a result
+of the whole query, statistics, and available indexes—not a guarantee of a
+particular JSON function.
+
+| Access form | Typical plan consequence | Practical implication |
+| :--- | :--- | :--- |
+| `JSON_VALUE(Document, '$.status')` in `WHERE` without a matching access path | SQL Server can need to scan candidate rows and evaluate the function for each | Cost grows with the candidate set; filter with a selective relational predicate first when available |
+| Same `JSON_VALUE` expression with a matching indexed computed column | The optimizer can use the computed-column index; the plan can show an Index Seek and, when needed columns are absent, a Key Lookup | Keep the expression, path, and data type compatible with the computed-column definition; include projected columns only after measuring |
+| `JSON_QUERY` in the select list | Extracts a fragment for rows that reach that part of the plan; it does not create a scalar search key by itself | Use it to return objects/arrays, not as the primary access path for selective filtering |
+| `OPENJSON` / `CROSS APPLY OPENJSON` | Turns an object or array into one or more relational rows; each expanded array can multiply rows before joins, aggregates, and sorts | Restrict the outer rows and the JSON path before shredding; project only the fields required with `WITH` |
+| `FOR JSON` | Formats the final relational result as JSON | Apply filters, joins, ordering, and pagination to the relational result before serialization |
+
+### Matching a computed-column access path
+
+The indexed computed column is defined in the storage chapter, but the query
+does not have to name that column. When the `JSON_VALUE` expression in the
+query is equivalent to its definition, SQL Server can recognize the match and
+use the index if it is beneficial.
 
 ```sql
--- Enforce valid JSON at write time
-ALTER TABLE Products
-ADD CONSTRAINT CK_ValidJSON CHECK (IS_JSON(Attributes) = 1);
+-- The table has a computed column defined as:
+-- ShipCountry AS JSON_VALUE(ShippingJSON, '$.country')
+-- and an index on ShipCountry.
+
+SELECT OrderID, TotalAmount
+FROM dbo.Orders
+WHERE JSON_VALUE(ShippingJSON, '$.country') = N'US';
 ```
 
-### ETL Validation — Detect Invalid or Incomplete Rows
+An actual plan can use an **Index Seek** on the computed-column index, followed
+by a **Key Lookup** when `OrderID` and `TotalAmount` are not available in that
+index. If those columns are frequently returned by this query, test an index
+that includes them; do not add included columns solely to force a plan shape.
+Changing the JSON path, wrapping the expression in a different conversion, or
+using a different collation can prevent the expression from matching the index.
+
+### Shredding: row expansion is the key cost
+
+`OPENJSON` is the right tool when the consumer needs relational rows, but it is
+not a filter index. In a `CROSS APPLY`, every qualifying outer row can yield
+zero, one, or many inner rows. For example, 1,000 orders with 20 items each
+can become roughly 20,000 rows before a later `JOIN`, `GROUP BY`, or `ORDER BY`.
+That larger intermediate result can increase CPU, memory grants, sorts, and
+join work.
+
+```sql
+-- Prefer restricting orders before expanding their item arrays.
+SELECT o.OrderID, item.Sku, item.Qty
+FROM dbo.Orders AS o
+CROSS APPLY OPENJSON(o.OrderJson, '$.items')
+WITH (
+    Sku nvarchar(20) '$.sku',
+    Qty int          '$.qty'
+) AS item
+WHERE o.OrderDate >= '2026-01-01'
+  AND JSON_VALUE(o.OrderJson, '$.status') = N'Closed';
+```
+
+The optimizer is free to choose the physical order of operations, so the text
+order of predicates is not a guarantee. The durable improvement is an access
+path for the selective relational or JSON predicate, plus a narrow `OPENJSON`
+projection. Use the actual plan to compare estimated and actual rows around
+the `APPLY`, then address the predicate or data model rather than assuming a
+JSON-specific operator is always the bottleneck.
+
+### A small measurement routine
+
+```sql
+SET STATISTICS IO, TIME ON;
+-- Execute the candidate query with the actual execution plan enabled in SSMS
+-- or Azure Data Studio, then compare logical reads, CPU, elapsed time,
+-- estimated versus actual rows, seeks/scans, lookups, and sort spills.
+SET STATISTICS IO, TIME OFF;
+```
+
+For the computed-column definition and index choices, see
+[03-JSON Columns](../01-database-objects/03-json-columns.md). Microsoft Learn
+documents that a query using the same `JSON_VALUE` expression can use an
+equivalent computed-column index when possible.
+
+---
+
+## Validation While Querying or Loading
+
+`ISJSON` lets a query distinguish malformed input from valid documents. Use it
+at a staging boundary before parsing a batch. First identify rejected rows with
+`lax` paths; after they are removed or corrected, use `strict` paths in the
+load query so an unexpected missing property stops the load.
+
+### ETL validation — detect invalid or incomplete rows
 
 ```sql
 -- Validate required JSON properties during bulk load
 SELECT src.RowID, src.JsonData
 FROM StagingTable src
-WHERE IS_JSON(src.JsonData) = 0                              -- invalid JSON
-   OR JSON_VALUE(src.JsonData, 'strict $.id')   IS NULL      -- missing required field
-   OR JSON_VALUE(src.JsonData, 'strict $.name') IS NULL;
+WHERE ISJSON(src.JsonData) = 0                               -- invalid JSON
+   OR JSON_VALUE(src.JsonData, '$.id')   IS NULL             -- missing required field
+   OR JSON_VALUE(src.JsonData, '$.name') IS NULL;
 
 -- Count valid vs invalid JSON rows
 SELECT
-    SUM(CASE WHEN IS_JSON(JsonData) = 1 THEN 1 ELSE 0 END) AS ValidCount,
-    SUM(CASE WHEN IS_JSON(JsonData) = 0 THEN 1 ELSE 0 END) AS InvalidCount
+    SUM(CASE WHEN ISJSON(JsonData) = 1 THEN 1 ELSE 0 END) AS ValidCount,
+    SUM(CASE WHEN ISJSON(JsonData) = 0 THEN 1 ELSE 0 END) AS InvalidCount
 FROM StagingTable;
+
+-- After the rejected rows are handled, require the property in the load.
+SELECT JSON_VALUE(JsonData, 'strict $.id') AS Id
+FROM StagingTable
+WHERE ISJSON(JsonData) = 1;
 ```
 
-### Type-Specific Validation (SQL Server 2022+)
-
-```sql
--- Reject rows where the column is not a JSON object (rejects arrays, scalars)
-ALTER TABLE Events
-ADD CONSTRAINT CK_PayloadIsObject CHECK (ISJSON(Payload, OBJECT) = 1);
-```
+For `CHECK (ISJSON(...))`, required-document rules, and type choices at write
+time, return to [03-JSON Columns](../01-database-objects/03-json-columns.md).
 
 ---
 
@@ -357,21 +478,22 @@ SELECT JSON_OBJECT(
 
 | Issue | Cause | Resolution |
 | :--- | :--- | :--- |
-| `JSON_VALUE` returns NULL | Path not found (lax mode) | `Verify path; use `strict` to get an error instead` |
+| `JSON_VALUE` returns NULL | Path not found (lax mode) | Verify the path; use `strict` to get an error instead |
 | `JSON_QUERY` returns NULL on scalar | Scalar values need `JSON_VALUE` | Use `JSON_VALUE` for strings/numbers, `JSON_QUERY` for objects/arrays |
 | `FOR JSON` produces unexpected nesting | Column naming causes auto-nesting | Use explicit aliases or `FOR JSON PATH` with dot notation |
 | `CROSS APPLY OPENJSON` returns no rows | Nested column not declared `AS JSON` | Add `AS JSON` flag to the nested array column in the outer `WITH` clause |
-| `JSON_OBJECTAGG` / `JSON_ARRAYAGG` not found | Functions require SQL Server 2022+ | Verify compatibility level ≥ 160; use `FOR JSON` as fallback on older versions |
+| `JSON_OBJECTAGG` / `JSON_ARRAYAGG` not found | Feature is not available on the current SQL Server/Azure platform | Check the current platform availability; use `FOR JSON` when the aggregate functions are unavailable |
 
 ---
 
 ## Best Practices
 
-- Store JSON columns as `NVARCHAR(MAX)` and add an `IS_JSON` CHECK constraint to catch invalid data at write time rather than at query time.
+- Keep table storage, persistent `ISJSON` constraints, and JSON access-path design in [03-JSON Columns](../01-database-objects/03-json-columns.md).
 - Prefer `OPENJSON` with a typed `WITH` clause over repeated `JSON_VALUE` calls — it parses the document once and produces strongly-typed columns in a single pass.
 - Use `strict` path mode in validation and ETL queries so missing required fields surface as errors rather than silent NULLs.
-- Index computed columns derived from `JSON_VALUE` (e.g., `AS JSON_VALUE(Payload, '$.customerId')`) when the same JSON property appears frequently in `WHERE` or `JOIN` predicates.
-- Prefer `JSON_OBJECTAGG` / `JSON_ARRAYAGG` (SQL 2022+) over `FOR JSON PATH` when aggregating subsets of rows — they compose cleanly inside larger `SELECT` statements without subqueries.
+- Use the JSON extraction functions here to shape a query; follow the computed-column and index guidance in the JSON-columns chapter when that extraction becomes a recurring access path.
+- Treat `OPENJSON` as a row-expanding relational operator: filter the outer input, project a narrow `WITH` schema, and verify row counts in the actual plan.
+- Use `JSON_OBJECTAGG` / `JSON_ARRAYAGG` where the target platform supports them; they compose cleanly inside larger `SELECT` statements without subqueries.
 
 ---
 
@@ -382,7 +504,7 @@ SELECT JSON_OBJECT(
 > - `JSON_VALUE` = scalar → string; `JSON_QUERY` = objects/arrays → JSON fragment
 > - `OPENJSON` with `WITH` clause provides strongly-typed output — preferred for structured parsing
 > - `FOR JSON PATH` gives explicit control; `FOR JSON AUTO` infers nesting from aliases
-> - `JSON_ARRAYAGG` and `JSON_OBJECTAGG` are SQL Server 2022+ — know them for newer platform questions
+> - `JSON_ARRAYAGG` and `JSON_OBJECTAGG` are preview in SQL Server 2025 (17.x), but generally available in eligible Azure SQL and Fabric services
 > - Default path mode is `lax` (returns NULL on missing path); `strict` raises an error — critical for exam scenario questions about error behavior
 
 ---
@@ -413,8 +535,9 @@ D. The string 'null'
 - Two read functions: `JSON_VALUE` (scalar) and `JSON_QUERY` (object/array)
 - `OPENJSON` is the most versatile — converts JSON to relational rows
 - `FOR JSON` converts relational results to JSON — essential for RAG prompt building
-- `JSON_OBJECTAGG` / `JSON_ARRAYAGG` (SQL 2022+) aggregate rows directly into JSON without subqueries
+- `JSON_OBJECTAGG` / `JSON_ARRAYAGG` aggregate rows directly into JSON where the target platform supports them
 - `CROSS APPLY OPENJSON` with `AS JSON` is the pattern for shredding nested arrays
+- Access method affects the plan: matching computed-column indexes can avoid broad scans, while `OPENJSON` can multiply rows
 
 ---
 
@@ -427,9 +550,22 @@ D. The string 'null'
 
 ## Official Documentation
 
+## Mock-detail syntax: output wrappers
+
+`FOR JSON PATH` is the predictable contract for API output. `ROOT` adds a named
+outer object and `WITHOUT_ARRAY_WRAPPER` removes the default outer array for one
+object. `WITH ARRAY_WRAPPER` belongs to `JSON_QUERY` with JSON path expressions
+that can match multiple values; it is not a `FOR JSON` output option. Do not
+confuse the output-clause options with JSON path syntax; test the exact
+SQL Server/Azure SQL version before using preview features.
+
 - [JSON Functions (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/json-functions-transact-sql)
 - [OPENJSON (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/openjson-transact-sql)
 - [FOR JSON (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/json/format-query-results-as-json-with-for-json-sql-server)
+- [JSON path expressions](https://learn.microsoft.com/en-us/sql/relational-databases/json/json-path-expressions-sql-server)
+- [JSON aggregate functions](https://learn.microsoft.com/en-us/sql/t-sql/functions/json-arrayagg-transact-sql)
+- [JSON_CONTAINS (Transact-SQL)](https://learn.microsoft.com/en-us/sql/t-sql/functions/json-contains-transact-sql)
+- [Index JSON data](https://learn.microsoft.com/en-us/sql/relational-databases/json/index-json-data)
 
 ---
 
