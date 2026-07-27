@@ -1,0 +1,417 @@
+---
+title: Relational Model and Data Types
+type: topic
+tags: [sql-server, relational-model, data-types, fundamentals]
+---
+
+# Relational Model and Data Types
+
+## Overview
+
+A relational database stores facts in tables and connects those facts through keys. This chapter gives you the modelling and type-selection vocabulary needed to create tables confidently in the next lesson.
+
+> [!abstract]
+>
+> - Learn the hierarchy from SQL Server instance to row, plus the role of schemas.
+> - Model entities, attributes, keys, and one-to-many relationships before writing DDL.
+> - Choose basic SQL Server types deliberately and handle `NULL` correctly.
+
+> [!tip] What the Exam Tests
+> DP-800 builds on schemas, tables, key relationships, type choices, and `NULL` handling. Specialized tables, JSON, partitioning, and advanced indexing come later; this chapter establishes the foundation they share.
+
+---
+
+## The hierarchy of stored data
+
+Before creating an object, be able to say where it lives.
+
+```text
+SQL Server instance
+└── Database: StudyDB
+    └── Schema: study
+        └── Table: Customer
+            ├── Column: CustomerId
+            ├── Column: CustomerName
+            └── Row: one customer record
+```
+
+| Term | What it is | Example | What it is not |
+| :--- | :--- | :--- | :--- |
+| Instance | A running SQL Server Database Engine | `localhost` | A single database |
+| Database | A container for objects, data, users, and settings | `StudyDB` | A schema |
+| Schema | A namespace inside a database | `dbo`, `study`, `Sales` | A table design diagram |
+| Table | Rows with a defined set of columns | `study.Customer` | A spreadsheet tab with arbitrary columns |
+| Column | One fact of a defined type per row | `CustomerName` | A key by default |
+| Row | One occurrence of the table's entity | one customer | A table |
+
+Use two-part names such as `study.Customer`. A schema is useful for organization and permission boundaries: `Sales.Order` and `Archive.Order` can coexist because their schemas differ. `dbo` is the common default schema, but it does not mean "the whole database."
+
+> [!note] Mental model — schema
+> A database is an office building; a schema is a labeled floor; tables are the rooms on that floor. The schema groups objects but does not create a separate database.
+
+## From business language to a relational model
+
+Start with a short statement of facts, not with `CREATE TABLE` syntax:
+
+> A customer can place many orders. Every order belongs to one customer. An order contains a date and total amount. A customer has a name and may have an email address.
+
+This identifies three things:
+
+| Modelling term | Meaning | Example |
+| :--- | :--- | :--- |
+| Entity | A thing about which facts are stored | Customer, SalesOrder |
+| Attribute | A fact that describes one entity | CustomerName, OrderDate |
+| Relationship | A connection between entities | customer places order |
+
+The relationship is **one-to-many**: one customer can be associated with many orders; one order belongs to one customer. In the relational model, the foreign key lives on the "many" side:
+
+```text
+Customer                                      SalesOrder
+-----------------------------------------     --------------------------------
+CustomerId  (primary key)                 1 ───< CustomerId (foreign key)
+CustomerName                                      SalesOrderId (primary key)
+Email                                             OrderDate
+                                                  OrderTotal
+```
+
+The `1 ───<` notation reads "one customer to many orders." It does not require every customer to have an order; zero orders is still compatible with the relationship.
+
+### Keep one fact in one place
+
+Avoid this first attempt:
+
+```text
+OrderId | OrderDate | CustomerName | CustomerEmail | ProductName | Quantity
+```
+
+It appears convenient, but it repeats customer facts for every order. A corrected email would require changing multiple rows; missing one creates contradictory data. Instead, store a customer once and use its key from each order. This is the core reason relational designs reduce duplication and inconsistency.
+
+This does not mean every repeated word is bad. An order may intentionally record a historical shipping address or unit price, even if the customer or product changes later. The question is whether the repeated value represents the *current entity fact* or a deliberate *snapshot at the time of the transaction*.
+
+## Keys: identity and relationships
+
+### Primary keys
+
+A primary key uniquely identifies every row and cannot be `NULL`. `CustomerId` is a good key because it is stable even when a customer changes name or email.
+
+```sql
+CREATE TABLE study.Customer (
+    CustomerId int NOT NULL,
+    CustomerName nvarchar(100) NOT NULL,
+    Email nvarchar(320) NULL,
+    CONSTRAINT PK_Customer PRIMARY KEY (CustomerId)
+);
+```
+
+The value may be generated by `IDENTITY` in the next lesson. Do not assume a generated integer must be gap-free or that its sequence indicates business importance; rollbacks, deleted rows, and concurrent inserts can leave gaps.
+
+### Natural versus surrogate keys
+
+A **natural key** comes from the business, such as an immutable government-issued identifier. A **surrogate key** is created solely to identify a row, commonly an integer `CustomerId`.
+
+| Choice | Benefit | Risk |
+| :--- | :--- | :--- |
+| Natural key | Business meaning is visible | Values can change, be absent, be long, or be sensitive |
+| Surrogate key | Stable and compact relationship value | Must add a separate rule for business uniqueness when needed |
+
+For a beginner model, use a surrogate primary key and add a `UNIQUE` rule only if the business genuinely requires a value to be unique. For example, an email address should not automatically be declared unique if multiple people can legitimately share an inbox.
+
+### Foreign keys
+
+A foreign key stores a key value from a parent table. The database can enforce that the referenced parent exists.
+
+```sql
+CREATE TABLE study.SalesOrder (
+    SalesOrderId int NOT NULL,
+    CustomerId int NOT NULL,
+    OrderDate date NOT NULL,
+    OrderTotal decimal(12, 2) NOT NULL,
+    CONSTRAINT PK_SalesOrder PRIMARY KEY (SalesOrderId),
+    CONSTRAINT FK_SalesOrder_Customer
+        FOREIGN KEY (CustomerId) REFERENCES study.Customer(CustomerId)
+);
+```
+
+`CustomerId` is required here because the stated rule says every order belongs to one customer. If an order could be created before a customer is known, allow `NULL` only if that is a real, temporary business state and design a process to resolve it.
+
+> [!warning] Common Mistake
+> A column named `CustomerId` is not a foreign key merely because of its name. It becomes an enforced relationship only when a `FOREIGN KEY` constraint is defined.
+
+### Other relationship shapes
+
+| Shape | Example | Typical implementation |
+| :--- | :--- | :--- |
+| One-to-one | Person and one current passport | Foreign key plus `UNIQUE` constraint |
+| One-to-many | Customer and orders | Foreign key on the many-side table |
+| Many-to-many | Orders and products | A bridge table such as `SalesOrderItem` |
+
+A many-to-many relationship needs a third table because an order can contain many products and a product can appear on many orders:
+
+```text
+SalesOrder  1 ───< SalesOrderItem >─── 1  Product
+```
+
+The bridge contains at least both keys and usually relationship-specific facts such as quantity and unit price. You will create only simple tables in Part 0; this pattern is included so that the underlying design is not mysterious when you meet it later.
+
+## Choose data types by meaning
+
+A type is a promise about what a column can represent. Do not choose `nvarchar` for every value merely because it accepts almost anything; you lose validation, accurate comparisons, and useful operations.
+
+| Business fact | Good starting type | Why | Avoid as a default |
+| :--- | :--- | :--- | :--- |
+| Internal identifier / count | `int` | Exact whole number | Text identifiers without a reason |
+| Very large count | `bigint` | Larger exact integer range | `decimal` when no fractional part exists |
+| Price, quantity, percentage | `decimal(p, s)` | Exact fixed scale | `float` / `real` for exact values |
+| Name or description | `nvarchar(n)` | Unicode characters | `varchar` when Unicode is needed |
+| Fixed code with guaranteed length | `char(n)` or `nchar(n)` | Fixed storage semantics | Fixed types for variable-length names |
+| Date only | `date` | No time component | Text date such as `nvarchar(10)` |
+| Timestamp | `datetime2` | Modern, precise type | `datetime` for new design without compatibility need |
+| Yes/no/unknown | `bit` | Compact Boolean-like value | Strings such as `Yes` and `No` |
+| Binary data | `varbinary(max)` | File or binary payload | Text encoding of binary data |
+
+### Numbers: exact versus approximate
+
+`int` and `decimal` are exact numeric types. `float` and `real` are approximate binary floating-point types. Approximate values are useful for scientific measurements where small representation differences are acceptable, but they should not be used for currency or values that must compare exactly.
+
+```sql
+DECLARE @exact decimal(10, 2) = 0.10 + 0.20;
+DECLARE @approximate float = 0.10 + 0.20;
+
+SELECT @exact AS exact_result, @approximate AS approximate_result;
+```
+
+The display of the approximate result can conceal a binary rounding difference. For a monetary amount, define an appropriate `decimal` precision and scale. `decimal(12, 2)` allows ten digits before the decimal point and two after it; it is an example, not a universal financial standard.
+
+### Text: Unicode and length
+
+Use `nvarchar` for names, addresses, free-form text, and other values that may include accents or characters outside a narrow code page. `nvarchar(100)` means up to 100 characters, not an instruction to pad every value to that size.
+
+Use a deliberate maximum length based on the business fact. `nvarchar(max)` is not a safer version of every text column; reserve it for genuinely large content. A country code may be `char(2)`, but a person's name should not be `char(100)` because names vary in length.
+
+### Dates and times
+
+Use `date` for a birth date, due date, or order date when the time is not meaningful. Use `datetime2` when it is. The type does not automatically decide time zone semantics: document whether a `datetime2` is local business time or UTC, and keep the convention consistent.
+
+```sql
+CREATE TABLE study.EventExample (
+    EventId int NOT NULL,
+    EventDate date NOT NULL,
+    RecordedAt datetime2 NOT NULL
+);
+```
+
+`timestamp` is a historical SQL Server synonym for `rowversion`; it is **not** a date/time type. Avoid it when you mean an event time.
+
+### Boolean-like values
+
+`bit` stores `0`, `1`, or `NULL`. Prefer a clearly phrased name such as `IsActive` or `HasAcceptedTerms`, then define whether unknown is allowed. A `bit NOT NULL` column with a default is common when every row must explicitly be true or false.
+
+## `NULL` and three-valued logic
+
+`NULL` represents unknown, missing, or not-applicable information. It is not a zero, empty string, or a string containing the letters `NULL`.
+
+| Expression | Result when `Email` is `NULL` | Why |
+| :--- | :--- | :--- |
+| `Email = N'a@example.test'` | Unknown | Missing value cannot equal a known value |
+| `Email <> N'a@example.test'` | Unknown | It also cannot be proven different |
+| `Email IS NULL` | True | This tests for absence explicitly |
+| `Email IS NOT NULL` | False | This tests for presence explicitly |
+
+`WHERE` returns only rows whose predicate is true. Rows with false **or unknown** predicates are excluded, which is why this query does not find missing emails:
+
+```sql
+-- Incorrect: no row satisfies equality with NULL.
+SELECT CustomerName
+FROM study.Customer
+WHERE Email = NULL;
+
+-- Correct.
+SELECT CustomerName
+FROM study.Customer
+WHERE Email IS NULL;
+```
+
+### Decide whether a column is optional
+
+Ask one question: *Can a valid row exist without this fact at the time it is saved?*
+
+- Customer name: normally `NOT NULL`.
+- Email address: possibly `NULL` if it was not collected.
+- Order customer: normally `NOT NULL` if every order has a customer.
+- End date of an active subscription: may be `NULL` until it ends.
+
+Do not store a fake placeholder to avoid `NULL`. `unknown@example.test` is a claimed value, not missing information; it can collide with a real value and make analytics misleading.
+
+### `NULL` in aggregation and expressions
+
+Many aggregate functions ignore `NULL` inputs. `COUNT(*)` counts rows; `COUNT(Email)` counts only non-null emails. `SUM` of an empty set returns `NULL`, which is distinct from a known total of zero.
+
+```sql
+SELECT COUNT(*) AS customer_rows,
+       COUNT(Email) AS customers_with_email
+FROM study.Customer;
+```
+
+Use `COALESCE` only when the output should substitute a value for absence:
+
+```sql
+SELECT CustomerName,
+       COALESCE(Email, N'No email recorded') AS email_display
+FROM study.Customer;
+```
+
+This changes the query result, not the stored `NULL` value.
+
+## Conversions and comparisons
+
+SQL Server can sometimes convert between types automatically, but implicit conversions can fail or cause unexpected performance work. Make the intended type clear when a literal is ambiguous.
+
+```sql
+DECLARE @orderDate date = '2026-07-26';
+DECLARE @amount decimal(12, 2) = 19.95;
+
+SELECT @orderDate AS order_date, @amount AS amount;
+```
+
+Use `CAST` or `CONVERT` when conversion is part of the task:
+
+```sql
+SELECT CAST(OrderTotal AS decimal(14, 2)) AS normalized_total
+FROM study.SalesOrder;
+```
+
+`TRY_CAST` and `TRY_CONVERT` return `NULL` rather than raising an error when a conversion fails. They are valuable when cleansing uncertain input, but do not silently hide bad data without recording or investigating it.
+
+```sql
+SELECT TRY_CONVERT(date, N'not a date') AS parsed_value;
+```
+
+### Collation in plain language
+
+A **collation** defines text comparison and sorting rules, including case and accent sensitivity. Many SQL Server installations use a case-insensitive collation, so `Ana` may compare equal to `ana`; do not rely on that without knowing the database's collation. Collation choices matter for identifiers and text comparison, but a beginner should first remember that a text comparison's behavior can be configuration-dependent.
+
+## A worked model for `StudyDB`
+
+The following definition ties the concepts together. It is small enough to understand and robust enough to practice with.
+
+```sql
+CREATE SCHEMA study;
+GO
+
+CREATE TABLE study.Customer (
+    CustomerId int IDENTITY(1, 1) NOT NULL,
+    CustomerName nvarchar(100) NOT NULL,
+    Email nvarchar(320) NULL,
+    IsActive bit NOT NULL CONSTRAINT DF_Customer_IsActive DEFAULT (1),
+    CONSTRAINT PK_Customer PRIMARY KEY (CustomerId)
+);
+GO
+
+CREATE TABLE study.SalesOrder (
+    SalesOrderId int IDENTITY(1, 1) NOT NULL,
+    CustomerId int NOT NULL,
+    OrderDate date NOT NULL,
+    OrderTotal decimal(12, 2) NOT NULL,
+    CONSTRAINT PK_SalesOrder PRIMARY KEY (SalesOrderId),
+    CONSTRAINT CK_SalesOrder_OrderTotal CHECK (OrderTotal >= 0),
+    CONSTRAINT FK_SalesOrder_Customer
+        FOREIGN KEY (CustomerId) REFERENCES study.Customer(CustomerId)
+);
+GO
+```
+
+Read the rules rather than only the syntax:
+
+- `CustomerId` identifies a customer and is generated by SQL Server.
+- A name is required; email is optional.
+- An order needs a real customer, date, and non-negative amount.
+- The foreign key protects the relationship, even if a future application bypasses its own validation.
+
+## Practice questions
+
+### 1. Modelling
+
+A customer can have many support tickets, and every ticket belongs to one customer. Which table should store `CustomerId` as a foreign key?
+
+A. `Customer`<br>
+B. `SupportTicket`<br>
+C. Both tables<br>
+D. Neither table
+
+> [!success]- Answer
+> **B. `SupportTicket`** is the many-side table. Each ticket stores the customer it belongs to; one customer can be referenced by many ticket rows.
+
+### 2. Type selection
+
+Which type is most appropriate for a price that must add and compare exactly to two decimal places?
+
+A. `float`<br>
+B. `nvarchar(20)`<br>
+C. `decimal(12, 2)`<br>
+D. `bit`
+
+> [!success]- Answer
+> **C. `decimal(12, 2)`** is an exact, fixed-scale type. Floating-point values are approximate and text does not carry numeric semantics.
+
+### 3. Missing values
+
+Which predicate returns rows whose email was not recorded?
+
+A. `Email = NULL`<br>
+B. `Email <> NULL`<br>
+C. `Email IS NULL`<br>
+D. `Email = ''`
+
+> [!success]- Answer
+> **C. `Email IS NULL`** explicitly tests the missing-value marker. An empty string is a different, known text value.
+
+## Use Cases
+
+- Translate a small business description into tables, attributes, and a relationship.
+- Choose types that preserve numeric, text, and temporal meaning.
+- Decide whether an unknown value should be allowed or rejected.
+
+## Common Issues & Errors
+
+> [!warning] Common Mistake
+> Using a name, email, or description as a primary key because it looks unique today makes relationships fragile when that business value changes or is duplicated.
+
+> [!warning] Common Mistake
+> `WHERE Email = NULL` never tests for missing email. Use `IS NULL`; remember that `WHERE` keeps only true conditions, not unknown ones.
+
+## Best Practices
+
+- Model one entity per table and place each fact where it has one clear meaning.
+- Use `NOT NULL` for required facts, but do not invent fake values to avoid optional `NULL`s.
+- Prefer exact numeric types for values that must be exact and `datetime2` for new date-and-time columns.
+- Name keys and constraints so errors identify the rule that was violated.
+- Specify schemas in object names and use them consistently.
+
+## Exam Tips
+
+> [!tip] Exam Tips
+> A schema is a namespace inside a database, not another database. A foreign key describes and can enforce a relationship; it does not automatically create an index on the child column. Later sections cover index choices and specialized objects.
+
+## Key Takeaways
+
+- A relational model separates entities and reconnects them with keys.
+- Cardinality determines which table holds a foreign key.
+- Types express meaning and constrain valid operations; select them before loading data.
+- `NULL` requires `IS NULL`/`IS NOT NULL` and introduces an unknown logical state.
+
+## Related Topics
+
+- [SQL Server Foundations Workbook](./00-foundations-workbook.md)
+- [Create and load data](./03-create-and-load-data.md)
+- [Integrity rules](./08-integrity-rules.md)
+- [Database Objects](../01-database-objects/database-objects.md)
+
+## Official Documentation
+
+- [Data types](https://learn.microsoft.com/sql/t-sql/data-types/data-types-transact-sql)
+- [Primary and foreign key constraints](https://learn.microsoft.com/sql/relational-databases/tables/primary-and-foreign-key-constraints)
+- [NULL and UNKNOWN](https://learn.microsoft.com/sql/t-sql/language-elements/null-and-unknown-transact-sql)
+
+---
+
+**[← Previous](./01-sql-server-and-tools.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./03-create-and-load-data.md)**
