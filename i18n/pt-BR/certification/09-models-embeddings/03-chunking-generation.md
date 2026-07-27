@@ -53,6 +53,14 @@ Antes de gerar embeddings, você deve decidir quais colunas embeder e como prepa
 
 ---
 
+## Fundamentos: recuperação, RAG e contexto
+
+Uma aplicação de busca semântica tem duas fases. Na **indexação**, ela seleciona texto, divide documentos quando necessário, gera embeddings e armazena vetores com o texto e seus metadados. Na **recuperação**, ela gera o embedding da pergunta e procura os chunks mais próximos. Em RAG (*Retrieval-Augmented Generation*), esses chunks recuperados são enviados como contexto para um modelo de chat elaborar a resposta. O modelo de embedding recupera; o modelo de chat responde.
+
+Chunking existe porque documentos longos podem ultrapassar o limite de tokens do modelo e porque recuperar um documento inteiro costuma trazer muitos assuntos irrelevantes. Um chunk deve preservar uma ideia suficiente para responder a uma pergunta, mas ser específico o bastante para que a busca encontre o trecho certo. Armazene sempre `ChunkText`, identificador do documento, ordem, origem, versão do modelo e metadados de filtro; um vetor sem texto original não é útil como contexto para RAG.
+
+Avalie a estratégia com perguntas reais: a resposta esperada aparece entre os primeiros resultados? O trecho tem contexto suficiente? A divisão cortou uma ideia importante? Antes de trocar de modelo, revise o texto selecionado, os limites dos chunks, o overlap e os filtros de metadados — esses fatores frequentemente explicam mais a qualidade da recuperação do que aumentar a dimensão do vetor.
+
 ## Identificando Quais Colunas Embeder
 
 Nem toda coluna precisa de embedding. Escolha colunas onde a busca semântica agregaria valor:
@@ -93,7 +101,7 @@ JOIN dbo.Categories c ON p.CategoryId = c.CategoryId;
 
 ## Estratégias de Chunking
 
-Modelos de embedding têm um limite máximo de tokens de entrada (ex: 8192 tokens para `text-embedding-3-small`). Documentos mais longos que isso devem ser divididos em chunks.
+Modelos de embedding têm um limite máximo de tokens de entrada (ex: 8191 tokens para `text-embedding-3-small`). Documentos mais longos que isso devem ser divididos em chunks.
 
 ### Chunking de Tamanho Fixo
 
@@ -269,12 +277,11 @@ CREATE INDEX IX_DocumentChunks_EmbeddingNull
 -- Gerar embeddings para todos os chunks não-embeddados
 UPDATE dc
 SET
-    Embedding  = CAST(
-        PREDICT(MODEL = [MyEmbeddingModel],
-                DATA = (SELECT dc2.ChunkText AS input_text)) AS VECTOR(1536)),
+    Embedding  = AI_GENERATE_EMBEDDINGS(
+        dc.ChunkText USE MODEL [MyEmbeddingModel]
+    ),
     EmbeddedAt = GETUTCDATE()
-FROM dbo.DocumentChunks dc
-CROSS APPLY (SELECT dc.ChunkText) dc2(ChunkText)
+FROM dbo.DocumentChunks AS dc
 WHERE dc.Embedding IS NULL;
 ```
 
@@ -343,7 +350,7 @@ EXEC sp_invoke_external_rest_endpoint
 
 ### Estimativa de Tokens
 
-Antes de chamar a API, estime as contagens de tokens para evitar exceder o limite de 8192 tokens:
+Antes de chamar a API, estime as contagens de tokens para evitar exceder o limite de 8191 tokens:
 
 ```sql
 -- Estimativa grosseira de tokens: ~4 caracteres por token para texto em inglês
@@ -354,7 +361,7 @@ WHERE TokenCount IS NULL;
 -- Sinalizar chunks que podem ser muito longos
 SELECT ChunkId, DocumentId, ChunkNumber, LEN(ChunkText) AS CharCount, TokenCount
 FROM dbo.DocumentChunks
-WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8192
+WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
 ```
 
 > [!caution] Limite de Tokens do Modelo
@@ -392,7 +399,7 @@ WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8192
 > - **Chunks com overlap** melhoram o recall nas fronteiras — use quando a qualidade de recuperação importa mais que o custo
 > - `VECTOR(1536)` armazena 1536 floats × 4 bytes = 6KB por linha — planeje o armazenamento adequadamente
 > - Sempre armazene o `ChunkText` junto ao embedding — é necessário para montar o contexto para o LLM
-> - `PREDICT(MODEL = ..., DATA = (SELECT text AS input_text))` — o alias `input_text` é obrigatório para modelos de embedding
+> - `AI_GENERATE_EMBEDDINGS(text USE MODEL ...)` gera o vetor para um external model de embeddings
 
 ---
 

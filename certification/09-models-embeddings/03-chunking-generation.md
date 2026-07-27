@@ -28,6 +28,14 @@ Before generating embeddings, you must decide which columns to embed and how to 
 
 ---
 
+## Foundations: Retrieval, RAG, and Context
+
+A semantic-search application has two phases. During **indexing**, it selects text, splits documents when needed, generates embeddings, and stores vectors with text and metadata. During **retrieval**, it generates an embedding for the question and looks for the nearest chunks. In RAG (*Retrieval-Augmented Generation*), those retrieved chunks are sent as context to a chat model that drafts the answer. The embedding model retrieves; the chat model responds.
+
+Chunking exists because long documents can exceed a model's token limit and because retrieving a whole document often brings too many irrelevant topics. A chunk should preserve enough of an idea to answer a question while remaining specific enough for search to find the right passage. Always store `ChunkText`, the document identifier, ordering, source, model version, and filter metadata; a vector without its original text is not useful RAG context.
+
+Evaluate a strategy with real questions: does the expected answer appear among the first results? Does the passage have enough context? Did a split cut an important idea? Before changing models, review selected text, chunk boundaries, overlap, and metadata filters — these factors often affect retrieval quality more than increasing vector dimensions.
+
 ## Identifying Which Columns to Embed
 
 Not every column needs an embedding. Choose columns where semantic search would provide value:
@@ -60,11 +68,15 @@ FROM dbo.Products p
 JOIN dbo.Categories c ON p.CategoryId = c.CategoryId;
 ```
 
+> [!note] Quality Tip
+>
+> Prefixing each field with its name (e.g., `"Product: "`, `"Category: "`) helps the embedding model understand the semantics of each part. This improves retrieval quality compared to plain concatenation without prefixes.
+
 ---
 
 ## Chunking Strategies
 
-Embedding models have a maximum input token limit (e.g., 8192 tokens for `text-embedding-3-small`). Documents longer than this must be split into chunks.
+Embedding models have a maximum input token limit (e.g., 8191 tokens for `text-embedding-3-small`). Documents longer than this must be split into chunks.
 
 ### Fixed-Size Chunking
 
@@ -189,7 +201,7 @@ GROUP BY DocumentId, ChunkNumber;
 | Strategy | Pros | Cons | Best For |
 | :--- | :--- | :--- | :--- |
 | Fixed-size | Simple, predictable | May cut mid-sentence | Technical docs, long text |
-| Overlapping | `Better boundary recall` | More chunks, higher cost | General documents |
+| Overlapping | Better boundary recall | More chunks, higher cost | General documents |
 | Sentence-based | Semantically coherent | Variable chunk size | Articles, reviews, Q&A |
 | Paragraph-based | Natural breaks | Very variable size | Web content, documentation |
 
@@ -232,12 +244,11 @@ CREATE INDEX IX_DocumentChunks_EmbeddingNull
 -- Generate embeddings for all unembedded chunks
 UPDATE dc
 SET
-    Embedding  = CAST(
-        PREDICT(MODEL = [MyEmbeddingModel],
-                DATA = (SELECT dc2.ChunkText AS input_text)) AS VECTOR(1536)),
+    Embedding  = AI_GENERATE_EMBEDDINGS(
+        dc.ChunkText USE MODEL [MyEmbeddingModel]
+    ),
     EmbeddedAt = GETUTCDATE()
-FROM dbo.DocumentChunks dc
-CROSS APPLY (SELECT dc.ChunkText) dc2(ChunkText)
+FROM dbo.DocumentChunks AS dc
 WHERE dc.Embedding IS NULL;
 ```
 
@@ -256,8 +267,9 @@ DECLARE @payload NVARCHAR(MAX) = N'{"input": ' + QUOTENAME(@chunk_text, '"') + '
 EXEC sp_invoke_external_rest_endpoint
     @url     = 'https://myopenai.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-02-01',
     @method  = 'POST',
-    @headers = '{"Content-Type":"application/json","api-key":"YOUR_KEY"}',
+    @headers = '{"Content-Type":"application/json"}',
     @payload = @payload,
+    @credential = [https://myopenai.openai.azure.com/],
     @response = @response OUTPUT;
 
 -- Extract the embedding array from the JSON response
@@ -293,8 +305,9 @@ DECLARE @response NVARCHAR(MAX);
 EXEC sp_invoke_external_rest_endpoint
     @url     = 'https://myopenai.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-02-01',
     @method  = 'POST',
-    @headers = '{"Content-Type":"application/json","api-key":"YOUR_KEY"}',
+    @headers = '{"Content-Type":"application/json"}',
     @payload = @payload,
+    @credential = [https://myopenai.openai.azure.com/],
     @response = @response OUTPUT;
 
 -- Parse the batch response and update the table
@@ -304,7 +317,7 @@ EXEC sp_invoke_external_rest_endpoint
 
 ### Token Estimation
 
-Before calling the API, estimate token counts to avoid exceeding the 8192-token limit:
+Before calling the API, estimate token counts to avoid exceeding the 8191-token limit:
 
 ```sql
 -- Rough token estimate: ~4 characters per token for English text
@@ -315,7 +328,7 @@ WHERE TokenCount IS NULL;
 -- Flag chunks that may be too long
 SELECT ChunkId, DocumentId, ChunkNumber, LEN(ChunkText) AS CharCount, TokenCount
 FROM dbo.DocumentChunks
-WHERE TokenCount > 7500;  -- Leave headroom below 8192 limit
+WHERE TokenCount > 7500;  -- Leave headroom below the 8191-token limit
 ```
 
 ---
@@ -334,7 +347,7 @@ WHERE TokenCount > 7500;  -- Leave headroom below 8192 limit
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
 | `Token limit exceeded` | Chunk text too long | Reduce chunk size; add token estimation check before embedding |
-| Embeddings are `NULL` after update | PREDICT error silently swallowed | Test PREDICT on a single row first; check error logs |
+| Embeddings are `NULL` after update | AI_GENERATE_EMBEDDINGS error silently swallowed | Test AI_GENERATE_EMBEDDINGS on a single row first; check error logs |
 | Poor retrieval quality | Chunks too large or split mid-sentence | Use smaller chunks with overlap, or sentence-based splitting |
 | Very slow batch embedding | One API call per row | Use batch REST calls or PREDICT in a set-based UPDATE |
 | Storage bloat | 1536 floats × 4 bytes × millions of rows | Use `text-embedding-3-small` (same dims as ada-002 but better quality); consider VECTOR compression |
@@ -349,7 +362,7 @@ WHERE TokenCount > 7500;  -- Leave headroom below 8192 limit
 > - **Overlapping chunks** improve recall at chunk boundaries — use when retrieval quality matters more than cost
 > - `VECTOR(1536)` stores 1536 floats × 4 bytes = 6KB per row — plan storage accordingly
 > - Always store the `ChunkText` alongside the embedding — it's needed to assemble the context for the LLM
-> - `PREDICT(MODEL = ..., DATA = (SELECT text AS input_text))` — the alias `input_text` is required for embedding models
+> - `AI_GENERATE_EMBEDDINGS(text USE MODEL ...)` generates a vector through an embedding external model
 
 ---
 
@@ -358,7 +371,7 @@ WHERE TokenCount > 7500;  -- Leave headroom below 8192 limit
 - Choose columns to embed based on semantic search value — free text, descriptions, reviews are good candidates
 - Chunk long documents before embedding — fixed-size with overlap is a safe default
 - Store chunks in a separate table with `ChunkText`, `DocumentId`, `ChunkNumber`, and `Embedding` columns
-- Generate embeddings with `PREDICT` (external model) or `sp_invoke_external_rest_endpoint` (REST call)
+- Generate embeddings with `AI_GENERATE_EMBEDDINGS` (external model) or `sp_invoke_external_rest_endpoint` (REST call)
 
 ---
 

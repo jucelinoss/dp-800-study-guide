@@ -8,7 +8,7 @@
 -- =================================================================================
 -- This script demonstrates preventive maintenance and embedding vector update patterns:
 --   1. Dirty Tracking Pattern (`IsEmbeddingStale BIT`) to identify stale vectors
---   2. Synchronous Update via Table Triggers (`AFTER INSERT, UPDATE`)
+--   2. Change Tracking, CDC, and event-driven integration options
 --   3. Batch Processing (Batch Regeneration) for pending vectors
 --   4. Full Regeneration Strategy (AI model swap from text-embedding-ada-002 to 3-small)
 --   5. Practical Project Scenarios (Text Modification Tracking vs Vector Date)
@@ -26,7 +26,7 @@ CREATE TABLE lab.ProductVectorCatalog (
     ProductID INT PRIMARY KEY,
     ProductName NVARCHAR(100) NOT NULL,
     Description NVARCHAR(MAX) NOT NULL,
-    DescriptionEmbedding NVARCHAR(MAX) NULL, -- Vector serialized as JSON
+    DescriptionEmbedding VECTOR(1536) NULL,
     IsEmbeddingStale BIT NOT NULL DEFAULT 1, -- Dirty Tracking flag
     LastUpdated DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
     EmbeddingGeneratedAt DATETIME2 NULL
@@ -34,8 +34,8 @@ CREATE TABLE lab.ProductVectorCatalog (
 GO
 
 INSERT INTO lab.ProductVectorCatalog (ProductID, ProductName, Description) VALUES
-(101, N'Capacete Premium', N'Capacete aerodinamico com fibra de carbono e ventilacao extra.'),
-(102, N'Luvas de Ciclismo', N'Luvas acolchoadas com gel e tecido respiravel.');
+(101, N'Premium Helmet', N'Aerodynamic helmet with carbon fiber and extra ventilation.'),
+(102, N'Cycling Gloves', N'Padded gloves with gel and breathable fabric.');
 GO
 
 
@@ -69,7 +69,7 @@ GO
 
 -- Simulate description change
 UPDATE lab.ProductVectorCatalog
-SET Description = N'Capacete aerodinamico com fibra de carbono, ventilacao extra e luz LED traseira.'
+SET Description = N'Aerodynamic carbon-fiber helmet with extra ventilation and rear LED light.'
 WHERE ProductID = 101;
 GO
 
@@ -92,14 +92,26 @@ UPDATE lab.ProductVectorCatalog
 SET IsEmbeddingStale = 1;
 GO
 
--- 2. Process batch of stale records (Simulating the batch job call)
+-- 2. Process a batch of stale records. The actual embedding call is shown below;
+-- this executable step only updates the maintenance state.
 UPDATE lab.ProductVectorCatalog
 SET 
-    DescriptionEmbedding = N'[-0.012, 0.045, 0.089, ...]', -- Simulated vector with 1536 dimensions
     IsEmbeddingStale = 0,
     EmbeddingGeneratedAt = GETUTCDATE()
 WHERE IsEmbeddingStale = 1;
 GO
+
+-- With a configured external embedding model, use this batch update instead.
+/*
+UPDATE p
+SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+        p.Description USE MODEL [AzureOpenAI_Embedding_Small]
+    ),
+    IsEmbeddingStale = 0,
+    EmbeddingGeneratedAt = SYSUTCDATETIME()
+FROM lab.ProductVectorCatalog AS p
+WHERE p.IsEmbeddingStale = 1;
+*/
 
 -- Validate if all rows were successfully re-indexed
 SELECT ProductID, IsEmbeddingStale, EmbeddingGeneratedAt 
@@ -108,27 +120,130 @@ GO
 
 
 -- =================================================================================
--- PART 3: PRACTICAL PROJECT SCENARIOS
+-- PART 3: CHANGE TRACKING AND CDC
+-- =================================================================================
+
+-- Change Tracking is a lightweight option for finding changed keys. Azure Functions
+-- SQL Trigger uses it while polling; it does not receive a push notification.
+/*
+ALTER DATABASE AdventureWorks2025
+SET CHANGE_TRACKING = ON
+    (CHANGE_RETENTION = 7 DAYS, AUTO_CLEANUP = ON);
+GO
+ALTER TABLE lab.ProductVectorCatalog
+ENABLE CHANGE_TRACKING WITH (TRACK_COLUMNS_UPDATED = ON);
+GO
+
+DECLARE @LastVersion BIGINT = 0;
+SELECT p.ProductID, p.Description, ct.SYS_CHANGE_VERSION, ct.SYS_CHANGE_OPERATION
+FROM CHANGETABLE(CHANGES lab.ProductVectorCatalog, @LastVersion) AS ct
+JOIN lab.ProductVectorCatalog AS p ON p.ProductID = ct.ProductID;
+*/
+
+-- CDC captures row-level change data. Enable it only when its richer history is needed.
+/*
+EXEC sys.sp_cdc_enable_db;
+EXEC sys.sp_cdc_enable_table
+    @source_schema = N'lab',
+    @source_name = N'ProductVectorCatalog',
+    @role_name = NULL;
+
+SELECT *
+FROM cdc.fn_cdc_get_all_changes_lab_ProductVectorCatalog
+    (sys.fn_cdc_get_min_lsn(N'lab_ProductVectorCatalog'), sys.fn_cdc_get_max_lsn(), N'all');
+*/
+GO
+
+-- =================================================================================
+-- PART 4: OUTBOX FOR ASYNCHRONOUS PROCESSING
+-- =================================================================================
+
+DROP TABLE IF EXISTS lab.EmbeddingOutbox;
+GO
+
+CREATE TABLE lab.EmbeddingOutbox (
+    EventID BIGINT IDENTITY(1,1) PRIMARY KEY,
+    ProductID INT NOT NULL,
+    Payload NVARCHAR(MAX) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    ProcessedAt DATETIME2 NULL
+);
+GO
+
+CREATE OR ALTER TRIGGER lab.trg_ProductVectorCatalog_Outbox
+ON lab.ProductVectorCatalog
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- UPDATE(Description) is also true for INSERT, so this covers both operations
+    -- without emitting events for maintenance-only updates.
+    IF UPDATE(Description)
+    BEGIN
+        INSERT INTO lab.EmbeddingOutbox (ProductID, Payload)
+        SELECT i.ProductID,
+               CONCAT(N'{"productId":', i.ProductID, N',"description":"',
+                      STRING_ESCAPE(i.Description, 'json'), N'"}')
+        FROM inserted AS i;
+    END;
+END;
+GO
+
+UPDATE lab.ProductVectorCatalog
+SET Description = N'Aerodynamic carbon-fiber helmet with extra ventilation and rear LED light.'
+WHERE ProductID = 101;
+GO
+
+SELECT EventID, ProductID, Payload, CreatedAt, ProcessedAt
+FROM lab.EmbeddingOutbox
+ORDER BY EventID;
+GO
+
+-- A worker can call Azure OpenAI, persist the returned vector, and then acknowledge the event.
+UPDATE lab.EmbeddingOutbox
+SET ProcessedAt = SYSUTCDATETIME()
+WHERE ProcessedAt IS NULL;
+GO
+
+-- Azure Functions can poll Change Tracking; Change Event Streams can forward database
+-- changes to Event Hubs/Eventstream. Logic Apps and Foundry workflows can be consumers.
+
+-- =================================================================================
+-- PART 5: PRACTICAL PROJECT SCENARIOS
 -- =================================================================================
 
 --- SCENARIO 1: Comparative Matrix of Embedding Maintenance Approaches
 -- Architecture decision guide for the DP-800 Exam.
 
 SELECT 
-    'Triggers de Tabela (Sincrono)' AS Abordagem,
-    'Alta (API chamada durante o UPDATE)' AS LatenciaEscrita,
-    'Pequenas tabelas ou escritas infrequentes' AS CasoDeUsoRecomendado,
-    'API indisponivel aborta a transacao de escrita' AS RiscoArquitetural
+    'Synchronous table triggers' AS Approach,
+    'High (the API is called during UPDATE)' AS WriteLatency,
+    'Small tables or infrequent writes' AS RecommendedUseCase,
+    'An unavailable API can abort the write transaction' AS ArchitectureRisk
 UNION ALL
 SELECT 
-    'Dirty Tracking + Batch Job (Assincrono)',
-    'Zero (Nao afeta o UPDATE do usuario)',
-    'Alta frequencia de escrita e tabelas grandes',
-    'Vetor fica temporariamente desatualizado ate a roda do job'
+    'Dirty tracking + batch job (asynchronous)',
+    'None (does not affect the user UPDATE)',
+    'High write frequency and large tables',
+    'The vector remains temporarily stale until the job runs'
 UNION ALL
 SELECT 
-    'Azure Functions SQL Trigger Binding',
-    'Quase em Tempo Real (Assincrono baseado em eventos)',
-    'Arquiteturas Cloud Serverless nativas Azure',
-    'Requer infraestrutura de Functions e Change Tracking ativo';
+    'Azure Functions SQL Trigger binding',
+    'Near real time (Change Tracking-based polling)',
+    'Azure-native serverless cloud architectures',
+    'Requires Functions infrastructure and Change Tracking';
+GO
+
+SELECT
+    'CDC' AS Approach,
+    'Scheduled or continuous consumer' AS WriteLatency,
+    'Consumers that need detailed row-change history' AS RecommendedUseCase,
+    'Additional operational overhead and retention management' AS ArchitectureRisk
+UNION ALL
+SELECT
+    'Change Event Streams',
+    'Asynchronous stream delivery',
+    'Event-driven integration through Event Hubs or Eventstream',
+    'Requires event-stream infrastructure and a consumer';
 GO

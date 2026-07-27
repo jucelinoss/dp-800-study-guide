@@ -52,6 +52,16 @@ tags:
 
 ---
 
+## Fundamento: embeddings são dados derivados
+
+Um embedding não é o dado de negócio original; ele é um artefato derivado do texto. Quando o título, a descrição, o idioma, as permissões ou o próprio modelo de embedding mudam, o vetor antigo pode deixar de representar corretamente o conteúdo. Esse desalinhamento é chamado de **drift**.
+
+O ciclo de vida confiável é: detectar inserções, atualizações e exclusões; identificar os chunks afetados; gerar novamente os vetores; e registrar quando e com qual modelo isso ocorreu. Use uma flag de pendência, timestamp ou watermark para tornar o processo incremental e idempotente. Uma troca de modelo, de dimensão ou do formato de texto normalmente exige re-embedding completo, pois o novo vetor pertence a outro espaço vetorial.
+
+> [!important] Atualizar texto não basta
+>
+> Uma busca semântica pode continuar funcionando com um vetor antigo, mas retornará resultados desatualizados. Por isso, manutenção de embeddings é parte do desenho da solução, não uma tarefa ocasional de limpeza.
+
 ## Comparação dos Métodos de Manutenção de Embeddings
 
 | Método | Latência | Complexidade | Infraestrutura | Melhor Para |
@@ -60,7 +70,7 @@ tags:
 | Change Tracking | Baixa (polling) | Média | SQL Agent ou scheduler | Volume moderado, amigável a lotes |
 | CDC | Média (polling) | Média | SQL Agent (on-prem) | Audit trail necessário com embeddings |
 | CES | Quase real-time | Média | Azure Event Hubs / Eventstream | SQL Server 2025 ou Azure SQL Database (visualização) |
-| Azure Functions SQL Trigger | Quase real-time | Média | Azure Functions | Qualquer Azure SQL, event-driven |
+| Azure Functions SQL Trigger | Quase real-time | Média | Azure Functions + Change Tracking | Processamento desacoplado por polling |
 | Azure Logic Apps | Minutos | Baixa | Logic Apps | Low-code, baixo volume |
 
 > [!tip] Regra de Ouro para o Exame
@@ -90,9 +100,9 @@ BEGIN
     IF UPDATE(Description)
     BEGIN
         UPDATE p
-        SET DescriptionEmbedding = CAST(
-            PREDICT(MODEL = [MyEmbeddingModel],
-                    DATA = (SELECT i.Description AS input_text)) AS VECTOR(1536))
+        SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+            i.Description USE MODEL [MyEmbeddingModel]
+        )
         FROM dbo.Products p
         INNER JOIN inserted i ON p.ProductId = i.ProductId;
     END;
@@ -135,9 +145,9 @@ SELECT @last_version = SyncVersion FROM dbo.EmbeddingWatermark WHERE TableName =
 
 -- Encontrar produtos cuja Descrição mudou desde a última execução
 UPDATE p
-SET DescriptionEmbedding = CAST(
-    PREDICT(MODEL = [MyEmbeddingModel],
-            DATA = (SELECT p2.Description AS input_text)) AS VECTOR(1536))
+SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+    p.Description USE MODEL [MyEmbeddingModel]
+)
 FROM dbo.Products p
 INNER JOIN CHANGETABLE(CHANGES dbo.Products, @last_version) AS ct
     ON p.ProductId = ct.ProductId
@@ -184,9 +194,9 @@ WITH ChangedProducts AS (
     WHERE __$operation IN (2, 5)  -- INSERT ou INSERT_OR_UPDATE
 )
 UPDATE p
-SET DescriptionEmbedding = CAST(
-    PREDICT(MODEL = [MyEmbeddingModel],
-            DATA = (SELECT p.Description AS input_text)) AS VECTOR(1536))
+SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+    p.Description USE MODEL [MyEmbeddingModel]
+)
 FROM dbo.Products p
 INNER JOIN ChangedProducts cp ON p.ProductId = cp.ProductId;
 
@@ -276,7 +286,7 @@ for event in eventstream_batch:
     )
 ```
 
-> [!note] CES é Exclusivo do Fabric
+> [!note] CES não é exclusivo do Fabric
 >
 > CES está disponível em visualização para SQL Server 2025 e Azure SQL Database; não é um recurso do SQL Database no Fabric. Não confunda CES com CDC ou Change Tracking.
 
@@ -367,19 +377,19 @@ Evite Foundry quando:
 
 | Aspecto | Microsoft Foundry | CES (Change Event Streaming) |
 | :--- | :--- | :--- |
-| **Plataforma de origem** | SQL Server, Azure SQL DB, SQL DB in Fabric, on-prem (com SHIR) | SQL DB in Microsoft Fabric apenas |
+| **Plataforma de origem** | SQL Server, Azure SQL DB, SQL DB in Fabric, on-prem (com SHIR) | SQL Server 2025 ou Azure SQL Database (visualização) |
 | **Código necessário** | Nenhum (pipeline declarativo) | Código de Notebook (Python) ou atividades de Pipeline |
 | **Trigger** | Schedule / event-driven / on-demand | Event-driven (push do CES) |
 | **Latência** | Segundos a minutos (dependendo do trigger) | Quase real-time (baseado em push) |
 | **Lógica de embedding** | Step `Embed` integrado | Você escreve no Notebook |
 | **Monitoramento** | Histórico de execuções do Foundry (centralizado) | Eventstream + histórico de jobs do Notebook (separado) |
-| **Melhor para** | Projetos de IA multi-workflow, refresh em lote + schedule, times sem código | Deployments Fabric-only precisando de latência sub-30s |
+| **Melhor para** | Projetos de IA multi-workflow, refresh em lote + schedule, times sem código | Streaming para Event Hubs/Eventstream com consumidor downstream |
 
 > [!warning] Erro Comum
-> "Microsoft Foundry **requer** o Fabric" — falso. O Foundry conecta ao Azure SQL Database e SQL Server on-prem (via Self-Hosted Integration Runtime) também. CES é o Fabric-only. Não os confunda.
+> "Microsoft Foundry **requer** o Fabric" — falso. O Foundry conecta ao Azure SQL Database e SQL Server on-prem (via Self-Hosted Integration Runtime) também. CES é um recurso de visualização separado para SQL Server 2025 e Azure SQL Database; o Eventstream do Fabric pode ser um de seus consumidores.
 
 > [!note] Modelo Mental — Foundry vs os Outros
-> **Foundry é a opção de "cartão de crédito"** — você paga (em custo de serviço + lock-in) pela ergonomia. **CES é o "pagamento por tap"** — rápido e nativo do Fabric mas apenas nos trilhos certos. **CDC/Change Tracking são "transferências bancárias"** — funcionam em qualquer lugar mas você escreve o plumbing. **Triggers são "dinheiro vivo"** — imediatos, mas custam latência de escrita e param de escalar em torno de alguns milhares de linhas por minuto.
+> **Foundry é a opção de "cartão de crédito"** — você paga (em custo de serviço + lock-in) pela ergonomia. **CES é o "pagamento por tap"** — caminho de visualização baseado em push por Event Hubs ou Eventstream. **CDC/Change Tracking são "transferências bancárias"** — funcionam em qualquer lugar mas você escreve o plumbing. **Triggers são "dinheiro vivo"** — imediatos, mas adicionam latência à escrita.
 
 ---
 
@@ -425,8 +435,8 @@ flowchart TD
 >
 > - **Triggers**: Mais simples, mas síncronos — adiciona latência da API de IA a cada escrita; arriscado se o endpoint cair
 > - **Change Tracking**: Melhor para cenários em lote — desacopla embedding do caminho de escrita
-> - **Azure Functions SQL trigger**: Alternativa event-driven ao polling — usa Change Tracking internamente
-> - **CES**: Nativo do Fabric, zero infraestrutura — disponível apenas no SQL Database in Fabric
+> - **Azure Functions SQL trigger**: usa Change Tracking e consulta mudanças por polling; desacopla o processamento, mas não é push
+> - **CES**: streaming baseado em push, em visualização, de SQL Server 2025 ou Azure SQL Database para Event Hubs/Eventstream
 > - Mantenha sempre um watermark (versão ou timestamp) para saber quais linhas foram embeddadas
 
 ---
@@ -436,7 +446,7 @@ flowchart TD
 - Nenhum método de manutenção de embeddings é adequado para todos os cenários — escolha com base em volume, latência e infraestrutura
 - Abordagens síncronas (triggers) têm simplicidade, mas arriscam acoplar escritas à disponibilidade da API de IA
 - Abordagens em lote assíncronas (Change Tracking, CDC) são mais resilientes, mas têm maior latência de embedding
-- CES é a abordagem Fabric-native preferida quando se usa SQL Database in Fabric
+- Use CES quando o suporte em visualização e a integração com Event Hubs/Eventstream forem adequados; ele não é exclusivo do Fabric
 
 ---
 

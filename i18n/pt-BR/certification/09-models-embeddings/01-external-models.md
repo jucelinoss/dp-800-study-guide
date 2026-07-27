@@ -18,10 +18,9 @@ tags:
 > - 📍 [3. Sintaxe de CREATE EXTERNAL MODEL](#sintaxe-de-create-external-model)
 > - 📍 [4. Gerenciando External Models](#gerenciando-external-models)
 > - 📍 [5. Permissões de External Model](#permissões-de-external-model)
-> - 📍 [6. Referência legada: não use PREDICT para External Models](#referência-legada-não-use-predict-para-external-models)
-> - 📍 [7. Chamando Chat Completions via External Model](#chamando-chat-completions-via-external-model)
-> - 📍 [8. Gerando Embeddings com AI_GENERATE_EMBEDDINGS](#gerando-embeddings-com-ai-generate-embeddings)
-> - 📍 [9. Armazenando Embeddings Gerados](#armazenando-embeddings-gerados)
+> - 📍 [6. Gerando Embeddings com External Model](#gerando-embeddings-com-external-model)
+> - 📍 [7. Chamando Endpoints de Chat](#chamando-endpoints-de-chat)
+> - 📍 [8. Armazenando Embeddings Gerados](#armazenando-embeddings-gerados)
 > - 📍 [10. Matriz de Decisão para Seleção de Modelo](#matriz-de-decisão-para-seleção-de-modelo)
 > - 📍 [11. Gerenciamento de Deployments de Modelos no Azure](#gerenciamento-de-deployments-de-modelos-no-azure)
 > - 📍 [12. Casos de Uso](#casos-de-uso)
@@ -54,6 +53,18 @@ O SQL Database no Microsoft Fabric, o Azure SQL Database e plataformas SQL compa
 > - `AI_GENERATE_EMBEDDINGS` retorna uma tabela de vetores de embedding em JSON
 
 ---
+
+## Fundamentos: embeddings, vetores e modelos
+
+Um **embedding** é uma representação numérica densa do significado de um texto. O modelo transforma, por exemplo, uma descrição de produto em um vetor — uma lista ordenada de números — para que buscas posteriores encontrem descrições semanticamente próximas, mesmo quando não usam as mesmas palavras. O vetor não substitui o texto: ele serve para localizar o texto original, que deve ser armazenado junto com identificador e metadados.
+
+Cada vetor tem uma quantidade fixa de números, chamada de **dimensão**. A dimensão é definida pelo modelo e precisa coincidir com a coluna que recebe o resultado. Consequentemente, trocar de modelo ou de dimensão exige regerar embeddings; vetores produzidos por modelos diferentes não devem ser misturados na mesma busca. O tipo `VECTOR(n)` armazena esses valores e a busca usa uma métrica de distância ou similaridade para ordenar candidatos — o score é comparável apenas dentro da mesma métrica e do mesmo espaço vetorial.
+
+Também separe três papéis: o **modelo de embedding** converte texto em vetor; o **modelo de chat** usa instruções e contexto para escrever uma resposta; e o **deployment/endpoint** é a instância acessável de um modelo no provedor. Um external model é o objeto de banco que registra essa ponte para o endpoint. A `DATABASE SCOPED CREDENTIAL` mantém o segredo ou a identidade de acesso fora do código e das consultas.
+
+> [!note] Por que isso importa
+>
+> O modelo não “entende” sua tabela automaticamente. Você escolhe o texto relevante, gera o vetor, persiste texto e vetor, e depois gera outro vetor para a pergunta do usuário. A comparação entre os vetores recupera candidatos; somente então uma aplicação ou modelo de chat decide como apresentar a resposta.
 
 ## Avaliando Modelos
 
@@ -138,7 +149,7 @@ Parâmetros principais:
 
 > [!note] Separação Lógica por Schema
 >
-> Crie external models em um schema dedicado (ex: `ai`) para simplificar o gerenciamento de permissões. Isso evita conceder `db_owner` para todos que precisam chamar modelos via `PREDICT`.
+> Crie external models em um schema dedicado (ex: `ai`) para simplificar o gerenciamento de permissões. Isso evita conceder `db_owner` para todos que precisam gerar embeddings.
 
 ---
 
@@ -174,7 +185,7 @@ WITH (
 As permissões seguem um modelo baseado em objetos, semelhante a stored procedures.
 
 - **CREATE EXTERNAL MODEL**: requer permissão `ALTER ANY EXTERNAL MODEL` ou membership em `db_owner`
-- **Chamar via PREDICT**: requer permissão `EXECUTE` no objeto de external model específico
+- **Gerar embeddings**: requer permissão `EXECUTE` no objeto de external model específico
 - **Separação por schema**: crie external models em um schema dedicado (ex: `ai`) para simplificar o gerenciamento de permissões
 
 ```sql
@@ -191,91 +202,34 @@ FROM sys.external_models;
 
 > [!important] EXECUTE vs ALTER ANY EXTERNAL MODEL
 >
-> - `EXECUTE ON EXTERNAL MODEL` → permite **usar** o modelo via `PREDICT` (menor privilégio — use isso)
+> - `EXECUTE ON EXTERNAL MODEL` → permite **usar** o modelo de embeddings (menor privilégio — use isso)
 > - `ALTER ANY EXTERNAL MODEL` → permite **criar/modificar** modelos — **não** é necessário para chamá-los
 >
 > O exame vai testar se você conhece a diferença!
 
 ---
 
-## Referência legada: não use PREDICT para External Models
+## Gerando Embeddings com External Model
 
-> [!warning]
->
-> Os exemplos desta seção foram mantidos apenas para contextualização histórica e não devem ser copiados. A interface atual para um External Model de embeddings é `AI_GENERATE_EMBEDDINGS`; `MODEL_TYPE = COMPLETIONS` não é aceito por `CREATE EXTERNAL MODEL`.
-
-`PREDICT` é a função T-SQL para invocar external models. O comportamento depende do tipo de modelo:
-
-- **Modelos de embedding**: retornam um valor `VECTOR` representando o conteúdo semântico do texto de entrada
-- **Modelos de completion**: retornam JSON contendo o texto de resposta gerado pelo modelo
-- **Predição em lote**: execute `PREDICT` em um `UPDATE` ou `SELECT` sobre uma tabela para processar muitas linhas
-- **Linha única**: use `PREDICT` com um literal ou variável para chamadas pontuais
+Use `AI_GENERATE_EMBEDDINGS` com um external model cujo `MODEL_TYPE` seja `EMBEDDINGS`. A função recebe uma expressão de texto e retorna o vetor gerado como JSON; o SQL pode atribuí-lo diretamente a uma coluna `VECTOR(n)` compatível. `PREDICT` não é a interface atual para esses external models.
 
 ```sql
 -- Gerar embedding para um único texto
-SELECT PREDICT(MODEL = ai.EmbeddingModel,
-               DATA = (SELECT 'What is vector search?' AS input)) AS embedding;
+SELECT AI_GENERATE_EMBEDDINGS(
+    N'What is vector search?' USE MODEL ai.EmbeddingModel
+) AS embedding;
 
 -- Lote: gerar embeddings para todos os documentos
 UPDATE Documents
-SET Embedding = CAST(
-    PREDICT(MODEL = ai.EmbeddingModel,
-            DATA = (SELECT Content AS input))
-    AS VECTOR(1536))
+SET Embedding = AI_GENERATE_EMBEDDINGS(Content USE MODEL ai.EmbeddingModel)
 WHERE Embedding IS NULL;
-
--- Chat completion via PREDICT
-DECLARE @response NVARCHAR(MAX);
-SELECT @response = CAST(
-    PREDICT(MODEL = ai.ChatModel,
-            DATA = (SELECT 'Explain indexing in 2 sentences.' AS input))
-    AS NVARCHAR(MAX));
-
--- Parsear a resposta da completion
--- Nota: respostas de external-model (incluindo as roteadas via
--- sp_invoke_external_rest_endpoint) encapsulam o payload da API sob `$.result`.
-SELECT JSON_VALUE(@response, '$.result.choices[0].message.content') AS Answer;
-```
-
-> [!tip] Alias Obrigatório para Embeddings
->
-> Para modelos de embedding, o alias da coluna de entrada **deve** ser `input_text`:
-> `DATA = (SELECT MyColumn AS input_text)`.
-> Para modelos de completion, o alias é `input`. Usar o alias errado causará erros de sintaxe silenciosos.
-
----
-
-## Chamando Chat Completions via External Model
-
-```sql
--- Formatar um prompt como JSON para o modelo de chat
-DECLARE @messages NVARCHAR(MAX) = N'[
-    {"role": "system", "content": "You are a helpful assistant that classifies customer feedback."},
-    {"role": "user", "content": "Classify this feedback as Positive, Negative, or Neutral: Great product, arrived fast!"}
-]';
-
--- Chamar o modelo de chat
-DECLARE @result NVARCHAR(MAX);
-SELECT @result = PREDICT(
-    MODEL = [MyChatModel],
-    DATA = (SELECT @messages AS messages)
-);
-
--- Extrair o texto de resposta — note o envelope `$.result`
-SELECT JSON_VALUE(@result, '$.result.choices[0].message.content') AS Classification;
 ```
 
 ---
 
-## Gerando Embeddings com AI_GENERATE_EMBEDDINGS
+## Chamando Endpoints de Chat
 
-```sql
-SELECT *
-FROM AI_GENERATE_EMBEDDINGS(
-    MODEL = ai.EmbeddingModel,
-    INPUT = N'What is vector search?'
-);
-```
+`AI_GENERATE_EMBEDDINGS` cria vetores; ela não gera respostas de chat. Para um endpoint de chat completion neste material, chame a API REST por `sp_invoke_external_rest_endpoint` e interprete o JSON conforme o contrato documentado do endpoint. Mantenha a credencial fora da procedure e não presuma um envelope de resposta de `PREDICT`.
 
 ## Armazenando Embeddings Gerados
 
@@ -286,12 +240,10 @@ ADD DescriptionEmbedding VECTOR(1536);  -- 1536 dims para text-embedding-3-small
 
 -- Gerar e armazenar embeddings para todos os produtos
 UPDATE p
-SET DescriptionEmbedding = CAST(
-    PREDICT(MODEL = [MyEmbeddingModel],
-            DATA = (SELECT p2.Description AS input_text)
-           ) AS VECTOR(1536))
-FROM dbo.Products p
-CROSS APPLY (SELECT p.Description) p2(Description)
+SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+    p.Description USE MODEL [MyEmbeddingModel]
+)
+FROM dbo.Products AS p
 WHERE p.DescriptionEmbedding IS NULL;
 ```
 
@@ -365,8 +317,8 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 | `Model not found` | Nome de deployment errado na URL de LOCATION | Verifique o nome do deployment no Azure OpenAI Studio |
 | `Dimension mismatch` | Modelo de embedding retorna dimensões diferentes da coluna VECTOR | Faça o VECTOR(n) corresponder às dimensões reais do modelo |
 | `Rate limit exceeded` | Muitas chamadas de API/minuto | Implemente batching; aumente a quota do Azure OpenAI |
-| `PREDICT syntax error` | Alias de coluna errado (`input_text` obrigatório para embeddings) | Use `input_text` como alias da coluna de entrada do embedding |
-| `Permission denied on PREDICT` | Usuário sem EXECUTE no external model | `GRANT EXECUTE ON EXTERNAL MODEL model_name TO role` |
+| Erro de `AI_GENERATE_EMBEDDINGS` | Texto ou external model incompatível | Verifique `MODEL_TYPE = EMBEDDINGS`, o texto de entrada e a dimensão da coluna `VECTOR(n)` |
+| Permissão negada ao gerar embeddings | Usuário sem EXECUTE no external model | `GRANT EXECUTE ON EXTERNAL MODEL model_name TO role` |
 
 ---
 
@@ -374,7 +326,7 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 
 - Armazene definições de external model em um schema dedicado (ex: `ai`) e conceda `EXECUTE` apenas para roles que precisam — nunca dependa de `db_owner` para acesso rotineiro
 - Use `text-embedding-3-small` como modelo de embedding padrão; só faça upgrade para `text-embedding-3-large` quando a qualidade de recuperação for mensuravelmente insuficiente
-- Evite chamar `PREDICT` linha por linha em um cursor; faça updates em lote com `WHERE Embedding IS NULL` para minimizar round-trips de API e permanecer dentro dos limites de TPM
+- Evite chamar `AI_GENERATE_EMBEDDINGS` linha por linha em um cursor; faça updates em lote com `WHERE Embedding IS NULL` para minimizar round-trips de API e permanecer dentro dos limites de TPM
 - Fixe versões de modelos em deployments de produção para evitar mudanças de comportamento inesperadas de atualizações automáticas
 - Monitore o uso de tokens e a latência do Azure OpenAI via Azure Monitor; configure alertas em erros de throttling antes que impactem a performance das queries
 
@@ -385,11 +337,11 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 > [!tip] Dicas para o Exame
 >
 > - `CREATE EXTERNAL MODEL` requer uma `DATABASE SCOPED CREDENTIAL` — a chave de API é armazenada na credencial, não na definição do modelo
-> - `MODEL_TYPE = EMBEDDINGS` vs `COMPLETIONS` — diferentes tipos de modelos têm diferentes convenções de chamada
-> - `PREDICT` é a função T-SQL para chamar external models — usada tanto para embeddings quanto para completions
+> - `MODEL_TYPE = EMBEDDINGS` identifica o external model usado para geração de vetores
+> - `AI_GENERATE_EMBEDDINGS(text USE MODEL ...)` é a interface T-SQL atual para gerar embeddings com external models
 > - A dimensão do embedding deve corresponder ao tamanho da coluna `VECTOR(n)` — `text-embedding-3-small` = 1536, `text-embedding-3-large` = 3072
 > - External models são objetos de escopo de banco de dados — visíveis em `sys.external_models`
-> - Permissão `EXECUTE` no objeto de external model é necessária para chamar `PREDICT` — `ALTER ANY EXTERNAL MODEL` é para criar/modificar, não para chamar
+> - Permissão `EXECUTE` no objeto de external model é necessária para gerar embeddings — `ALTER ANY EXTERNAL MODEL` é para criar/modificar, não para chamar
 > - `gpt-35-turbo` está obsoleto — questões do exame podem referenciar `gpt-4o-mini` como seu substituto
 
 ---
@@ -398,9 +350,9 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 
 - External models registram endpoints de IA como objetos do banco de dados — chamáveis via T-SQL sem código customizado
 - `CREATE EXTERNAL MODEL` + `DATABASE SCOPED CREDENTIAL` é o padrão de configuração
-- `PREDICT(MODEL = ..., DATA = ...)` chama o modelo e retorna resultados inline com queries SQL
-- Combine o tipo de modelo (`EMBEDDINGS` vs `COMPLETIONS`) com o caso de uso
-- Use permissão `EXECUTE` (não `ALTER ANY EXTERNAL MODEL`) para permitir que roles chamem modelos via `PREDICT`
+- `AI_GENERATE_EMBEDDINGS(text USE MODEL ...)` chama um modelo externo de embeddings inline com queries SQL
+- Use um modelo com `MODEL_TYPE = EMBEDDINGS` para geração de vetores
+- Use permissão `EXECUTE` (não `ALTER ANY EXTERNAL MODEL`) para permitir que roles chamem o modelo de embeddings
 
 ---
 
@@ -408,7 +360,7 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 
 **Questão de Prática**
 
-Um banco de dados tem um EXTERNAL MODEL configurado para o Azure OpenAI text-embedding-3-small. Um usuário no ReportingRole pode consultar tabelas de documentos mas recebe "permission denied" ao chamar PREDICT. Qual permissão é necessária?
+Um banco de dados tem um EXTERNAL MODEL configurado para o Azure OpenAI text-embedding-3-small. Um usuário no ReportingRole pode consultar tabelas de documentos mas recebe "permission denied" ao gerar um embedding. Qual permissão é necessária?
 
 A. Permissão SELECT em sys.external_models
 
@@ -421,7 +373,7 @@ D. Membership no papel db_owner
 > [!success]- Resposta
 > **B — Permissão EXECUTE no EXTERNAL MODEL**
 >
-> Chamar um external model via PREDICT requer permissão EXECUTE no objeto de external model específico — similar a precisar de EXECUTE em uma stored procedure. SELECT em sys.external_models (A) apenas permite visualizar metadados do modelo. ALTER ANY EXTERNAL MODEL (C) permite criar/modificar modelos, não usá-los. db_owner (D) funcionaria, mas é excessivamente amplo.
+> Gerar embeddings por um external model requer permissão EXECUTE no objeto de external model específico — similar a precisar de EXECUTE em uma stored procedure. SELECT em sys.external_models (A) apenas permite visualizar metadados do modelo. ALTER ANY EXTERNAL MODEL (C) permite criar/modificar modelos, não usá-los. db_owner (D) funcionaria, mas é excessivamente amplo.
 
 ---
 

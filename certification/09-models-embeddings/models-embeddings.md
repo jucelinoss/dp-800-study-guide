@@ -22,9 +22,9 @@ Evaluating and managing external AI models, designing embedding strategies, and 
 mindmap
   root((Models and Embeddings))
     External Models
-      sp_invoke_external_rest_endpoint
+      AI_GENERATE_EMBEDDINGS
       DATABASE SCOPED CREDENTIAL
-      JSON response parsing
+      MODEL_TYPE = EMBEDDINGS
     Embedding Dimensions
       ada-002 = 1536
       3-small = 1536
@@ -51,7 +51,7 @@ flowchart TD
     Models --> Manage[Model Management]
     Maintenance --> Triggers[Table Triggers]
     Maintenance --> CT[Change Tracking]
-    Maintenance --> Foundry[Microsoft Foundry]
+    Maintenance --> CES[Change Event Streaming]
 ```
 
 ## Section Contents
@@ -64,12 +64,10 @@ flowchart TD
 
 ## Key Concepts
 
-- **External Models**: AI models registered in the database for inference (multimodal, multilanguage, structured output)
+- **External Models**: Database objects that register embedding inference endpoints, used with `AI_GENERATE_EMBEDDINGS`
 - **Embedding**: Dense vector representation of text/data used for semantic similarity search
 - **Chunking**: Breaking content into overlapping/fixed-size segments before embedding
 - **Embedding Maintenance**: Keeping embeddings in sync with source data changes
-- **Microsoft Foundry**: Azure AI model hub for deploying and managing models
-- **Structured Output**: Constraining model responses to a defined JSON schema
 
 ## Related Resources
 

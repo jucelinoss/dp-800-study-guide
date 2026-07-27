@@ -28,6 +28,16 @@ tags:
 
 ---
 
+## Foundation: Embeddings Are Derived Data
+
+An embedding is not the original business data; it is an artifact derived from text. When a title, description, language, permissions, or the embedding model itself changes, the old vector can no longer represent the content correctly. This misalignment is called **drift**.
+
+A reliable lifecycle detects inserts, updates, and deletes; identifies affected chunks; regenerates vectors; and records when and with which model that happened. Use a dirty flag, timestamp, or watermark to make processing incremental and idempotent. A model, dimension, or text-format change usually requires a full re-embedding because the new vectors belong to a different vector space.
+
+> [!important] Updating text is not enough
+>
+> Semantic search can still run with an old vector, but it will retrieve stale results. Embedding maintenance is therefore part of solution design, not an occasional cleanup task.
+
 ## Embedding Maintenance Methods Comparison
 
 | Method | Latency | Complexity | Infrastructure | Best For |
@@ -35,8 +45,8 @@ tags:
 | Table Triggers | Near real-time | Low | `None (in-DB)` | Small tables, low write volume |
 | Change Tracking | Low (polling) | Medium | SQL Agent or scheduler | Moderate volume, batch-friendly |
 | CDC | Medium (polling) | Medium | SQL Agent (on-prem) | Audit trail needed with embeddings |
-| CES (Fabric) | Near real-time | Low | Fabric only | Fabric SQL, cloud-native |
-| Azure Functions SQL Trigger | Near real-time | Medium | Azure Functions | Any Azure SQL, event-driven |
+| CES | Near real-time | Medium | Azure Event Hubs / Eventstream | SQL Server 2025 or Azure SQL Database (preview) |
+| Azure Functions SQL Trigger | Near real-time | Medium | Azure Functions + Change Tracking | Decoupled processing through polling |
 | Azure Logic Apps | Minutes | Low | Logic Apps | Low-code, low-volume |
 | Microsoft Foundry | Configurable | Low | Fabric/Foundry | Declarative AI pipeline |
 
@@ -61,9 +71,9 @@ BEGIN
     IF UPDATE(Description)
     BEGIN
         UPDATE p
-        SET DescriptionEmbedding = CAST(
-            PREDICT(MODEL = [MyEmbeddingModel],
-                    DATA = (SELECT i.Description AS input_text)) AS VECTOR(1536))
+        SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+            i.Description USE MODEL [MyEmbeddingModel]
+        )
         FROM dbo.Products p
         INNER JOIN inserted i ON p.ProductId = i.ProductId;
     END;
@@ -106,9 +116,9 @@ SELECT @last_version = SyncVersion FROM dbo.EmbeddingWatermark WHERE TableName =
 
 -- Find products whose Description changed since last run
 UPDATE p
-SET DescriptionEmbedding = CAST(
-    PREDICT(MODEL = [MyEmbeddingModel],
-            DATA = (SELECT p2.Description AS input_text)) AS VECTOR(1536))
+SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+    p.Description USE MODEL [MyEmbeddingModel]
+)
 FROM dbo.Products p
 INNER JOIN CHANGETABLE(CHANGES dbo.Products, @last_version) AS ct
     ON p.ProductId = ct.ProductId
@@ -151,9 +161,9 @@ WITH ChangedProducts AS (
     WHERE __$operation IN (2, 5)  -- INSERT or INSERT_OR_UPDATE
 )
 UPDATE p
-SET DescriptionEmbedding = CAST(
-    PREDICT(MODEL = [MyEmbeddingModel],
-            DATA = (SELECT p.Description AS input_text)) AS VECTOR(1536))
+SET DescriptionEmbedding = AI_GENERATE_EMBEDDINGS(
+    p.Description USE MODEL [MyEmbeddingModel]
+)
 FROM dbo.Products p
 INNER JOIN ChangedProducts cp ON p.ProductId = cp.ProductId;
 
@@ -180,7 +190,7 @@ public static async Task Run(
     var openAiClient = new OpenAIClient(new Uri(openAiEndpoint), new AzureKeyCredential(apiKey));
 
     foreach (var change in changes.Where(c =>
-        c.Operation ` SqlChangeOperation.Insert || c.Operation ` SqlChangeOperation.Update))
+        c.Operation == SqlChangeOperation.Insert || c.Operation == SqlChangeOperation.Update))
     {
         if (change.Item.Description == null) continue;
 
@@ -207,12 +217,12 @@ public static async Task Run(
 
 ---
 
-## Method 5: CES (Change Event Streaming — Fabric)
+## Method 5: CES (Change Event Streaming)
 
-In Fabric SQL Database, CES streams changes to an Eventstream, which triggers a Data Pipeline or Notebook to re-generate embeddings.
+In SQL Server 2025 and Azure SQL Database (preview), CES streams changes to Azure Event Hubs and can feed a Fabric Eventstream. A downstream pipeline or notebook can then re-generate embeddings.
 
 ```text
-Fabric SQL DB (Products table)
+SQL Server 2025 or Azure SQL Database (Products table)
     → CES (Change Event Streaming)
         → Fabric Eventstream
             → Fabric Notebook (Python)
@@ -344,21 +354,21 @@ Both Foundry and CES (Change Event Streaming) appear on the blueprint as named m
 
 | Aspect | Microsoft Foundry | CES (Change Event Streaming) |
 | :--- | :--- | :--- |
-| **Source platform** | SQL Server, Azure SQL DB, SQL DB in Fabric, on-prem (with SHIR) | SQL DB in Microsoft Fabric only |
+| **Source platform** | SQL Server, Azure SQL DB, SQL DB in Fabric, on-prem (with SHIR) | SQL Server 2025 or Azure SQL Database (preview) |
 | **Code required** | None (declarative pipeline) | Notebook code (Python) or Pipeline activities |
 | **Trigger** | Schedule / event-driven / on-demand | Event-driven (push from CES) |
 | **Latency** | Seconds to minutes (depending on trigger) | Near-real-time (push-based) |
 | **Embedding logic** | Built-in `Embed` step | You write it in the Notebook |
 | **Monitoring** | Foundry run history (centralised) | Eventstream + Notebook job history (split) |
-| **Best for** | Multi-workflow AI projects, batch + scheduled refresh, no-code teams | Fabric-only deployments needing sub-30 s latency |
+| **Best for** | Multi-workflow AI projects, batch + scheduled refresh, no-code teams | Change streaming to Event Hubs/Eventstream with a downstream consumer |
 
 ### What the exam will ask
 
 > [!warning] Common Mistake
-> "Microsoft Foundry **requires** Fabric" — false. Foundry connects to Azure SQL Database and on-prem SQL Server (via Self-Hosted Integration Runtime) too. CES is the Fabric-only one. Don't conflate them.
+> "Microsoft Foundry **requires** Fabric" — false. Foundry connects to Azure SQL Database and on-prem SQL Server (via Self-Hosted Integration Runtime) too. CES is a separate preview feature for SQL Server 2025 and Azure SQL Database; Fabric Eventstream can be one of its consumers.
 
 > [!note] Mental model — Foundry vs the others
-> **Foundry is the "credit card" option** — pay (in service cost + lock-in) for ergonomics. **CES is the "tap to pay"** — fast and Fabric-native but only on the right rails. **CDC/Change Tracking are "bank transfers"** — they work everywhere but you write the plumbing. **Triggers are "cash"** — instant, but they cost write latency and stop scaling around a few thousand rows per minute.
+> **Foundry is the "credit card" option** — pay (in service cost + lock-in) for ergonomics. **CES is the "tap to pay"** — a push-based preview path through Event Hubs or Eventstream. **CDC/Change Tracking are "bank transfers"** — they work everywhere but you write the plumbing. **Triggers are "cash"** — immediate, but they add write latency.
 
 ```python
 # Foundry handles the embedding call for you, but if you want to see what
@@ -419,8 +429,8 @@ flowchart TD
 >
 > - **Triggers**: Simplest but synchronous — adds AI API latency to every write; risky if endpoint is down
 > - **Change Tracking**: Best for batch scenarios — decouple embedding from write path
-> - **Azure Functions SQL trigger**: Event-driven alternative to polling — uses Change Tracking internally
-> - **CES**: Fabric-native, zero-infrastructure — only available in SQL Database in Fabric
+> - **Azure Functions SQL trigger**: uses Change Tracking and polls for changes; it decouples processing but is not a push trigger
+> - **CES**: preview push-based change streaming from SQL Server 2025 or Azure SQL Database to Event Hubs/Eventstream
 > - Always maintain a watermark (version or timestamp) to know which rows have been embedded
 
 ---
@@ -430,7 +440,7 @@ flowchart TD
 - No single embedding maintenance method suits all scenarios — choose based on volume, latency, and infrastructure
 - Synchronous approaches (triggers) have simplicity but risk tightly coupling writes to AI API availability
 - Asynchronous batch approaches (Change Tracking, CDC) are more resilient but have higher embedding latency
-- CES is the preferred Fabric-native approach when using SQL Database in Fabric
+- Use CES when its preview support and Event Hubs/Eventstream integration fit the architecture; it is not Fabric-only
 
 ---
 

@@ -1,5 +1,5 @@
 -- =================================================================================
--- DP-800 - PRACTICAL LAB: EXTERNAL AI MODELS (CREATE EXTERNAL MODEL AND PREDICT)
+-- DP-800 - PRACTICAL LAB: EXTERNAL AI MODELS (CREATE EXTERNAL MODEL AND AI_GENERATE_EMBEDDINGS)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
 -- CONFIGURATION NOTE: To run this and other lab scripts, you need
@@ -9,9 +9,9 @@
 -- This script demonstrates the integration of AI models (Azure OpenAI) as database objects:
 --   1. Creating Scope Credentials (`CREATE DATABASE SCOPED CREDENTIAL`)
 --   2. Registering External Models (`CREATE EXTERNAL MODEL`) for Embeddings and Completions
---   3. Invocation via `PREDICT(MODEL = ..., DATA = ...)` Function
+--   3. Embedding generation through the `AI_GENERATE_EMBEDDINGS` function
 --   4. Usage Permission Management (`GRANT EXECUTE ON EXTERNAL MODEL`)
---   5. Practical Project Scenarios (Storing 1536-dimension Vectors)
+--   5. Native VECTOR storage, REST invocation, and model-dimension decisions
 -- =================================================================================
 
 USE AdventureWorks2025;
@@ -31,13 +31,13 @@ GO
 CREATE TABLE lab.ProductEmbeddings (
     ProductID INT PRIMARY KEY,
     ProductDescription NVARCHAR(MAX) NOT NULL,
-    EmbeddingVector NVARCHAR(MAX) NULL -- Stores the 1536-dimension vector serialized as JSON
+    EmbeddingVector VECTOR(1536) NULL
 );
 GO
 
 INSERT INTO lab.ProductEmbeddings (ProductID, ProductDescription) VALUES
-(1, N'Capacete de ciclismo leve com alta protecao contra impactos'),
-(2, N'Bicicleta de montanha com 24 marchas e suspensao dupla');
+(1, N'Lightweight cycling helmet with high impact protection'),
+(2, N'Mountain bike with 24 gears and dual suspension');
 GO
 
 
@@ -52,13 +52,13 @@ GO
 -- 1. Create the Scope Credential with the API access key
 CREATE DATABASE SCOPED CREDENTIAL [AzureOpenAIApiKeyCred]
 WITH IDENTITY = 'HTTPEndpointHeaders',
-SECRET = '{"api-key": "SUA_AZURE_OPENAI_KEY_AQUI"}';
+SECRET = '{"api-key": "YOUR_AZURE_OPENAI_KEY_HERE"}';
 GO
 
 -- 2. Create the External Model for Embeddings (text-embedding-3-small)
 CREATE EXTERNAL MODEL [AzureOpenAI_Embedding_Small]
 WITH (
-    LOCATION = 'https://meu-recurso-openai.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings',
+    LOCATION = 'https://my-openai-resource.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings',
     API_FORMAT = 'Azure_OpenAI',
     MODEL_TYPE = EMBEDDINGS,
     CREDENTIAL = [AzureOpenAIApiKeyCred]
@@ -67,56 +67,84 @@ GO
 
 -- 3. Query registered external models in the catalog view
 SELECT 
-    name AS NomeModelo,
-    model_type_desc AS TipoModelo,
+    name AS ModelName,
+    model_type_desc AS ModelType,
     location AS EndpointURL,
-    create_date AS DataCriacao
+    create_date AS CreatedAt
 FROM sys.external_models;
 GO
 
 
 -- =================================================================================
--- PART 2: INVOKING THE MODEL VIA PREDICT AND ASSIGNING PERMISSIONS
+-- PART 2: INVOKING AI_GENERATE_EMBEDDINGS AND ASSIGNING PERMISSIONS
 -- =================================================================================
 -- KEY CONCEPTS AND DEFINITIONS:
---   - PREDICT: Native T-SQL function to invoke integrated AI models.
---   - PERMISSIONS: To invoke a model with PREDICT, the user needs the `GRANT EXECUTE ON EXTERNAL MODEL` permission.
+--   - AI_GENERATE_EMBEDDINGS: Generates an embedding from a text value using a registered embedding model.
+--   - PERMISSIONS: The caller needs `GRANT EXECUTE ON EXTERNAL MODEL` for the external model.
 
 -- -- [DP-800 POINT OF ATTENTION]
 -- 1. Grant external model execution permission to the application role
 GRANT EXECUTE ON EXTERNAL MODEL::[AzureOpenAI_Embedding_Small] TO [public];
 GO
 
--- 2. Conceptual example of batch call via PREDICT to populate the vector column
+-- 2. Example: generate and persist embeddings with the external model
 /*
 UPDATE p
-SET EmbeddingVector = CAST(
-    PREDICT(MODEL = [AzureOpenAI_Embedding_Small],
-            DATA = (SELECT p2.ProductDescription AS input_text)
-           ) AS NVARCHAR(MAX))
-FROM lab.ProductEmbeddings p
-CROSS APPLY (SELECT p.ProductDescription) p2(ProductDescription)
+SET EmbeddingVector = AI_GENERATE_EMBEDDINGS(
+    p.ProductDescription USE MODEL [AzureOpenAI_Embedding_Small]
+)
+FROM lab.ProductEmbeddings AS p
 WHERE p.EmbeddingVector IS NULL;
 */
 GO
 
+-- Inspect the generated vector metadata after running the preceding example.
+/*
+SELECT ProductID,
+       VECTORPROPERTY(EmbeddingVector, 'Dimensions') AS Dimensions,
+       VECTORPROPERTY(EmbeddingVector, 'BaseType') AS BaseType
+FROM lab.ProductEmbeddings;
+*/
+
 
 -- =================================================================================
--- PART 3: PRACTICAL PROJECT SCENARIOS
+-- PART 3: REST INVOCATION FOR A CHAT COMPLETION
+-- =================================================================================
+
+-- Embeddings are normally generated with AI_GENERATE_EMBEDDINGS. For a chat-completion
+-- endpoint, call the REST endpoint explicitly and consume the returned JSON.
+/*
+DECLARE @Payload NVARCHAR(MAX) = N'{
+  "messages": [{"role": "user", "content": "Summarize this product description."}],
+  "max_tokens": 100
+}';
+
+EXEC sp_invoke_external_rest_endpoint
+    @method = N'POST',
+    @url = N'https://my-openai-resource.openai.azure.com/openai/deployments/my-chat-deployment/chat/completions?api-version=2024-10-21',
+    @payload = @Payload,
+    @credential = [AzureOpenAIApiKeyCred];
+*/
+GO
+
+-- =================================================================================
+-- PART 4: PRACTICAL PROJECT SCENARIOS
 -- =================================================================================
 
 --- SCENARIO 1: Embedding Model Dimensioning Comparison Matrix
 -- Architecture decision guide for vector storage and cost.
 
 SELECT 
-    'text-embedding-3-small' AS Modelo,
-    1536 AS DimensoesVetor,
-    'Baixo / Otimo para a maioria dos casos' AS CustoStorage,
-    'Recomendado como padrao para RAG e busca semantica' AS Recomendacao
+    'text-embedding-3-small' AS Model,
+    1536 AS VectorDimensions,
+    'Lower / suitable for most workloads' AS StorageCost,
+    'Recommended default for RAG and semantic search' AS Recommendation
 UNION ALL
 SELECT 
     'text-embedding-3-large',
     3072,
-    'Alto (Dobro do tamanho por vetor)',
-    'Usar apenas quando for exigida altíssima precisão de busca';
+    'Higher (twice as many values per vector)',
+    'Use only when additional retrieval quality is required';
 GO
+
+-- Do not mix vectors from different embedding models or dimensions in one search space.
