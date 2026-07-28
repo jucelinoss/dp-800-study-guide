@@ -343,6 +343,51 @@ PRINT N'  ORDER BY vs.distance;  -- ASC = menor distancia primeiro';
 PRINT N'*/';
 GO
 
+-- ---------------------------------------------------------------------------------
+-- 5.4 [OPCIONAL] rCTE gerar 100+ linhas VECTOR(4) dummy — se sua tabela do AdventureWorks for pequena
+-- ---------------------------------------------------------------------------------
+PRINT CHAR(13)+CHAR(10) + N'--- 5.4 [OPCIONAL / Referencia] Caso sua tabela tenha <100 linhas: rCTE VECTOR(4) ---';
+PRINT N'/*';
+PRINT N'  DROP TABLE IF EXISTS lab.VectorProductsMini;';
+PRINT N'  CREATE TABLE lab.VectorProductsMini (';
+PRINT N'      ProductID INT PRIMARY KEY,';
+PRINT N'      ProductName NVARCHAR(200),';
+PRINT N'      Description NVARCHAR(1000),';
+PRINT N'      DescriptionVector VECTOR(4)';
+PRINT N'  );';
+PRINT N'';
+PRINT N'  ;WITH Numeros AS (';
+PRINT N'      SELECT 5 AS Numero';
+PRINT N'      UNION ALL';
+PRINT N'      SELECT Numero + 1 FROM Numeros WHERE Numero < 104';
+PRINT N'  )';
+PRINT N'  INSERT INTO lab.VectorProductsMini (ProductID, ProductName, Description, DescriptionVector)';
+PRINT N'  SELECT';
+PRINT N'      Numero,';
+PRINT N'      CONCAT(N''Produto de teste '', Numero),';
+PRINT N'      N''Vetor adicional para exercicio de indice aproximado.'',';
+PRINT N'      CAST(N''[0.025, -0.038, 0.089, 0.120]'' AS VECTOR(4))';
+PRINT N'  FROM Numeros';
+PRINT N'  OPTION (MAXRECURSION 100);';
+PRINT N'';
+PRINT N'  -- Depois habilite preview e crie o indice em escala pequena (4 dims):';
+PRINT N'  -- ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;';
+PRINT N'  -- CREATE VECTOR INDEX IX_VPMini_DV ON lab.VectorProductsMini(DescriptionVector)';
+PRINT N'  --     WITH ( METRIC = ''cosine'', TYPE = ''DiskANN'' );';
+PRINT N'';
+PRINT N'  DECLARE @q VECTOR(4) = CAST(N''[0.025, -0.038, 0.089, 0.120]'' AS VECTOR(4));';
+PRINT N'  SELECT TOP (10) WITH APPROXIMATE';
+PRINT N'      p.ProductID, p.ProductName, vs.distance AS DistanciaCosseno';
+PRINT N'  FROM VECTOR_SEARCH(';
+PRINT N'      TABLE = lab.VectorProductsMini AS p,';
+PRINT N'      COLUMN = DescriptionVector,';
+PRINT N'      SIMILAR_TO = @q,';
+PRINT N'      METRIC = N''cosine''';
+PRINT N'  ) AS vs';
+PRINT N'  ORDER BY vs.distance;';
+PRINT N'*/';
+GO
+
 -- =================================================================================
 -- PARTE 6/8: ENN vs ANN — Fluxograma + tabela decisao EXAME
 -- =================================================================================
