@@ -325,7 +325,8 @@ BEGIN
     SET NOCOUNT ON;
 
     DECLARE @schema sysname, @table sysname, @definition nvarchar(max),
-            @selectList nvarchar(max), @sql nvarchar(max);
+            @selectList nvarchar(max), @sql nvarchar(max),
+            @ErrorMessage nvarchar(2048);
 
     ------------------------------------------------------------------
     -- 1) Parse @TableName into schema + table (safe 2-part name)
@@ -340,7 +341,10 @@ BEGIN
     -- 2) Validate TABLE exists via sys.tables
     ------------------------------------------------------------------
     IF OBJECT_ID(@TableName, 'U') IS NULL
-        THROW 50002, N'Table "' + @TableName + N'" does not exist in current database.', 1;
+    BEGIN
+        SET @ErrorMessage = N'Table "' + @TableName + N'" does not exist in current database.';
+        THROW 50002, @ErrorMessage, 1;
+    END;
 
     ------------------------------------------------------------------
     -- 3) Validate that @JsonColumn and @KeyColumn EXIST in the table
@@ -351,7 +355,10 @@ BEGIN
         WHERE SCHEMA_NAME(t.schema_id) = @schema
           AND t.name  = @table
           AND c.name  = @JsonColumn)
-        THROW 50003, N'JSON column "' + @JsonColumn + N'" does not exist in ' + @TableName + N'.', 1;
+    BEGIN
+        SET @ErrorMessage = N'JSON column "' + @JsonColumn + N'" does not exist in ' + @TableName + N'.';
+        THROW 50003, @ErrorMessage, 1;
+    END;
 
     IF NOT EXISTS (
         SELECT 1 FROM sys.columns c
@@ -359,7 +366,10 @@ BEGIN
         WHERE SCHEMA_NAME(t.schema_id) = @schema
           AND t.name  = @table
           AND c.name  = @KeyColumn)
-        THROW 50004, N'Key column "' + @KeyColumn + N'" does not exist in ' + @TableName + N'.', 1;
+    BEGIN
+        SET @ErrorMessage = N'Key column "' + @KeyColumn + N'" does not exist in ' + @TableName + N'.';
+        THROW 50004, @ErrorMessage, 1;
+    END;
 
     ------------------------------------------------------------------
     -- 4) Read the saved mapping DEFINITION
@@ -369,7 +379,10 @@ BEGIN
     WHERE  MappingName = @MappingName;
 
     IF @definition IS NULL
-        THROW 50005, N'Mapping "' + @MappingName + N'" not found in lab.JsonFunctionsMapping.', 1;
+    BEGIN
+        SET @ErrorMessage = N'Mapping "' + @MappingName + N'" not found in lab.JsonFunctionsMapping.';
+        THROW 50005, @ErrorMessage, 1;
+    END;
 
     ------------------------------------------------------------------
     -- 5) Build the SELECT LIST dynamically
@@ -394,7 +407,10 @@ BEGIN
     WHERE JsonPath LIKE N'$.%' AND Kind IN (N'scalar', N'json');
 
     IF @selectList IS NULL
-        THROW 50006, N'Mapping "' + @MappingName + N'" has no allowed paths.', 1;
+    BEGIN
+        SET @ErrorMessage = N'Mapping "' + @MappingName + N'" has no allowed paths.';
+        THROW 50006, @ErrorMessage, 1;
+    END;
 
     ------------------------------------------------------------------
     -- 6) Build the final SQL — ALL via QUOTENAME (no value concatenation)
