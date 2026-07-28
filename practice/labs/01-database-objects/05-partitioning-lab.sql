@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: TABLE AND INDEX PARTITIONING
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/01-database-objects/05-partitioning.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need
 -- to restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -318,6 +321,11 @@ SELECT N'SWITCH PARTITION',
        N'Move an entire aligned partition to an archive table',
        N'Target must exist, be empty, and meet SWITCH requirements';
 GO
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/01-database-objects/05-partitioning.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

@@ -326,4 +326,4 @@ D. Utilizar triggers de banco (DDL Triggers) para bloquear atualizações.
 
 ---
 
-**[← Anterior](./02-sql-database-projects.md) | [↑ Voltar para a Seção](./cicd-database-projects.md) | [Próximo →](./04-deployment-pipelines.md)**
+**[← Anterior](./02-sql-database-projects.md) | [↑ Voltar para a Seção](./cicd-database-projects.md) | [Lab: Controle de Fonte e Branching](../../practice/labs/07-cicd-database-projects/03-source-control-branching-lab.sql) | [Próximo →](./04-deployment-pipelines.md)**

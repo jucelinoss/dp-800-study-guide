@@ -343,4 +343,4 @@ D. Consultar periodicamente a DMV `sys.dm_os_wait_stats` via script manual execu
 
 ---
 
-**[← Anterior](./02-rest-graphql-endpoints.md) | [↑ Voltar para a Seção](./azure-services-integration.md) | [Próximo →](./04-change-event-handling.md)**
+**[← Anterior](./02-rest-graphql-endpoints.md) | [↑ Voltar para a Seção](./azure-services-integration.md) | [Lab: Monitoramento](../../practice/labs/08-azure-services-integration/03-monitoring-lab.sql) | [Próximo →](./04-change-event-handling.md)**

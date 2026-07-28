@@ -317,4 +317,4 @@ D. OPENJSON to traverse a graph stored in JSON
 
 ---
 
-**[← Previous](./03-regex-fuzzy-matching.md) | [↑ Back to Section](./advanced-tsql.md) | [Next →](./05-correlated-queries-error-handling.md)**
+**[← Previous](./03-regex-fuzzy-matching.md) | [↑ Back to Section](./advanced-tsql.md) | [Lab: Graph Queries](../../practice/labs/03-advanced-tsql/04-graph-queries-lab.sql) | [Next →](./05-correlated-queries-error-handling.md)**

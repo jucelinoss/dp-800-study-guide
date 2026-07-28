@@ -447,4 +447,4 @@ ORDER BY ordinal;
 
 ---
 
-**[↑ Voltar para a Seção](./advanced-tsql.md) | [Próximo →](./02-json-functions.md)**
+**[↑ Voltar para a Seção](./advanced-tsql.md) | [Lab: CTEs e Window Functions](../../practice/labs/03-advanced-tsql/01-ctes-window-functions-lab.sql) | [Próximo →](./02-json-functions.md)**

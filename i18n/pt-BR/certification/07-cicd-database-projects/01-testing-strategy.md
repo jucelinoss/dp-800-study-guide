@@ -365,4 +365,4 @@ D. Executar comandos de carga manual no pipeline do Azure DevOps usando SqlPacka
 
 ---
 
-**[↑ Voltar para a Seção](./cicd-database-projects.md) | [Next →](./02-sql-database-projects.md)**
+**[↑ Voltar para a Seção](./cicd-database-projects.md) | [Lab: Estrategia de Testes](../../practice/labs/07-cicd-database-projects/01-testing-strategy-lab.sql) | [Next →](./02-sql-database-projects.md)**

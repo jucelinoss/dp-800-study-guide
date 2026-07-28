@@ -344,4 +344,4 @@ D. FAILED_DATABASE_AUTHENTICATION_GROUP
 
 ---
 
-**[← Anterior](./03-permissions-access.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Próximo →](./05-secure-endpoints.md)**
+**[← Anterior](./03-permissions-access.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Lab: Auditoria](../../practice/labs/05-data-security-compliance/04-auditing-lab.sql) | [Próximo →](./05-secure-endpoints.md)**

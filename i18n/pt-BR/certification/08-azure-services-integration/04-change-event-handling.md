@@ -321,4 +321,4 @@ D. Triggers DDL de tabelas.
 
 ---
 
-**[← Anterior](./03-monitoring.md) | [↑ Voltar para a Seção](./azure-services-integration.md)**
+**[← Anterior](./03-monitoring.md) | [↑ Voltar para a Seção](./azure-services-integration.md) | [Lab: Manipulação de Eventos](../../practice/labs/08-azure-services-integration/04-change-event-handling-lab.sql)**

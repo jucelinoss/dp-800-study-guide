@@ -426,4 +426,4 @@ D. Use EXECUTE AS OWNER in all generated procedures
 
 ---
 
-**[↑ Back to Section](./ai-assisted-tools.md) | [Next →](./02-github-copilot-setup.md)**
+**[↑ Back to Section](./ai-assisted-tools.md) | [Lab: AI Security Impact](../../practice/labs/04-ai-assisted-tools/01-ai-security-impact-lab.sql) | [Next →](./02-github-copilot-setup.md)**

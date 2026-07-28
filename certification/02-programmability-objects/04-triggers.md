@@ -413,4 +413,4 @@ D. AFTER INSERT trigger on the view
 
 ---
 
-**[← Previous](./03-stored-procedures.md) | [↑ Back to Section](./programmability-objects.md)**
+**[← Previous](./03-stored-procedures.md) | [↑ Back to Section](./programmability-objects.md) | [Lab: Triggers](../../practice/labs/02-programmability-objects/04-triggers-lab.sql)**

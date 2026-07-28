@@ -263,4 +263,4 @@ WHERE ProductName = N'Notebook';
 
 ---
 
-**[← Previous](./06-aggregation-and-grouping.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./08-integrity-rules.md)**
+**[← Previous](./06-aggregation-and-grouping.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Safe DML](../../practice/labs/00-fundamentals/07-safe-dml.sql) | [Next →](./08-integrity-rules.md)**

@@ -429,4 +429,4 @@ Vantagens: Serviço de busca gerenciado com RRF integrado; escala independenteme
 
 ---
 
-**[↑ Voltar à Seção](./rag.md) | [Próximo →](./02-prompts-and-responses.md)**
+**[↑ Voltar à Seção](./rag.md) | [Lab: Casos de Uso RAG](../../practice/labs/11-rag/01-rag-use-cases-lab.sql) | [Próximo →](./02-prompts-and-responses.md)**

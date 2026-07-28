@@ -13,6 +13,9 @@
 --   4. Configuração de Alertas do Azure Monitor via Azure CLI (`az monitor metrics alert`)
 --   5. Cenários Práticos de Projeto (Investigação de Exaustão de vCores / DTUs e Deadlocks)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/08-azure-services-integration/03-monitoring.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -95,3 +98,7 @@ SELECT
     '--window-size 5m --evaluation-frequency 1m' AS JanelaAvaliacao,
     'Envia notificacao por e-mail/webhook para o grupo DBA_Team' AS AcaoAutomacao;
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/08-azure-services-integration/03-monitoring.md
+-- =================================================================================================

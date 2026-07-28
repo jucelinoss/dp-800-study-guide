@@ -13,6 +13,8 @@
 --   4. Estruturação de regras de CODEOWNERS para revisão de DBAs
 --   5. Cenários Práticos de Projeto (Auditoria de Objetos Modificados fora do Pipeline de CI/CD)
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/03-source-control-branching.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -101,3 +103,7 @@ SELECT
     '@senior-dba-team',
     'Aprovacao de DBAs Seniores para scripts Pre/Post Deployment';
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/07-cicd-database-projects/03-source-control-branching.md
+-- =================================================================================================

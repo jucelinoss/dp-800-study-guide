@@ -249,4 +249,4 @@ SELECT * FROM sys.security_predicates;
 
 ---
 
-**[← Previous](./01-encryption.md) | [↑ Back to Section](./data-security-compliance.md) | [Next →](./03-permissions-access.md)**
+**[← Previous](./01-encryption.md) | [↑ Back to Section](./data-security-compliance.md) | [Lab: Dynamic Data Masking and RLS](../../practice/labs/05-data-security-compliance/02-dynamic-data-masking-rls-lab.sql) | [Next →](./03-permissions-access.md)**

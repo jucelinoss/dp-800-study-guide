@@ -418,4 +418,4 @@ D. Criar um trigger `AFTER INSERT` diretamente na View.
 
 ---
 
-**[← Anterior](./03-stored-procedures.md) | [↑ Voltar para a Seção](./programmability-objects.md)**
+**[← Anterior](./03-stored-procedures.md) | [↑ Voltar para a Seção](./programmability-objects.md) | [Lab: Triggers](../../practice/labs/02-programmability-objects/04-triggers-lab.sql)**

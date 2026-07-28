@@ -14,6 +14,9 @@
 --   6. Conhecer 3 padroes de ARQUITETURA e quando usar cada um
 --   7. Usar tabelas de DECISAO e TROUBLESHOOTING para o dia do exame
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/11-rag/01-rag-use-cases.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -828,3 +831,7 @@ PRINT CHAR(13)+CHAR(10) + N'>>> PROXIMO PASSO: Execute o LAB 02 para aprender a 
 PRINT N'    sp_invoke_external_rest_endpoint, usar DATABASE SCOPED CREDENTIAL,';
 PRINT N'    e parsear respostas JSON reais do Azure OpenAI.';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/11-rag/01-rag-use-cases.md
+-- =================================================================================================

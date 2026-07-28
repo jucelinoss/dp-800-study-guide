@@ -21,6 +21,8 @@
 --   VECTOR_SEARCH:    https://learn.microsoft.com/sql/t-sql/functions/vector-search-transact-sql
 --   DiskANN Vector Index: https://learn.microsoft.com/azure/azure-sql/database/vector-index
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/10-intelligent-search/02-vector-search.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -596,3 +598,7 @@ GO
 
 PRINT CHAR(13)+CHAR(10) + N'>>> PROXIMO: Lab 10-IS 03 - Hybrid Search RRF (FTS + Vector + RRF).';
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/10-intelligent-search/02-vector-search.md
+-- =================================================================================================

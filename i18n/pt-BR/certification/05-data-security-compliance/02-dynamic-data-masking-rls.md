@@ -302,4 +302,4 @@ D. Controlar os acessos realizando mapeamentos de tabelas externas em schemas di
 
 ---
 
-**[← Anterior](./01-encryption.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Próximo →](./03-permissions-access.md)**
+**[← Anterior](./01-encryption.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Lab: Dynamic Data Masking e RLS](../../practice/labs/05-data-security-compliance/02-dynamic-data-masking-rls-lab.sql) | [Próximo →](./03-permissions-access.md)**

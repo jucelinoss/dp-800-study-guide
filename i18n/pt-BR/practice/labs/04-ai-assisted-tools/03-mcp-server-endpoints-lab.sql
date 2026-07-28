@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: ENDPOINTS DE SERVIDORES MCP (MODEL CONTEXT PROTOCOL)
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/04-ai-assisted-tools/03-mcp-server-endpoints.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -128,3 +131,7 @@ SELECT N'Descoberta de schema' AS Proposito, N'VIEW DEFINITION' AS EscopoMinimo,
 UNION ALL SELECT N'Consulta de catálogo', N'SELECT em view aprovada', N'Excluir dados sensíveis; registrar resultado e correlation ID'
 UNION ALL SELECT N'Ação DDL/DML', N'Não concedida por padrão', N'Exigir identidade separada, aprovação e controle de mudança em produção';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/04-ai-assisted-tools/03-mcp-server-endpoints.md
+-- =================================================================================================

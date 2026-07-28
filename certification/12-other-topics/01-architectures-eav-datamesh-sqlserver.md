@@ -213,3 +213,7 @@ sequenceDiagram
 ## Conclusion
 
 The evolution of SQL Server has transformed the database from a mere traditional relational engine into a complete data platform, capable of processing unstructured data (JSON, Vectors), operating in modern decentralized architectures (Data Mesh), and working transparently across on-premises, hybrid, and multi-cloud environments.
+
+---
+
+**[↑ Back to Section](./other-topics.md) | [Lab: Architectures, EAV, and Data Mesh](../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql)**

@@ -345,4 +345,4 @@ Uma CTE é referenciada duas vezes em uma consulta. O SQL Server materializa o r
 
 ---
 
-**[← Anterior](./08-integrity-rules.md) | [↑ Voltar à Seção](./fundamentals.md) | [Próximo →](./10-index-fundamentals.md)**
+**[← Anterior](./08-integrity-rules.md) | [↑ Voltar à Seção](./fundamentals.md) | [Lab: Index Introduction](../../practice/labs/00-fundamentals/09-index-introduction.sql) | [Próximo →](./10-index-fundamentals.md)**

@@ -14,6 +14,9 @@
 --   5. Practical Project Scenarios (Auditing Objects Modified Outside the CI/CD Pipeline)
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/07-cicd-database-projects/03-source-control-branching.md
+
 USE AdventureWorks2025;
 GO
 
@@ -101,3 +104,7 @@ SELECT
     '@senior-dba-team',
     'Aprovacao de DBAs Seniores para scripts Pre/Post Deployment';
 GO
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/07-cicd-database-projects/03-source-control-branching.md
+-- =================================================================================================

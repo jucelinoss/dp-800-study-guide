@@ -387,4 +387,4 @@ logs de chamador/parâmetros/resultado e credenciais separadas para schema e esc
 
 ---
 
-**[← Anterior](./02-github-copilot-setup.md) | [↑ Voltar para a Seção](./ai-assisted-tools.md)**
+**[← Anterior](./02-github-copilot-setup.md) | [↑ Voltar para a Seção](./ai-assisted-tools.md) | [Lab: Endpoints MCP](../../practice/labs/04-ai-assisted-tools/03-mcp-server-endpoints-lab.sql)**

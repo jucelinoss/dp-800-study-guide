@@ -641,4 +641,4 @@ partição.
 
 ---
 
-**[← Anterior](./04-constraints-sequences.md) | [↑ Voltar para a Seção](./database-objects.md)**
+**[← Anterior](./04-constraints-sequences.md) | [↑ Voltar para a Seção](./database-objects.md) | [Lab: Particionamento](../../practice/labs/01-database-objects/05-partitioning-lab.sql)**

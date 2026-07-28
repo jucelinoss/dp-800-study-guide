@@ -400,4 +400,4 @@ falhas de geração, recall/precision, latência e validação de resposta.
 
 ---
 
-**[↑ Voltar à Seção](./models-embeddings.md) | [Próximo →](./02-embedding-maintenance.md)**
+**[↑ Voltar à Seção](./models-embeddings.md) | [Lab: Modelos Externos](../../practice/labs/09-models-embeddings/01-external-models-lab.sql) | [Próximo →](./02-embedding-maintenance.md)**

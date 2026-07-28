@@ -478,4 +478,4 @@ D. Criar um segundo Clustered Index sobre a coluna Status
 
 ---
 
-**[↑ Voltar para a Seção](./database-objects.md) | [Próximo →](./02-specialized-tables.md)**
+**[↑ Voltar para a Seção](./database-objects.md) | [Lab: Tabelas, Tipos de Dados e Índices](../../practice/labs/01-database-objects/01-tables-indexes-lab.sql) | [Próximo →](./02-specialized-tables.md)**

@@ -5,6 +5,9 @@
 -- Prerequisite: Labs 01-08 (DML and query patterns)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/09-subqueries-and-ctes.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- ====================================================================
 -- PART 1: Measure baseline (no targeted index)
 -- KEY CONCEPT: STATISTICS IO shows logical reads — pages read from cache.
@@ -182,4 +185,7 @@ GO
 -- 2. Use sys.indexes to check if an index is clustered or nonclustered.
 -- 3. What happens to logical reads when you add a covering index?
 -- 4. Why does each additional index slow down INSERT operations?
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/09-subqueries-and-ctes.md
+-- =================================================================================================

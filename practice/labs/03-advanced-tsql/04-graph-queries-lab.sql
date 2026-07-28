@@ -2,6 +2,9 @@
 -- DP-800 - PRACTICAL LAB: GRAPH QUERIES (NODES, EDGES, MATCH, AND SHORTEST_PATH)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/03-advanced-tsql/04-graph-queries.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- CONFIGURATION NOTE: To run this and other lab scripts, you need
 -- to restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -157,3 +160,7 @@ FROM lab.Person P1, lab.friendOf F, lab.Person P2, lab.likes L, lab.Restaurant R
 WHERE MATCH(P1-(F)->P2-(L)->R)
   AND R.Cuisine = 'Italiana';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/03-advanced-tsql/04-graph-queries.md
+-- =================================================================================================

@@ -4,6 +4,8 @@
 -- Objetivo: STATISTICS IO, CREATE INDEX, medir antes/depois, covering
 -- Pré-requisito: Laboratórios 01-08 (padrões DML e consulta)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/09-subqueries-and-ctes.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- ====================================================================
 -- PARTE 1: Meça a linha de base (sem índice direcionado)
@@ -183,3 +185,7 @@ GO
 -- 3. O que acontece com as leituras lógicas quando você adiciona um covering index?
 -- 4. Por que cada índice adicional diminui as operações de INSERT?
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/09-subqueries-and-ctes.md
+-- =================================================================================================

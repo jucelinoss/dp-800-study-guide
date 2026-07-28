@@ -392,4 +392,4 @@ WHERE TokenCount > 7500;  -- Leave headroom below the 8191-token limit
 
 ---
 
-**[← Previous](./02-embedding-maintenance.md) | [↑ Back to Section](./models-embeddings.md)**
+**[← Previous](./02-embedding-maintenance.md) | [↑ Back to Section](./models-embeddings.md) | [Lab: Chunking and Generation](../../practice/labs/09-models-embeddings/03-chunking-generation-lab.sql)**

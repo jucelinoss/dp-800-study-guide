@@ -368,4 +368,4 @@ credential ao principal que a usará e valide regras de URL/escopo e plataforma.
 
 ---
 
-**[← Anterior](./04-auditing.md) | [↑ Voltar para a Seção](./data-security-compliance.md)**
+**[← Anterior](./04-auditing.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Lab: Endpoints Seguros](../../practice/labs/05-data-security-compliance/05-secure-endpoints-lab.sql)**

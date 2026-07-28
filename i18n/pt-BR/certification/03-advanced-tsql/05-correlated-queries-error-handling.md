@@ -785,4 +785,4 @@ D. A transação inteira é confirmada (committed) até a linha anterior ao erro
 
 ---
 
-**[← Anterior](./04-graph-queries.md) | [↑ Voltar para a Seção](./advanced-tsql.md)**
+**[← Anterior](./04-graph-queries.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Lab: Correlated Queries e Error Handling](../../practice/labs/03-advanced-tsql/05-correlated-queries-error-handling-lab.sql)**

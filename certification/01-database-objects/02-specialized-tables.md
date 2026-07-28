@@ -366,4 +366,4 @@ D. Memory-optimized table with DURABILITY = SCHEMA_AND_DATA
 
 ---
 
-**[← Previous](./01-tables-indexes.md) | [↑ Back to Section](./database-objects.md) | [Next →](./03-json-columns.md)**
+**[← Previous](./01-tables-indexes.md) | [↑ Back to Section](./database-objects.md) | [Lab: Specialized Tables](../../practice/labs/01-database-objects/02-specialized-tables-lab.sql) | [Next →](./03-json-columns.md)**

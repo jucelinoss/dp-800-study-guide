@@ -413,4 +413,4 @@ D. Enable RCSI and retry on deadlock
 
 ---
 
-**[← Previous](./01-database-configurations.md) | [↑ Back to Section](./performance-optimization.md) | [Next →](./03-query-performance-troubleshooting.md)**
+**[← Previous](./01-database-configurations.md) | [↑ Back to Section](./performance-optimization.md) | [Lab: Transaction Isolation and Concurrency](../../practice/labs/06-performance-optimization/02-transaction-isolation-concurrency-lab.sql) | [Next →](./03-query-performance-troubleshooting.md)**

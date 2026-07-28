@@ -14,6 +14,9 @@
 --   5. Stoplists, language settings, and index maintenance
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/10-intelligent-search/01-fulltext-search.md
+
 USE AdventureWorks2025;
 GO
 
@@ -187,3 +190,7 @@ GO
 SELECT catalog_name, population_type_description, status_description
 FROM sys.dm_fts_index_population;
 GO
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/10-intelligent-search/01-fulltext-search.md
+-- =================================================================================================

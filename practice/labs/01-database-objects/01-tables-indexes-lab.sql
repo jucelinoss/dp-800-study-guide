@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: TABLES, DATA TYPES, AND INDEXES
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/01-database-objects/01-tables-indexes.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and the other lab scripts, restore the AdventureWorks
 -- (OLTP) database backup available at:
 -- https://learn.microsoft.com/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -729,6 +732,11 @@ DROP TABLE IF EXISTS lab.SalesOrderDetail_Row;
 DROP TABLE IF EXISTS lab.SalesOrderDetail_Page;
 -- DROP SCHEMA IF EXISTS lab;
 */
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/01-database-objects/01-tables-indexes.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

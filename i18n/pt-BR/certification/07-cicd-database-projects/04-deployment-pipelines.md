@@ -400,4 +400,4 @@ D. `/Action:Script`
 
 ---
 
-**[← Anterior](./03-source-control-branching.md) | [↑ Voltar para a Seção](./cicd-database-projects.md)**
+**[← Anterior](./03-source-control-branching.md) | [↑ Voltar para a Seção](./cicd-database-projects.md) | [Lab: Pipelines de Deployment](../../practice/labs/07-cicd-database-projects/04-deployment-pipelines-lab.sql)**

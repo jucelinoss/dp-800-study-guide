@@ -13,6 +13,8 @@
 --   4. Carga Idempotente de Dados de Referência com a Instrução MERGE
 --   5. Cenários Práticos de Projeto (Carga de Tabelas de Domínio em Scripts Post-Deployment)
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/01-testing-strategy.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -148,3 +150,7 @@ GO
 PRINT 'Iniciando execucao de Post-Deployment scripts...';
 PRINT 'Carga de tabelas de dominio finalizada com sucesso.';
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/07-cicd-database-projects/01-testing-strategy.md
+-- =================================================================================================

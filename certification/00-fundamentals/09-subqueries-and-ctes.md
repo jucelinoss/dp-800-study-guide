@@ -345,4 +345,4 @@ A CTE is referenced twice in a query. Does SQL Server materialize the result onc
 
 ---
 
-**[← Previous](./08-integrity-rules.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./10-index-fundamentals.md)**
+**[← Previous](./08-integrity-rules.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Index Introduction](../../practice/labs/00-fundamentals/09-index-introduction.sql) | [Next →](./10-index-fundamentals.md)**

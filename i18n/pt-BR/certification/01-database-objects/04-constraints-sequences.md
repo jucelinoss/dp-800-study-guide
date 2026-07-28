@@ -732,4 +732,4 @@ D. Uma transação concorrente no momento da queda consumiu os valores remanesce
 
 ---
 
-**[← Anterior](./03-json-columns.md) | [↑ Voltar para a Seção](./database-objects.md) | [Próximo →](./05-partitioning.md)**
+**[← Anterior](./03-json-columns.md) | [↑ Voltar para a Seção](./database-objects.md) | [Lab: Constraints e Sequences](../../practice/labs/01-database-objects/04-constraints-sequences-lab.sql) | [Próximo →](./05-partitioning.md)**

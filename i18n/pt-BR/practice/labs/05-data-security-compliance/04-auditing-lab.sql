@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: AUDITORIA DE BANCO DE DADOS (SQL AUDIT E SPECIFICATIONS)
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/05-data-security-compliance/04-auditing.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -124,3 +127,7 @@ SELECT
 FROM sys.server_audits sa
 LEFT JOIN sys.database_audit_specifications das ON sa.server_audit_guid = das.server_audit_guid;
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/05-data-security-compliance/04-auditing.md
+-- =================================================================================================

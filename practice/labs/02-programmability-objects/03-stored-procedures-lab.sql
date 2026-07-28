@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: STORED PROCEDURES (sp_executesql, OUTPUT, TVP, TRY/CATCH AND EXECUTE AS)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/02-programmability-objects/03-stored-procedures.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -404,6 +407,11 @@ GO
 --    reduces impact if a validation failure occurs.
 --
 -- Official source: https://learn.microsoft.com/sql/connect/ado-net/sql/writing-secure-dynamic-sql
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/02-programmability-objects/03-stored-procedures.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

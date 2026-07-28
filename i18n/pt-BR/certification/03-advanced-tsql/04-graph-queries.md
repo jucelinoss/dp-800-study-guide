@@ -346,4 +346,4 @@ D. Utilizar a função `OPENJSON` para navegar no grafo persistido em colunas de
 
 ---
 
-**[← Anterior](./03-regex-fuzzy-matching.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Próximo →](./05-correlated-queries-error-handling.md)**
+**[← Anterior](./03-regex-fuzzy-matching.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Lab: Graph Queries](../../practice/labs/03-advanced-tsql/04-graph-queries-lab.sql) | [Próximo →](./05-correlated-queries-error-handling.md)**

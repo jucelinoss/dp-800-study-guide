@@ -13,6 +13,8 @@
 --   4. Usage Permission Management (`GRANT EXECUTE ON EXTERNAL MODEL`)
 --   5. Native VECTOR storage, REST invocation, and model-dimension decisions
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/09-models-embeddings/01-external-models.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -148,3 +150,7 @@ SELECT
 GO
 
 -- Do not mix vectors from different embedding models or dimensions in one search space.
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/09-models-embeddings/01-external-models.md
+-- =================================================================================================

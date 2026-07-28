@@ -195,4 +195,4 @@ SELECT @@SERVERNAME AS server_name, DB_NAME() AS current_database;
 
 ---
 
-**[← Anterior](./fundamentals.md) | [↑ Voltar à Seção](./fundamentals.md) | [Próximo →](./02-relational-model-and-data-types.md)**
+**[← Anterior](./fundamentals.md) | [↑ Voltar à Seção](./fundamentals.md) | [Lab: Setup StudyDB](../../practice/labs/00-fundamentals/01-setup-studydb.sql) | [Próximo →](./02-relational-model-and-data-types.md)**

@@ -5,6 +5,9 @@
 -- Prerequisite: Labs 01-03 (not required, but recommended context)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/04-select-and-filter.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- ====================================================================
 -- INNER JOIN: only matching rows from both sides
 -- KEY CONCEPT: Both sides must match. Rows without a match are excluded.
@@ -172,4 +175,7 @@ GO
 -- 4. Write a self-join query to find product subcategories and their
 --    parent categories (ProductSubcategory LEFT JOIN to itself, or
 --    join ProductSubcategory to ProductCategory).
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/04-select-and-filter.md
+-- =================================================================================================

@@ -384,4 +384,4 @@ D. Enable Managed Identity authentication to replace password-based access
 
 ---
 
-**[← Previous](./04-auditing.md) | [↑ Back to Section](./data-security-compliance.md)**
+**[← Previous](./04-auditing.md) | [↑ Back to Section](./data-security-compliance.md) | [Lab: Secure Endpoints](../../practice/labs/05-data-security-compliance/05-secure-endpoints-lab.sql)**

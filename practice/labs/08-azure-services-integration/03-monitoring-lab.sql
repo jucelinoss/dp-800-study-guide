@@ -13,6 +13,8 @@
 --   4. Azure Monitor alert configuration through Azure CLI (`az monitor metrics alert`)
 --   5. Practical design scenarios (vCore/DTU exhaustion and deadlock investigation)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/08-azure-services-integration/03-monitoring.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -95,3 +97,7 @@ SELECT
     '--window-size 5m --evaluation-frequency 1m' AS JanelaAvaliacao,
     'Envia notificacao por e-mail/webhook para o grupo DBA_Team' AS AcaoAutomacao;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/08-azure-services-integration/03-monitoring.md
+-- =================================================================================================

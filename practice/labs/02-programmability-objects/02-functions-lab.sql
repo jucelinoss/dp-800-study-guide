@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: SCALAR AND TABLE-VALUED FUNCTIONS (UDFs, iTVF, mTVF AND APPLY)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/02-programmability-objects/02-functions.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need
 -- to restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -350,6 +353,11 @@ GO
 
 SET STATISTICS IO, TIME OFF;
 GO
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/02-programmability-objects/02-functions.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

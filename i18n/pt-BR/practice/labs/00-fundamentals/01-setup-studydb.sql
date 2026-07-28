@@ -3,6 +3,8 @@
 -- Objetivo: Cria o banco de dados reutilizável StudyDB e o schema study.
 -- ATENÇÃO: Executar este script DESTRÓI e recria o StudyDB.
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/01-sql-server-and-tools.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- [OBSERVE] @@SERVERNAME mostra o nome da sua instância.
 -- Se conectado ao Azure SQL, retorna o nome do servidor.
@@ -50,3 +52,7 @@ GO
 -- 2. Por que usamos um schema (study) em vez de criar tabelas no dbo?
 -- 3. Qual é a diferença entre @@SERVERNAME e DB_NAME()?
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/01-sql-server-and-tools.md
+-- =================================================================================================

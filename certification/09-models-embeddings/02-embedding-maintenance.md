@@ -460,4 +460,4 @@ flowchart TD
 
 ---
 
-**[← Previous](./01-external-models.md) | [↑ Back to Section](./models-embeddings.md) | [Next →](./03-chunking-generation.md)**
+**[← Previous](./01-external-models.md) | [↑ Back to Section](./models-embeddings.md) | [Lab: Embedding Maintenance](../../practice/labs/09-models-embeddings/02-embedding-maintenance-lab.sql) | [Next →](./03-chunking-generation.md)**

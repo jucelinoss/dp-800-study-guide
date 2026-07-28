@@ -11,6 +11,8 @@
 --   2. GROUP 2: Data Mesh & Data Products with No Re-Deployment
 --   3. GROUP 3: Environment Simulation (On-Premises, Cloud/Fabric Zero-ETL, and Hybrid/Azure Arc)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/12-other-topics/01-architectures-eav-datamesh-sqlserver.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -198,3 +200,7 @@ GO
 -- Clear session context
 EXEC sp_set_session_context @key = N'CurrentTenantID', @value = NULL;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/12-other-topics/01-architectures-eav-datamesh-sqlserver.md
+-- =================================================================================================

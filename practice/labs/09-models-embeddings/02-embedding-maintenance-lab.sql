@@ -13,6 +13,8 @@
 --   4. Full Regeneration Strategy (AI model swap from text-embedding-ada-002 to 3-small)
 --   5. Practical Project Scenarios (Text Modification Tracking vs Vector Date)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/09-models-embeddings/02-embedding-maintenance.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -247,3 +249,7 @@ SELECT
     'Event-driven integration through Event Hubs or Eventstream',
     'Requires event-stream infrastructure and a consumer';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/09-models-embeddings/02-embedding-maintenance.md
+-- =================================================================================================

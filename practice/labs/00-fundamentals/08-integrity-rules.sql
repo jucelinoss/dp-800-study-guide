@@ -5,6 +5,9 @@
 -- Prerequisite: Labs 01-07 (DML patterns)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/08-integrity-rules.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- Create lab schema if it doesn't exist (idempotent)
 IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'lab')
     EXEC ('CREATE SCHEMA lab');
@@ -195,4 +198,7 @@ GO
 --    then try to insert the same value again. Catch the error.
 -- 3. Explain the difference between DEFAULT firing vs not firing.
 -- 4. What does ON DELETE CASCADE do? Why must it be used carefully?
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/08-integrity-rules.md
+-- =================================================================================================

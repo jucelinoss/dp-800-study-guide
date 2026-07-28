@@ -13,6 +13,9 @@
 --   4. Tratamento de Erros e Timeouts em Chamadas REST síncronas
 --   5. Cenários Práticos de Projeto (Validação e Enriquecimento de Dados via Azure Function REST)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/08-azure-services-integration/02-rest-graphql-endpoints.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -101,3 +104,7 @@ SELECT
     'Todas as plataformas Azure',
     'Recomendado para alto volume e chamadas de lote (>1000/min)';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/08-azure-services-integration/02-rest-graphql-endpoints.md
+-- =================================================================================================

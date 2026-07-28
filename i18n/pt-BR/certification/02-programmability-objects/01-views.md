@@ -407,4 +407,4 @@ D. As tabelas base associadas possuem um Columnstore Index configurado.
 
 ---
 
-**[↑ Voltar para a Seção](./programmability-objects.md) | [Próximo →](./02-functions.md)**
+**[↑ Voltar para a Seção](./programmability-objects.md) | [Lab: Views](../../practice/labs/02-programmability-objects/01-views-lab.sql) | [Próximo →](./02-functions.md)**

@@ -2,6 +2,9 @@
 -- DP-800 - LAB: REGEX, PHONETIC MATCHING (SOUNDEX/DIFFERENCE) AND FUZZY MATCHING
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/03-advanced-tsql/03-regex-fuzzy-matching.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -173,3 +176,7 @@ FROM lab.RawContacts c1
 JOIN lab.RawContacts c2 ON c1.ContactID < c2.ContactID
 WHERE DIFFERENCE(c1.FullName, c2.FullName) >= 3;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/03-advanced-tsql/03-regex-fuzzy-matching.md
+-- =================================================================================================

@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: DATABASE CONFIGURATIONS AND AUTOMATIC OPTIMIZATION
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/06-performance-optimization/01-database-configurations.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- CONFIGURATION NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -150,3 +153,7 @@ SELECT
 FROM sys.databases
 WHERE database_id = DB_ID();
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/06-performance-optimization/01-database-configurations.md
+-- =================================================================================================

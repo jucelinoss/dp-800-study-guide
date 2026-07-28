@@ -342,4 +342,4 @@ D. `DISTINCT` must always be added
 
 ---
 
-**[← Previous](./04-select-and-filter.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./06-aggregation-and-grouping.md)**
+**[← Previous](./04-select-and-filter.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Aggregation](../../practice/labs/00-fundamentals/05-aggregation.sql) | [Next →](./06-aggregation-and-grouping.md)**

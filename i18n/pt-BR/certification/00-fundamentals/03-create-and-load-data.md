@@ -349,4 +349,4 @@ Você precisa de uma cópia descartável de duas colunas para uma consulta explo
 
 ---
 
-**[← Anterior](./02-relational-model-and-data-types.md) | [↑ Voltar à Seção](./fundamentals.md) | [Próximo →](./04-select-and-filter.md)**
+**[← Anterior](./02-relational-model-and-data-types.md) | [↑ Voltar à Seção](./fundamentals.md) | [Lab: Load and Read Data](../../practice/labs/00-fundamentals/03-load-and-read-data.sql) | [Próximo →](./04-select-and-filter.md)**

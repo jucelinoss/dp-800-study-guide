@@ -370,4 +370,4 @@ D. A procedure executará se o usuário possuir a role `db_datareader`.
 
 ---
 
-**[← Anterior](./02-dynamic-data-masking-rls.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Próximo →](./04-auditing.md)**
+**[← Anterior](./02-dynamic-data-masking-rls.md) | [↑ Voltar para a Seção](./data-security-compliance.md) | [Lab: Permissões e Acesso](../../practice/labs/05-data-security-compliance/03-permissions-access-lab.sql) | [Próximo →](./04-auditing.md)**

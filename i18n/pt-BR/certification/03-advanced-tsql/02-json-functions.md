@@ -512,4 +512,4 @@ a `JSON_QUERY` com paths que retornam múltiplos valores; não é opção de `FO
 
 ---
 
-**[← Anterior](./01-ctes-window-functions.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Próximo →](./03-regex-fuzzy-matching.md)**
+**[← Anterior](./01-ctes-window-functions.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Lab: Funções JSON](../../practice/labs/03-advanced-tsql/02-json-functions-lab.sql) | [Próximo →](./03-regex-fuzzy-matching.md)**

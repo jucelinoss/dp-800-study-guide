@@ -10,6 +10,9 @@
 --     embedding model's dimension, such as VECTOR(1536).
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/10-intelligent-search/02-vector-search.md
+
 USE AdventureWorks2025;
 GO
 
@@ -144,3 +147,7 @@ GO
 
 -- Do not mix models, dimensions, or metrics in one search space.
 -- Use ENN for small sets and validation; use ANN to reduce latency at scale.
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/10-intelligent-search/02-vector-search.md
+-- =================================================================================================

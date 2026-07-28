@@ -510,4 +510,4 @@ variável. `secretref:` não substitui a expressão de connection string do DAB.
 
 ---
 
-**[↑ Voltar para a Seção](./azure-services-integration.md) | [Next →](./02-rest-graphql-endpoints.md)**
+**[↑ Voltar para a Seção](./azure-services-integration.md) | [Lab: Data API Builder](../../practice/labs/08-azure-services-integration/01-data-api-builder-lab.sql) | [Next →](./02-rest-graphql-endpoints.md)**

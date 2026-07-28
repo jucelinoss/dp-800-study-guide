@@ -326,4 +326,4 @@ Aggregation is the gateway to more advanced analytic patterns:
 
 ---
 
-**[← Previous](./05-relationships-and-joins.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./07-change-data-safely.md)**
+**[← Previous](./05-relationships-and-joins.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Subqueries and CTEs](../../practice/labs/00-fundamentals/06-subqueries-and-ctes.sql) | [Next →](./07-change-data-safely.md)**

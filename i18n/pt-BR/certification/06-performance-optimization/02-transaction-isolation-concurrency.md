@@ -352,4 +352,4 @@ D. Habilitar o RCSI e tratar erros de deadlock 1205 com retry logic.
 
 ---
 
-**[← Anterior](./01-database-configurations.md) | [↑ Voltar para a Seção](./performance-optimization.md) | [Próximo →](./03-query-performance-troubleshooting.md)**
+**[← Anterior](./01-database-configurations.md) | [↑ Voltar para a Seção](./performance-optimization.md) | [Lab: Isolamento e Concorrência](../../practice/labs/06-performance-optimization/02-transaction-isolation-concurrency-lab.sql) | [Próximo →](./03-query-performance-troubleshooting.md)**

@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: DYNAMIC DATA MASKING (DDM) E ROW-LEVEL SECURITY (RLS)
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/05-data-security-compliance/02-dynamic-data-masking-rls.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -190,3 +193,7 @@ FROM sys.masked_columns mc
 JOIN sys.objects o ON mc.object_id = o.object_id
 JOIN sys.columns c ON mc.object_id = c.object_id AND mc.column_id = c.column_id;
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/05-data-security-compliance/02-dynamic-data-masking-rls.md
+-- =================================================================================================

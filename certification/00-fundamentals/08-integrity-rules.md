@@ -376,4 +376,4 @@ Constraints are the building blocks of reliable database design. Build on this f
 
 ---
 
-**[← Previous](./07-change-data-safely.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./09-subqueries-and-ctes.md)**
+**[← Previous](./07-change-data-safely.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Integrity Rules](../../practice/labs/00-fundamentals/08-integrity-rules.sql) | [Next →](./09-subqueries-and-ctes.md)**

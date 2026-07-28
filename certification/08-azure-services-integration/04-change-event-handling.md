@@ -378,4 +378,4 @@ END;
 
 ---
 
-**[← Previous](./03-monitoring.md) | [↑ Back to Section](./azure-services-integration.md)**
+**[← Previous](./03-monitoring.md) | [↑ Back to Section](./azure-services-integration.md) | [Lab: Change Event Handling](../../practice/labs/08-azure-services-integration/04-change-event-handling-lab.sql)**

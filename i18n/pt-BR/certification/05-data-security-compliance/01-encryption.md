@@ -464,4 +464,4 @@ D. Implementar criptografia de coluna local utilizando a função `ENCRYPTBYKEY`
 
 ---
 
-**[↑ Voltar para a Seção](./data-security-compliance.md) | [Próximo →](./02-dynamic-data-masking-rls.md)**
+**[↑ Voltar para a Seção](./data-security-compliance.md) | [Lab: Criptografia](../../practice/labs/05-data-security-compliance/01-encryption-lab.sql) | [Próximo →](./02-dynamic-data-masking-rls.md)**

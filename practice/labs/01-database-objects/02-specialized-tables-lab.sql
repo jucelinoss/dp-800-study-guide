@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: SPECIALIZED TABLES
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/01-database-objects/02-specialized-tables.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and the other lab scripts, restore the AdventureWorks
 -- (OLTP) database backup available at:
 -- https://learn.microsoft.com/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -1248,6 +1251,11 @@ IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = 'MyStorage
 IF OBJECT_ID('tempdb..#SalesImport') IS NOT NULL DROP TABLE #SalesImport;
 GO
 */
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/01-database-objects/02-specialized-tables.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

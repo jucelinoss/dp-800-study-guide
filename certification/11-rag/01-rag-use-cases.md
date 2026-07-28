@@ -382,4 +382,4 @@ Advantages: Managed search service with built-in RRF; scales independently of da
 
 ---
 
-**[↑ Back to Section](./rag.md) | [Next →](./02-prompts-and-responses.md)**
+**[↑ Back to Section](./rag.md) | [Lab: RAG Use Cases](../../practice/labs/11-rag/01-rag-use-cases-lab.sql) | [Next →](./02-prompts-and-responses.md)**

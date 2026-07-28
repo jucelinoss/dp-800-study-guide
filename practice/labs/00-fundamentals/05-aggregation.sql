@@ -5,6 +5,9 @@
 -- Prerequisite: Lab 04 (familiarity with AdventureWorks schema)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/05-relationships-and-joins.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- ====================================================================
 -- Aggregate functions overview
 -- KEY CONCEPT: All aggregates except COUNT(*) ignore NULL values.
@@ -183,4 +186,7 @@ GO
 -- 3. Count orders by year, showing only years with > 5,000 orders.
 -- 4. Write a conditional aggregation that counts red, blue, and black
 --    products separately in one query.
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/05-relationships-and-joins.md
+-- =================================================================================================

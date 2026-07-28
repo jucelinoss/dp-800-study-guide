@@ -13,6 +13,8 @@
 --   4. Error and Timeout Handling in Synchronous REST Calls
 --   5. Practical Project Scenarios (Data Validation and Enrichment via Azure Function REST)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/08-azure-services-integration/02-rest-graphql-endpoints.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -101,3 +103,7 @@ SELECT
     'Todas as plataformas Azure',
     'Recomendado para alto volume e chamadas de lote (>1000/min)';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/08-azure-services-integration/02-rest-graphql-endpoints.md
+-- =================================================================================================

@@ -433,4 +433,4 @@ D. Forçar um plano de execução de forma manual usando comandos do Query Store
 
 ---
 
-**[← Anterior](./02-transaction-isolation-concurrency.md) | [↑ Voltar para a Seção](./performance-optimization.md)**
+**[← Anterior](./02-transaction-isolation-concurrency.md) | [↑ Voltar para a Seção](./performance-optimization.md) | [Lab: Troubleshooting de Performance](../../practice/labs/06-performance-optimization/03-query-performance-troubleshooting-lab.sql)**

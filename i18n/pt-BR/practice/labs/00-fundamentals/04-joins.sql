@@ -4,6 +4,8 @@
 -- Objetivo: INNER, LEFT, RIGHT, CROSS JOIN, self-join, multi-join
 -- Pré-requisito: Laboratórios 01-03 (não obrigatório, mas contexto recomendado)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/04-select-and-filter.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- ====================================================================
 -- INNER JOIN: apenas linhas correspondentes de ambos os lados
@@ -173,3 +175,7 @@ GO
 --    categorias pai (ProductSubcategory LEFT JOIN consigo mesma, ou
 --    junte ProductSubcategory a ProductCategory).
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/04-select-and-filter.md
+-- =================================================================================================

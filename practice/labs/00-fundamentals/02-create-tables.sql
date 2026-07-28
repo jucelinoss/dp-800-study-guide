@@ -5,6 +5,9 @@
 -- Prerequisite: Lab 01 (StudyDB must exist with study schema)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/02-relational-model-and-data-types.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 USE StudyDB;
 GO
 
@@ -150,4 +153,7 @@ GO
 -- 2. Which table(s) contain a FOREIGN KEY? What parent do they reference?
 -- 3. What error do you get inserting a SalesOrder with CustomerId = 999?
 -- 4. Why does SalesOrderItem use a composite primary key?
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/02-relational-model-and-data-types.md
+-- =================================================================================================

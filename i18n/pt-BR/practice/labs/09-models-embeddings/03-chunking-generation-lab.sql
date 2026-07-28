@@ -23,6 +23,9 @@
 --   Azure OpenAI Embeddings:
 --     https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/embeddings
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/09-models-embeddings/03-chunking-generation.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -713,3 +716,7 @@ GO
 PRINT CHAR(13)+CHAR(10) + N'>>> FIM DOS 3 LABS DE 09-ME (Models & Embeddings).';
 PRINT N'    Proximo modulo: 10-Intelligent Search (FTS, Vector Search, Hybrid RRF).';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/09-models-embeddings/03-chunking-generation.md
+-- =================================================================================================

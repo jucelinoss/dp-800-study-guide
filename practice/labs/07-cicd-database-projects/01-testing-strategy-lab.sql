@@ -14,6 +14,9 @@
 --   5. Practical Project Scenarios (Domain Table Loading in Post-Deployment Scripts)
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/07-cicd-database-projects/01-testing-strategy.md
+
 USE AdventureWorks2025;
 GO
 
@@ -148,3 +151,7 @@ GO
 PRINT 'Iniciando execucao de Post-Deployment scripts...';
 PRINT 'Carga de tabelas de dominio finalizada com sucesso.';
 GO
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/07-cicd-database-projects/01-testing-strategy.md
+-- =================================================================================================

@@ -13,6 +13,9 @@
 --   5. Tuning k, candidate counts, and an optional ANN source
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/10-intelligent-search/03-hybrid-search-rrf.md
+
 USE AdventureWorks2025;
 GO
 
@@ -212,3 +215,7 @@ SELECT N'Weighted score',
        N'Only after validating a common score scale',
        N'Do not add a full-text RANK directly to vector distance';
 GO
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/10-intelligent-search/03-hybrid-search-rrf.md
+-- =================================================================================================

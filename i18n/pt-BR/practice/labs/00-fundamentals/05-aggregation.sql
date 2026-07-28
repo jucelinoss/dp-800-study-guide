@@ -4,6 +4,8 @@
 -- Objetivo: COUNT, SUM, AVG, MIN, MAX, GROUP BY, HAVING, agg condicional
 -- Pré-requisito: Laboratório 04 (familiaridade com schema AdventureWorks)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/05-relationships-and-joins.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- ====================================================================
 -- Visão geral das funções de agregação
@@ -184,3 +186,7 @@ GO
 -- 4. Escreva uma agregação condicional que conte produtos vermelhos, azuis e pretos
 --    separadamente em uma consulta.
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/05-relationships-and-joins.md
+-- =================================================================================================

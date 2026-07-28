@@ -278,4 +278,4 @@ Fundamentos de índices são a base para dois tópicos mais profundos do exame D
 
 ---
 
-**[← Anterior](./09-subqueries-and-ctes.md) | [↑ Voltar à Seção](./fundamentals.md) | [Próximo →](./11-ready-for-dp800.md)**
+**[← Anterior](./09-subqueries-and-ctes.md) | [↑ Voltar à Seção](./fundamentals.md) | [Lab: Review and Cleanup](../../practice/labs/00-fundamentals/10-review-and-cleanup.sql) | [Próximo →](./11-ready-for-dp800.md)**

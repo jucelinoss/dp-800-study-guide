@@ -13,6 +13,9 @@
 --   4. Configuração de Segurança por Papel (`anonymous`, `authenticated`)
 --   5. Cenários Práticos de Projeto (Comandos da CLI DAB `dab init`, `dab add`, `dab start`)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/08-azure-services-integration/01-data-api-builder.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -127,3 +130,7 @@ SELECT N'Configuração DAB ou dab init' AS Camada, N'@env(''MSSQL_CONNECTION_ST
 UNION ALL
 SELECT N'Ambiente do Azure Container Apps', N'DATABASE_CONNECTION_STRING=secretref:connection-string', N'Container Apps injeta o segredo na variável de ambiente';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/08-azure-services-integration/01-data-api-builder.md
+-- =================================================================================================

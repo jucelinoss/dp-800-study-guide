@@ -411,4 +411,4 @@ D. Increase the cost threshold for parallelism to 100
 
 ---
 
-**[↑ Back to Section](./performance-optimization.md) | [Next →](./02-transaction-isolation-concurrency.md)**
+**[↑ Back to Section](./performance-optimization.md) | [Lab: Database Configurations](../../practice/labs/06-performance-optimization/01-database-configurations-lab.sql) | [Next →](./02-transaction-isolation-concurrency.md)**

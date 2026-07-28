@@ -6,6 +6,9 @@
 --   Download: https://learn.microsoft.com/sql/samples/adventureworks-install-configure
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/03-create-and-load-data.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- SETUP NOTE: If AdventureWorks is not yet installed, restore the OLTP
 -- backup. The schema used here is standard across AdventureWorks versions.
 
@@ -162,4 +165,7 @@ GO
 -- 2. Return the 10 most recent orders (by OrderDate).
 -- 3. Find all people whose last name starts with 'S'.
 -- 4. Use OFFSET-FETCH to return products 11-20 when sorted by Name.
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/03-create-and-load-data.md
+-- =================================================================================================

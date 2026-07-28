@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: CRIPTOGRAFIA DE DADOS (TDE, ALWAYS ENCRYPTED E CELL-LEVEL)
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/05-data-security-compliance/01-encryption.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -196,3 +199,7 @@ SELECT
     'Requer código manual OPEN/CLOSE SYMMETRIC KEY',
     'Exige chamadas explícitas de função';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/05-data-security-compliance/01-encryption.md
+-- =================================================================================================

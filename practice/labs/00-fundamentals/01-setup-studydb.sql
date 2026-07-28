@@ -4,6 +4,9 @@
 -- WARNING: Running this script DESTROYS and recreates StudyDB.
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/01-sql-server-and-tools.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- [OBSERVE] @@SERVERNAME shows your instance name.
 -- If connected to Azure SQL, this returns the server name.
 SELECT @@SERVERNAME AS server_name;
@@ -49,4 +52,7 @@ GO
 -- 1. What does SINGLE_USER do? Why is it needed before DROP DATABASE?
 -- 2. Why do we use a schema (study) instead of creating tables in dbo?
 -- 3. What's the difference between @@SERVERNAME and DB_NAME()?
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/01-sql-server-and-tools.md
+-- =================================================================================================

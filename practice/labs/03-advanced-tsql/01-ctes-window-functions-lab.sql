@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: CTEs (RECURSIVE, MATERIALIZATION) AND WINDOW FUNCTIONS
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/03-advanced-tsql/01-ctes-window-functions.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to restore the
 -- AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/sql/samples/adventureworks-install-configure
@@ -887,3 +890,7 @@ ORDER BY SalesPersonID;
 -- Note: Salesperson 102 has 2 identical $500 sales. ROW_NUMBER returns 1 row
 -- (arbitrarily), RANK returns 2 rows (all tied for 1st).
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/03-advanced-tsql/01-ctes-window-functions.md
+-- =================================================================================================

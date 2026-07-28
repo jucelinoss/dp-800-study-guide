@@ -748,4 +748,4 @@ D. The transaction is committed up to the point of the error
 
 ---
 
-**[← Previous](./04-graph-queries.md) | [↑ Back to Section](./advanced-tsql.md)**
+**[← Previous](./04-graph-queries.md) | [↑ Back to Section](./advanced-tsql.md) | [Lab: Correlated Queries and Error Handling](../../practice/labs/03-advanced-tsql/05-correlated-queries-error-handling-lab.sql)**

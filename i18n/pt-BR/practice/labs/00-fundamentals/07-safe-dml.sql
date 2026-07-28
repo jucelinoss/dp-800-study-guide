@@ -4,6 +4,8 @@
 -- Objetivo: UPDATE, DELETE, cláusula OUTPUT, transações, @@ROWCOUNT
 -- Pré-requisito: Laboratórios 01-06 (familiaridade com schema AdventureWorks)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/07-change-data-safely.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- ATENÇÃO: Este laboratório usa BEGIN TRAN / ROLLBACK para prevenir alterações
 -- permanentes. Substitua ROLLBACK por COMMIT apenas quando pretender salvar.
@@ -174,3 +176,7 @@ GO
 --    registro, suporte a WHERE e reset de identity?
 -- 4. Escreva um bloco TRY/CATCH em torno de um UPDATE que pode falhar.
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/07-change-data-safely.md
+-- =================================================================================================

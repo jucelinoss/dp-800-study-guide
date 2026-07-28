@@ -422,4 +422,4 @@ D. Adicionar comentários com as regras de erros em cada novo arquivo SQL criado
 
 ---
 
-**[← Anterior](./01-ai-security-impact.md) | [↑ Voltar para a Seção](./ai-assisted-tools.md) | [Próximo →](./03-mcp-server-endpoints.md)**
+**[← Anterior](./01-ai-security-impact.md) | [↑ Voltar para a Seção](./ai-assisted-tools.md) | [Lab: GitHub Copilot](../../practice/labs/04-ai-assisted-tools/02-github-copilot-setup-lab.sql) | [Próximo →](./03-mcp-server-endpoints.md)**

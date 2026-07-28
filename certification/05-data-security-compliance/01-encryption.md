@@ -430,4 +430,4 @@ D. TDE with customer-managed keys in Azure Key Vault
 
 ---
 
-**[↑ Back to Section](./data-security-compliance.md) | [Next →](./02-dynamic-data-masking-rls.md)**
+**[↑ Back to Section](./data-security-compliance.md) | [Lab: Encryption](../../practice/labs/05-data-security-compliance/01-encryption-lab.sql) | [Next →](./02-dynamic-data-masking-rls.md)**

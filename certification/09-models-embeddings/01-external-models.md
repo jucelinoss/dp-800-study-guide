@@ -382,4 +382,4 @@ answer quality. These metrics make a model change reversible and auditable.
 
 ---
 
-**[↑ Back to Section](./models-embeddings.md) | [Next →](./02-embedding-maintenance.md)**
+**[↑ Back to Section](./models-embeddings.md) | [Lab: External Models](../../practice/labs/09-models-embeddings/01-external-models-lab.sql) | [Next →](./02-embedding-maintenance.md)**

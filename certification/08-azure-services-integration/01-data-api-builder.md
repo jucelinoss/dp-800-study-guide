@@ -483,4 +483,4 @@ valid replacement for DAB's connection-string expression.
 
 ---
 
-**[↑ Back to Section](./azure-services-integration.md) | [Next →](./02-rest-graphql-endpoints.md)**
+**[↑ Back to Section](./azure-services-integration.md) | [Lab: Data API Builder](../../practice/labs/08-azure-services-integration/01-data-api-builder-lab.sql) | [Next →](./02-rest-graphql-endpoints.md)**

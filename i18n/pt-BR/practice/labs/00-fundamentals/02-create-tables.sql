@@ -4,6 +4,8 @@
 -- Objetivo: Cria o modelo relacional com PK, FK, CHECK, DEFAULT.
 -- Pré-requisito: Laboratório 01 (StudyDB deve existir com schema study)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/02-relational-model-and-data-types.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 USE StudyDB;
 GO
@@ -151,3 +153,7 @@ GO
 -- 3. Que erro você obtém ao inserir um SalesOrder com CustomerId = 999?
 -- 4. Por que SalesOrderItem usa uma chave primária composta?
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/02-relational-model-and-data-types.md
+-- =================================================================================================

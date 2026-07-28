@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: MCP SERVER ENDPOINTS (MODEL CONTEXT PROTOCOL)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/04-ai-assisted-tools/03-mcp-server-endpoints.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks (OLTP version) database backup available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -134,3 +137,7 @@ UNION ALL
 SELECT N'DDL/DML action', N'Not granted by default',
        N'Require separate identity, approval path, and production change control';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/04-ai-assisted-tools/03-mcp-server-endpoints.md
+-- =================================================================================================

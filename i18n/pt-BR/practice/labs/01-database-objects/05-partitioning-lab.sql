@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: PARTICIONAMENTO DE TABELAS E ÍNDICES
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/01-database-objects/05-partitioning.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -309,6 +312,10 @@ UNION ALL SELECT N'TRUNCATE PARTITION', N'Descarta todas as linhas de uma parti�
 UNION ALL SELECT N'SWITCH PARTITION', N'Move uma partição alinhada inteira para arquivo', N'Destino deve existir, estar vazio e atender aos requisitos de SWITCH';
 GO
 
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/01-database-objects/05-partitioning.md
+-- =================================================================================================
 -- =================================================================================================
 -- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
 -- =================================================================================================

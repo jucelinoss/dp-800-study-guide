@@ -448,4 +448,4 @@ result shape, for example with some dynamic SQL paths.
 
 ---
 
-**[← Previous](./02-functions.md) | [↑ Back to Section](./programmability-objects.md) | [Next →](./04-triggers.md)**
+**[← Previous](./02-functions.md) | [↑ Back to Section](./programmability-objects.md) | [Lab: Stored Procedures](../../practice/labs/02-programmability-objects/03-stored-procedures-lab.sql) | [Next →](./04-triggers.md)**

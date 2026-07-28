@@ -216,4 +216,4 @@ D. Habilitar o modo strict do caminho JSON
 
 ---
 
-**[← Anterior](./02-specialized-tables.md) | [↑ Voltar à seção](./database-objects.md) | [Próximo →](./04-constraints-sequences.md)**
+**[← Anterior](./02-specialized-tables.md) | [↑ Voltar à seção](./database-objects.md) | [Lab: Colunas e Índices JSON](../../practice/labs/01-database-objects/03-json-columns-lab.sql) | [Próximo →](./04-constraints-sequences.md)**

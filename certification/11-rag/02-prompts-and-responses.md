@@ -477,4 +477,4 @@ only approved fields plus retrieval/source traceability.
 
 ---
 
-**[← Previous](./01-rag-use-cases.md) | [↑ Back to Section](./rag.md)**
+**[← Previous](./01-rag-use-cases.md) | [↑ Back to Section](./rag.md) | [Lab: Prompts and Responses](../../practice/labs/11-rag/02-prompts-and-responses-lab.sql)**

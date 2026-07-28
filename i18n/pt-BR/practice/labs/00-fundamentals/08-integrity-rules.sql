@@ -4,6 +4,8 @@
 -- Objetivo: Violações FK, UNIQUE, CHECK, comportamento DEFAULT, ON DELETE
 -- Pré-requisito: Laboratórios 01-07 (padrões DML)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/08-integrity-rules.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- Crie schema lab se não existir (idempotente)
 IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'lab')
@@ -196,3 +198,7 @@ GO
 -- 3. Explique a diferença entre DEFAULT sendo acionado vs não sendo acionado.
 -- 4. O que ON DELETE CASCADE faz? Por que deve ser usado com cuidado?
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/08-integrity-rules.md
+-- =================================================================================================

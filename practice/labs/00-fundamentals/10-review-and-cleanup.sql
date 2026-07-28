@@ -4,6 +4,9 @@
 -- Purpose: Multi-join aggregation review + CTE bonus
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/10-index-fundamentals.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- ====================================================================
 -- FINAL REVIEW: Multi-join aggregation
 -- Business question: "Show each territory with total sales, order count,
@@ -82,3 +85,7 @@ GO
 -- GO
 -- PRINT 'StudyDB has been removed.';
 -- GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/10-index-fundamentals.md
+-- =================================================================================================

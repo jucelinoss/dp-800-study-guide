@@ -9,6 +9,9 @@
 -- Antes de começar, anote para cada experimento: leituras lógicas, CPU, duração,
 -- linhas estimadas/reais e operadores. Não compare apenas o ícone Scan/Seek.
 -- =============================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/01-database-objects/03-json-columns.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =============================================================================
 
 USE AdventureWorks2025;
 GO
@@ -307,3 +310,7 @@ GO
 -- DROP TABLE IF EXISTS lab.JsonColumnsNative;
 -- DROP TABLE IF EXISTS lab.JsonColumnsOrders;
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/01-database-objects/03-json-columns.md
+-- =================================================================================================

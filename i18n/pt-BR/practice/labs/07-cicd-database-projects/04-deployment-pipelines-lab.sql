@@ -13,6 +13,8 @@
 --   4. Autenticação Passwordless em Pipelines usando Managed Identity e Azure Key Vault
 --   5. Cenários Práticos de Projeto (Simulação da Execução de Pipeline com Transações de Deploy)
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/04-deployment-pipelines.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -105,3 +107,7 @@ sqlpackage /Action:Publish \
     /p:GenerateSmartDefaults=true
 */
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/07-cicd-database-projects/04-deployment-pipelines.md
+-- =================================================================================================

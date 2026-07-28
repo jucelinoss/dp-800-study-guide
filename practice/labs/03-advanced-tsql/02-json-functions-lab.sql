@@ -5,6 +5,9 @@
 -- Goal: extract, validate, shred, modify, and serialize JSON documents. Enable an
 -- Actual Execution Plan for Parts 2 and 6 and capture rows, reads, CPU, and memory.
 -- =============================================================================
+-- THEORY REFERENCE: ../../../certification/03-advanced-tsql/02-json-functions.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =============================================================================
 
 USE AdventureWorks2025;
 GO
@@ -486,3 +489,7 @@ GO
 -- DROP TABLE IF EXISTS lab.JsonFunctionsStage;
 -- DROP TABLE IF EXISTS lab.JsonFunctionsOrders;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/03-advanced-tsql/02-json-functions.md
+-- =================================================================================================

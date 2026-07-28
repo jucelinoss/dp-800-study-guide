@@ -290,4 +290,4 @@ D. The underlying table has a columnstore index
 
 ---
 
-**[↑ Back to Section](./programmability-objects.md) | [Next →](./02-functions.md)**
+**[↑ Back to Section](./programmability-objects.md) | [Lab: Views](../../practice/labs/02-programmability-objects/01-views-lab.sql) | [Next →](./02-functions.md)**

@@ -2,6 +2,9 @@
 -- DP-800 - PRACTICAL LAB: OBJECT-LEVEL PERMISSIONS AND SECURE ACCESS (RBAC / IMPERSONATION)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/05-data-security-compliance/03-permissions-access.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -151,3 +154,7 @@ GO
 
 REVERT;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/05-data-security-compliance/03-permissions-access.md
+-- =================================================================================================

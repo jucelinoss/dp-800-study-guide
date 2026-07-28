@@ -698,4 +698,4 @@ D. Tabela in-memory com a durabilidade `DURABILITY = SCHEMA_AND_DATA`
 
 ---
 
-**[← Anterior](./01-tables-indexes.md) | [↑ Voltar para a Seção](./database-objects.md) | [Próximo →](./03-json-columns.md)**
+**[← Anterior](./01-tables-indexes.md) | [↑ Voltar para a Seção](./database-objects.md) | [Lab: Tabelas Especializadas](../../practice/labs/01-database-objects/02-specialized-tables-lab.sql) | [Próximo →](./03-json-columns.md)**

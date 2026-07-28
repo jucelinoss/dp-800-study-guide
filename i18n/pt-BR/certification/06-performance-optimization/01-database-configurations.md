@@ -391,4 +391,4 @@ D. Alterar a configuração de MAXDOP do banco de dados para 1.
 
 ---
 
-**[↑ Voltar para a Seção](./performance-optimization.md) | [Próximo →](./02-transaction-isolation-concurrency.md)**
+**[↑ Voltar para a Seção](./performance-optimization.md) | [Lab: Configurações de Banco](../../practice/labs/06-performance-optimization/01-database-configurations-lab.sql) | [Próximo →](./02-transaction-isolation-concurrency.md)**

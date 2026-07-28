@@ -326,4 +326,4 @@ D. Create a second clustered index on Status
 
 ---
 
-**[↑ Back to Section](./database-objects.md) | [Next →](./02-specialized-tables.md)**
+**[↑ Back to Section](./database-objects.md) | [Lab: Tables, Data Types, and Indexes](../../practice/labs/01-database-objects/01-tables-indexes-lab.sql) | [Next →](./02-specialized-tables.md)**

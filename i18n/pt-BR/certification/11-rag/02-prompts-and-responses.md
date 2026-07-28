@@ -538,4 +538,4 @@ extração, registre correlation ID e mantenha rastreabilidade das fontes.
 
 ---
 
-**[← Anterior](./01-rag-use-cases.md) | [↑ Voltar à Seção](./rag.md)**
+**[← Anterior](./01-rag-use-cases.md) | [↑ Voltar à Seção](./rag.md) | [Lab: Prompts e Respostas](../../practice/labs/11-rag/02-prompts-and-responses-lab.sql)**

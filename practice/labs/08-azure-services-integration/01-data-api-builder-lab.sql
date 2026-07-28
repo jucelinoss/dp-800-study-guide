@@ -13,6 +13,8 @@
 --   4. Role-Based Security Configuration (`anonymous`, `authenticated`)
 --   5. Practical Project Scenarios (DAB CLI commands `dab init`, `dab add`, `dab start`)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/08-azure-services-integration/01-data-api-builder.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -135,3 +137,7 @@ SELECT
     N'DATABASE_CONNECTION_STRING=secretref:connection-string',
     N'Container Apps injects the secret into the environment variable';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/08-azure-services-integration/01-data-api-builder.md
+-- =================================================================================================

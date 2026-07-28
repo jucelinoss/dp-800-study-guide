@@ -342,4 +342,4 @@ D. `CROSS JOIN`
 
 ---
 
-**[← Previous](./03-create-and-load-data.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./05-relationships-and-joins.md)**
+**[← Previous](./03-create-and-load-data.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Joins](../../practice/labs/00-fundamentals/04-joins.sql) | [Next →](./05-relationships-and-joins.md)**

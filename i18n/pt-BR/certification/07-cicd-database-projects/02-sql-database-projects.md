@@ -355,4 +355,4 @@ D. Utilizar o utilitário bacpac para exportar os dados e importá-los novamente
 
 ---
 
-**[← Anterior](./01-testing-strategy.md) | [↑ Voltar para a Seção](./cicd-database-projects.md) | [Próximo →](./03-source-control-branching.md)**
+**[← Anterior](./01-testing-strategy.md) | [↑ Voltar para a Seção](./cicd-database-projects.md) | [Lab: Projetos de Banco de Dados SQL](../../practice/labs/07-cicd-database-projects/02-sql-database-projects-lab.sql) | [Próximo →](./03-source-control-branching.md)**

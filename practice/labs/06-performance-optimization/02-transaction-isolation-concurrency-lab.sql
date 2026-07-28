@@ -2,6 +2,9 @@
 -- DP-800 - PRACTICAL LAB: ISOLATION LEVELS AND CONCURRENCY (RCSI, SNAPSHOT, DEADLOCKS)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/06-performance-optimization/02-transaction-isolation-concurrency.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) from:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -150,3 +153,7 @@ SELECT
 FROM DeadlockCTE
 CROSS APPLY TargetData.nodes('//RingBufferTarget/event[@name="xml_deadlock_report"]') AS DeadlockTable(XEvent);
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/06-performance-optimization/02-transaction-isolation-concurrency.md
+-- =================================================================================================

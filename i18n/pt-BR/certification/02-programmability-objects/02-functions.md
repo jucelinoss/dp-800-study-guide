@@ -603,4 +603,4 @@ D. A TVF apresenta falha por não possuir um Clustered Index configurado sobre s
 
 ---
 
-**[← Anterior](./01-views.md) | [↑ Voltar para a Seção](./programmability-objects.md) | [Próximo →](./03-stored-procedures.md)**
+**[← Anterior](./01-views.md) | [↑ Voltar para a Seção](./programmability-objects.md) | [Lab: Funções](../../practice/labs/02-programmability-objects/02-functions-lab.sql) | [Próximo →](./03-stored-procedures.md)**

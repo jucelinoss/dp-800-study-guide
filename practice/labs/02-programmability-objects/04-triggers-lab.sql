@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: TRIGGERS (AFTER, INSTEAD OF, DDL AND MULTI-ROW HANDLING)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/02-programmability-objects/04-triggers.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to restore the
 -- AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -332,6 +335,11 @@ FROM sys.triggers
 WHERE parent_id = OBJECT_ID(N'lab.Products')
   AND name IN (N'trg_AuditProducts_MultiRow', N'trg_ObserveProductUpdate');
 GO
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/02-programmability-objects/04-triggers.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

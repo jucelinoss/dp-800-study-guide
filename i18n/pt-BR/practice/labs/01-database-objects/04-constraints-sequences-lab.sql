@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: CONSTRAINTS E SEQUENCES
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/01-database-objects/04-constraints-sequences.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -737,6 +740,10 @@ GO
 SELECT GlobalSalesID, TransactionCode, CustomerCPF, Amount, LastUpdated FROM lab.ConsolidatedSalesDW;
 GO
 
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/01-database-objects/04-constraints-sequences.md
+-- =================================================================================================
 -- =================================================================================================
 -- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
 -- =================================================================================================

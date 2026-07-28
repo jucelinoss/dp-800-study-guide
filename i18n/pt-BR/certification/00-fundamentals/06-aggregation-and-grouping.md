@@ -326,4 +326,4 @@ Agregação é o portal para padrões analíticos mais avançados:
 
 ---
 
-**[← Anterior](./05-relationships-and-joins.md) | [↑ Voltar à Seção](./fundamentals.md) | [Próximo →](./07-change-data-safely.md)**
+**[← Anterior](./05-relationships-and-joins.md) | [↑ Voltar à Seção](./fundamentals.md) | [Lab: Subqueries e CTEs](../../practice/labs/00-fundamentals/06-subqueries-and-ctes.sql) | [Próximo →](./07-change-data-safely.md)**

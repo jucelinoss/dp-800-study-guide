@@ -3,6 +3,8 @@
 -- Banco de Dados: AdventureWorks2025
 -- Objetivo: Revisão de agregação multi-join + CTE bônus
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/10-index-fundamentals.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- ====================================================================
 -- REVISÃO FINAL: Agregação multi-join
@@ -82,3 +84,7 @@ GO
 -- GO
 -- PRINT 'StudyDB foi removido.';
 -- GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/10-index-fundamentals.md
+-- =================================================================================================

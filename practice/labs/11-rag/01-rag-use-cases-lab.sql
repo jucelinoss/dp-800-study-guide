@@ -13,6 +13,8 @@
 --   4. Multi-turn Conversation History Maintenance (`ConversationHistory`)
 --   5. Practical Project Scenarios (Grounding Against AI Hallucinations)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/11-rag/01-rag-use-cases.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -130,3 +132,7 @@ SELECT
     'SIM (Altera os pesos internos do modelo)',
     'Ajustar tom de voz, formato estrito de saída ou vocabulário especializado';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/11-rag/01-rag-use-cases.md
+-- =================================================================================================

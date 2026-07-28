@@ -13,6 +13,8 @@
 --   4. Batch embedding generation through external models or REST
 --   5. Practical Design Scenarios (Preparation for Vector RAG Search)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/09-models-embeddings/03-chunking-generation.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -224,3 +226,7 @@ SELECT
     'Highly variable chunk sizes',
     'Articles, manuals, and Q&A knowledge bases';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/09-models-embeddings/03-chunking-generation.md
+-- =================================================================================================

@@ -5,6 +5,9 @@
 -- Prerequisite: Labs 01-06 (familiarity with AdventureWorks schema)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/07-change-data-safely.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- WARNING: This lab uses BEGIN TRAN / ROLLBACK to prevent permanent
 -- changes. Replace ROLLBACK with COMMIT only when you intend to save.
 
@@ -173,4 +176,7 @@ GO
 -- 3. What is the difference between DELETE and TRUNCATE in terms of
 --    logging, WHERE support, and identity reset?
 -- 4. Write a TRY/CATCH block around an UPDATE that might fail.
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/07-change-data-safely.md
+-- =================================================================================================

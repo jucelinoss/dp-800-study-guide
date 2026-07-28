@@ -417,4 +417,4 @@ ORDER BY vs.distance;
 
 ---
 
-**[← Anterior](./01-fulltext-search.md) | [↑ Voltar à Seção](./intelligent-search.md) | [Próximo →](./03-hybrid-search-rrf.md)**
+**[← Anterior](./01-fulltext-search.md) | [↑ Voltar à Seção](./intelligent-search.md) | [Lab: Vector Search](../../practice/labs/10-intelligent-search/02-vector-search-lab.sql) | [Próximo →](./03-hybrid-search-rrf.md)**

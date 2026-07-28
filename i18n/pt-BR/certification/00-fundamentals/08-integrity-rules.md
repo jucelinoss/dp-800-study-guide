@@ -376,4 +376,4 @@ Restrições são os blocos de construção do design confiável de banco de dad
 
 ---
 
-**[← Anterior](./07-change-data-safely.md) | [↑ Voltar à Seção](./fundamentals.md) | [Próximo →](./09-subqueries-and-ctes.md)**
+**[← Anterior](./07-change-data-safely.md) | [↑ Voltar à Seção](./fundamentals.md) | [Lab: Integrity Rules](../../practice/labs/00-fundamentals/08-integrity-rules.sql) | [Próximo →](./09-subqueries-and-ctes.md)**

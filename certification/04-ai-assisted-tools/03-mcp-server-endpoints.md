@@ -473,4 +473,4 @@ D. GitHub Copilot does not support MCP servers for database access
 
 ---
 
-**[← Previous](./02-github-copilot-setup.md) | [↑ Back to Section](./ai-assisted-tools.md)**
+**[← Previous](./02-github-copilot-setup.md) | [↑ Back to Section](./ai-assisted-tools.md) | [Lab: MCP Server Endpoints](../../practice/labs/04-ai-assisted-tools/03-mcp-server-endpoints-lab.sql)**

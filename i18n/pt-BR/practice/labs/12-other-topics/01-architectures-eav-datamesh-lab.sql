@@ -11,6 +11,9 @@
 --   2. AGRUPAMENTO 2: Data Mesh & Produtos de Dados (Data Products) sem Redesplegue de Código
 --   3. AGRUPAMENTO 3: Simulação de Ambientes (On-Premises, Nuvem/Fabric Zero-ETL e Híbrido/Azure Arc)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/12-other-topics/01-architectures-eav-datamesh-sqlserver.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -198,3 +201,7 @@ GO
 -- Limpar contexto de sessão
 EXEC sp_set_session_context @key = N'CurrentTenantID', @value = NULL;
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/12-other-topics/01-architectures-eav-datamesh-sqlserver.md
+-- =================================================================================================

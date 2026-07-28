@@ -411,4 +411,4 @@ D. Executar o filtro usando `TRANSLATE(Name, 'Smith', '     ') IS NULL`.
 
 ---
 
-**[← Anterior](./02-json-functions.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Próximo →](./04-graph-queries.md)**
+**[← Anterior](./02-json-functions.md) | [↑ Voltar para a Seção](./advanced-tsql.md) | [Lab: Regex e Fuzzy Matching](../../practice/labs/03-advanced-tsql/03-regex-fuzzy-matching-lab.sql) | [Próximo →](./04-graph-queries.md)**

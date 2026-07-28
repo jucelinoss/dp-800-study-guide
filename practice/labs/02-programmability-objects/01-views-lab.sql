@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: VIEWS (SIMPLE, INDEXED, SCHEMABINDING AND CHECK OPTION)
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/02-programmability-objects/01-views.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need
 -- to restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -636,6 +639,11 @@ DROP TABLE IF EXISTS lab.Orders;
 DROP TABLE IF EXISTS lab.Customers;
 DROP TABLE IF EXISTS lab.Products;
 */
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/02-programmability-objects/01-views.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

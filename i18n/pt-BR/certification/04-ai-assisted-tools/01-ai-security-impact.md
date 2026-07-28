@@ -458,4 +458,4 @@ D. Utilizar a propriedade `EXECUTE AS OWNER` em todas as procedures criadas pela
 
 ---
 
-**[↑ Voltar para a Seção](./ai-assisted-tools.md) | [Próximo →](./02-github-copilot-setup.md)**
+**[↑ Voltar para a Seção](./ai-assisted-tools.md) | [Lab: Impacto de Segurança em IA](../../practice/labs/04-ai-assisted-tools/01-ai-security-impact-lab.sql) | [Próximo →](./02-github-copilot-setup.md)**

@@ -400,4 +400,4 @@ D. ALTER PARTITION FUNCTION MERGE RANGE on the oldest boundary
 
 ---
 
-**[← Previous](./04-constraints-sequences.md) | [↑ Back to Section](./database-objects.md)**
+**[← Previous](./04-constraints-sequences.md) | [↑ Back to Section](./database-objects.md) | [Lab: Partitioning](../../practice/labs/01-database-objects/05-partitioning-lab.sql)**

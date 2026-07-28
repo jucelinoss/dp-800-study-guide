@@ -6,6 +6,9 @@
 -- Habilite o plano REAL nas Partes 3 e 6; anote linhas estimadas/reais, leituras,
 -- CPU, memória e operadores. Modelagem e índices são aprofundados no Lab 01.
 -- =============================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/03-advanced-tsql/02-json-functions.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =============================================================================
 
 USE AdventureWorks2025;
 GO
@@ -550,3 +553,7 @@ GO
 -- DROP TABLE IF EXISTS lab.JsonFunctionsStage;
 -- DROP TABLE IF EXISTS lab.JsonFunctionsOrders;
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/03-advanced-tsql/02-json-functions.md
+-- =================================================================================================

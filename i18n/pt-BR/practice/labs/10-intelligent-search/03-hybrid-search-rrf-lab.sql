@@ -20,6 +20,8 @@
 --   Hybrid Search Azure AI Search: https://learn.microsoft.com/azure/search/hybrid-search-overview
 --   Reciprocal Rank Fusion:     https://learn.microsoft.com/azure/search/hybrid-search-ranking
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/10-intelligent-search/03-hybrid-search-rrf.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -556,3 +558,7 @@ GO
 
 PRINT CHAR(13)+CHAR(10) + N'>>> FIM MODULO 10-INTELLIGENT SEARCH (3 labs: FTS / Vector / Hybrid RRF).';
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/10-intelligent-search/03-hybrid-search-rrf.md
+-- =================================================================================================

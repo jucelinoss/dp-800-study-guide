@@ -13,6 +13,8 @@
 --   4. Handling HTTP API Errors (200 OK vs 400 Bad Request vs 429 Rate Limit)
 --   5. Practical Project Scenarios (Structured JSON Output Generation via `response_format`)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/11-rag/02-prompts-and-responses.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -178,3 +180,7 @@ SELECT
 GO
 -- Production checklist: validate structured output, log a correlation ID, retain
 -- retrieval/source references, and store only approved fields. Never log secrets.
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/11-rag/02-prompts-and-responses.md
+-- =================================================================================================

@@ -2,6 +2,9 @@
 -- DP-800 - PRACTICAL LAB: SECURITY AND IMPACT OF AI-ASSISTED TOOLS
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/04-ai-assisted-tools/01-ai-security-impact.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -160,3 +163,7 @@ WHERE t.TABLE_TYPE = 'BASE TABLE'
   )
 ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/04-ai-assisted-tools/01-ai-security-impact.md
+-- =================================================================================================

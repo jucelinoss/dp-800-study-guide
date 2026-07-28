@@ -22,6 +22,9 @@
 --   Azure OpenAI Chat Completions:
 --     https://learn.microsoft.com/azure/ai-services/openai/reference#chat-completions
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/11-rag/02-prompts-and-responses.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -789,3 +792,7 @@ GO
 PRINT CHAR(13)+CHAR(10) + '>>> PARABENS! Voce concluiu os labs 11-RAG (01 e 02).';
 PRINT N'    Revise agora as cheat-sheets do Dominio 3 e faca as questoes de pratica.';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/11-rag/02-prompts-and-responses.md
+-- =================================================================================================

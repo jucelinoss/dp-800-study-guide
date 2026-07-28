@@ -443,4 +443,4 @@ estaticamente o formato, como em alguns caminhos de SQL dinâmico.
 
 ---
 
-**[← Anterior](./02-functions.md) | [↑ Voltar para a Seção](./programmability-objects.md) | [Próximo →](./04-triggers.md)**
+**[← Anterior](./02-functions.md) | [↑ Voltar para a Seção](./programmability-objects.md) | [Lab: Stored Procedures](../../practice/labs/02-programmability-objects/03-stored-procedures-lab.sql) | [Próximo →](./04-triggers.md)**

@@ -569,4 +569,4 @@ SQL Server/Azure SQL version before using preview features.
 
 ---
 
-**[← Previous](./01-ctes-window-functions.md) | [↑ Back to Section](./advanced-tsql.md) | [Next →](./03-regex-fuzzy-matching.md)**
+**[← Previous](./01-ctes-window-functions.md) | [↑ Back to Section](./advanced-tsql.md) | [Lab: JSON Functions](../../practice/labs/03-advanced-tsql/02-json-functions-lab.sql) | [Next →](./03-regex-fuzzy-matching.md)**

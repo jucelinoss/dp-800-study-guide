@@ -387,4 +387,4 @@ D. Use TRANSLATE(Name, 'Smith', '     ') IS NULL
 
 ---
 
-**[← Previous](./02-json-functions.md) | [↑ Back to Section](./advanced-tsql.md) | [Next →](./04-graph-queries.md)**
+**[← Previous](./02-json-functions.md) | [↑ Back to Section](./advanced-tsql.md) | [Lab: Regex and Fuzzy Matching](../../practice/labs/03-advanced-tsql/03-regex-fuzzy-matching-lab.sql) | [Next →](./04-graph-queries.md)**

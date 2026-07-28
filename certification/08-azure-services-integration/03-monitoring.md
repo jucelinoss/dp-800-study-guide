@@ -375,4 +375,4 @@ AzureDiagnostics
 
 ---
 
-**[← Previous](./02-rest-graphql-endpoints.md) | [↑ Back to Section](./azure-services-integration.md) | [Next →](./04-change-event-handling.md)**
+**[← Previous](./02-rest-graphql-endpoints.md) | [↑ Back to Section](./azure-services-integration.md) | [Lab: Monitoring](../../practice/labs/08-azure-services-integration/03-monitoring-lab.sql) | [Next →](./04-change-event-handling.md)**

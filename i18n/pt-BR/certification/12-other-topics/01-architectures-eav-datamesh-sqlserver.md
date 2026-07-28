@@ -206,3 +206,7 @@ sequenceDiagram
 ## 🏁 Conclusão
 
 A evolução do SQL Server transformou o banco de dados de um mero motor relacional tradicional em uma plataforma de dados completa, capaz de processar dados não-estruturados (JSON, Vetores), atuar em arquiteturas modernas descentralizadas (Data Mesh) e operar de forma transparente em ambientes locais, híbridos e multicloud.
+
+---
+
+**[↑ Voltar para a Certificação](../dp-800-overview.md) | [Lab: Arquiteturas, EAV e Data Mesh](../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql)**

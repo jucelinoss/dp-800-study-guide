@@ -206,4 +206,4 @@ D. Enable JSON path strict mode
 
 ---
 
-**[← Previous](./02-specialized-tables.md) | [↑ Back to Section](./database-objects.md) | [Next →](./04-constraints-sequences.md)**
+**[← Previous](./02-specialized-tables.md) | [↑ Back to Section](./database-objects.md) | [Lab: JSON Columns and Indexes](../../practice/labs/01-database-objects/03-json-columns-lab.sql) | [Next →](./04-constraints-sequences.md)**

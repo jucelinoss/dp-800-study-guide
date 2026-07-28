@@ -388,4 +388,4 @@ distância numérica e normalização de `RANK`: `(distance * 0.60) + ((1.0 - ra
 
 ---
 
-**[← Anterior](./02-vector-search.md) | [↑ Voltar à Seção](./intelligent-search.md)**
+**[← Anterior](./02-vector-search.md) | [↑ Voltar à Seção](./intelligent-search.md) | [Lab: Hybrid Search RRF](../../practice/labs/10-intelligent-search/03-hybrid-search-rrf-lab.sql)**

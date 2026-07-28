@@ -414,4 +414,4 @@ D. `Email = ''`
 
 ---
 
-**[← Previous](./01-sql-server-and-tools.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./03-create-and-load-data.md)**
+**[← Previous](./01-sql-server-and-tools.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Create Tables](../../practice/labs/00-fundamentals/02-create-tables.sql) | [Next →](./03-create-and-load-data.md)**

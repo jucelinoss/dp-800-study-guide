@@ -429,4 +429,4 @@ SELECT lcid, name FROM sys.fulltext_languages ORDER BY name;
 
 ---
 
-**[↑ Voltar à Seção](./intelligent-search.md) | [Próximo →](./02-vector-search.md)**
+**[↑ Voltar à Seção](./intelligent-search.md) | [Lab: Full-Text Search](../../practice/labs/10-intelligent-search/01-fulltext-search-lab.sql) | [Próximo →](./02-vector-search.md)**

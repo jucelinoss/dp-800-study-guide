@@ -444,4 +444,4 @@ D. Force a specific plan using sp_query_store_force_plan
 
 ---
 
-**[← Previous](./02-transaction-isolation-concurrency.md) | [↑ Back to Section](./performance-optimization.md)**
+**[← Previous](./02-transaction-isolation-concurrency.md) | [↑ Back to Section](./performance-optimization.md) | [Lab: Query Performance Troubleshooting](../../practice/labs/06-performance-optimization/03-query-performance-troubleshooting-lab.sql)**

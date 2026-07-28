@@ -23,6 +23,9 @@
 --   - VECTOR Data Type:
 --     https://learn.microsoft.com/en-us/sql/t-sql/data-types/vector-data-type
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/09-models-embeddings/01-external-models.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -574,3 +577,7 @@ GO
 
 PRINT CHAR(13)+CHAR(10) + N'>>> PROXIMO: Lab 09-ME 02 - Manutencao de Embeddings (drift, 6 metodos, Foundry).';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/09-models-embeddings/01-external-models.md
+-- =================================================================================================

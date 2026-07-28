@@ -2,6 +2,9 @@
 -- DP-800 - HANDS-ON LAB: CONSTRAINTS AND SEQUENCES
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/01-database-objects/04-constraints-sequences.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -736,6 +739,11 @@ GO
 -- and TX-103 received the new ID 5002!
 SELECT GlobalSalesID, TransactionCode, CustomerCPF, Amount, LastUpdated FROM lab.ConsolidatedSalesDW;
 GO
+
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/01-database-objects/04-constraints-sequences.md
+-- =================================================================================================
 
 -- =================================================================================================
 -- OFFICIAL MICROSOFT LEARN REFERENCES

@@ -14,6 +14,9 @@
 --   5. Practical design scenarios (simulated pipeline execution with deployment transactions)
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/07-cicd-database-projects/04-deployment-pipelines.md
+
 USE AdventureWorks2025;
 GO
 
@@ -108,3 +111,7 @@ sqlpackage /Action:Publish \
     /p:GenerateSmartDefaults=true
 */
 GO
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/07-cicd-database-projects/04-deployment-pipelines.md
+-- =================================================================================================

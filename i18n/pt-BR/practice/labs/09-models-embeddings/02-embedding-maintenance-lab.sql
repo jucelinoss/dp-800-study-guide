@@ -27,6 +27,9 @@
 --   - Microsoft Foundry (RAG and Vector Search solutions):
 --     https://learn.microsoft.com/en-us/foundry/
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/09-models-embeddings/02-embedding-maintenance.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 
 USE AdventureWorks2025;
 GO
@@ -760,3 +763,7 @@ GO
 
 PRINT CHAR(13)+CHAR(10) + N'>>> PROXIMO: Lab 09-ME (03) - Chunking & Geracao & Batch JSON parsing.';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/09-models-embeddings/02-embedding-maintenance.md
+-- =================================================================================================

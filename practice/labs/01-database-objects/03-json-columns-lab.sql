@@ -5,6 +5,9 @@
 -- Goal: decide which attributes stay relational and when a JSON attribute deserves
 -- an indexable projection. JSON parsing and serialization are covered in the JSON Functions lab.
 -- =============================================================================
+-- THEORY REFERENCE: ../../../certification/01-database-objects/03-json-columns.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =============================================================================
 
 USE AdventureWorks2025;
 GO
@@ -255,3 +258,7 @@ GO
 -- Optional cleanup:
 -- DROP TABLE IF EXISTS lab.JsonColumnsOrders;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/01-database-objects/03-json-columns.md
+-- =================================================================================================

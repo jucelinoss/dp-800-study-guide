@@ -349,4 +349,4 @@ You need a throwaway copy of two columns for an exploratory query. Which pattern
 
 ---
 
-**[← Previous](./02-relational-model-and-data-types.md) | [↑ Back to Section](./fundamentals.md) | [Next →](./04-select-and-filter.md)**
+**[← Previous](./02-relational-model-and-data-types.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Load and Read Data](../../practice/labs/00-fundamentals/03-load-and-read-data.sql) | [Next →](./04-select-and-filter.md)**

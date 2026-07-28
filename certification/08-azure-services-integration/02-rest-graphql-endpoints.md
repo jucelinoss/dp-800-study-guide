@@ -495,4 +495,4 @@ apply to different products and control planes.
 
 ---
 
-**[← Previous](./01-data-api-builder.md) | [↑ Back to Section](./azure-services-integration.md) | [Next →](./03-monitoring.md)**
+**[← Previous](./01-data-api-builder.md) | [↑ Back to Section](./azure-services-integration.md) | [Lab: REST and GraphQL Endpoints](../../practice/labs/08-azure-services-integration/02-rest-graphql-endpoints-lab.sql) | [Next →](./03-monitoring.md)**

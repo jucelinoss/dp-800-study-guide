@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: TABELAS ESPECIALIZADAS (SPECIALIZED TABLES)
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/01-database-objects/02-specialized-tables.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -1249,6 +1252,10 @@ IF OBJECT_ID('tempdb..#SalesImport') IS NOT NULL DROP TABLE #SalesImport;
 GO
 */
 
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/01-database-objects/02-specialized-tables.md
+-- =================================================================================================
 -- =================================================================================================
 -- REFERÊNCIAS OFICIAIS DO MICROSOFT LEARN
 -- =================================================================================================

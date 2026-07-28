@@ -515,4 +515,4 @@ chamador também precisa de read/write apropriado no datasource.
 
 ---
 
-**[← Anterior](./01-data-api-builder.md) | [↑ Voltar para a Seção](./azure-services-integration.md) | [Próximo →](./03-monitoring.md)**
+**[← Anterior](./01-data-api-builder.md) | [↑ Voltar para a Seção](./azure-services-integration.md) | [Lab: Endpoints REST e GraphQL](../../practice/labs/08-azure-services-integration/02-rest-graphql-endpoints-lab.sql) | [Próximo →](./03-monitoring.md)**

@@ -5,6 +5,9 @@
 -- Prerequisite: Labs 01-05 (AGGREGATION concepts required)
 -- ====================================================================
 
+-- THEORY REFERENCE: ../../../certification/00-fundamentals/06-aggregation-and-grouping.md
+--    Open the theory guide alongside this lab for conceptual context.
+
 -- ====================================================================
 -- Derived table: subquery in FROM with required alias
 -- KEY CONCEPT: A derived table is an inline view. It must have an alias.
@@ -208,4 +211,7 @@ GO
 -- 3. When would you choose a #TempTable over a CTE?
 -- 4. Create a table variable holding today's high-value orders
 --    (TotalDue > 5000) and query it.
--- ====================================================================
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/00-fundamentals/06-aggregation-and-grouping.md
+-- =================================================================================================

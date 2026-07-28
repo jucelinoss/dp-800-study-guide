@@ -5,6 +5,8 @@
 -- Pré-requisito: AdventureWorks deve estar restaurado em sua instância.
 --   Download: https://learn.microsoft.com/sql/samples/adventureworks-install-configure
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/03-create-and-load-data.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- NOTA DE CONFIGURAÇÃO: Se o AdventureWorks ainda não estiver instalado, restaure
 -- o backup OLTP. O schema usado aqui é padrão em todas as versões do AdventureWorks.
@@ -163,3 +165,7 @@ GO
 -- 3. Encontre todas as pessoas cujo sobrenome começa com 'S'.
 -- 4. Use OFFSET-FETCH para retornar produtos 11-20 quando ordenados por Name.
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/03-create-and-load-data.md
+-- =================================================================================================

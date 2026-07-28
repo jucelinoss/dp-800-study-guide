@@ -13,6 +13,8 @@
 --   4. Rastreamento de Refatoração de Nomes via Tabela de Log (`__RefactorLog`)
 --   5. Cenários Práticos de Projeto (Simulação de Ações de Proteção contra Perda de Dados em CI/CD)
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -120,3 +122,7 @@ SELECT
     'OutputPath: ./deploy.sql',
     'Recomendado para revisão por DBAs em ambientes estritos';
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
+-- =================================================================================================

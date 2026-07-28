@@ -4,6 +4,8 @@
 -- Objetivo: Derived tables, CTEs, temp tables, table variables
 -- Pré-requisito: Laboratórios 01-05 (conceitos de AGREGAÇÃO necessários)
 -- ====================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/00-fundamentals/06-aggregation-and-grouping.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
 
 -- ====================================================================
 -- Derived table: subconsulta no FROM com alias obrigatório
@@ -209,3 +211,7 @@ GO
 -- 4. Crie uma table variable contendo pedidos de alto valor de hoje
 --    (TotalDue > 5000) e consulte-a.
 -- ====================================================================
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/00-fundamentals/06-aggregation-and-grouping.md
+-- =================================================================================================

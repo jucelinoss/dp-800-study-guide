@@ -13,6 +13,8 @@
 --   4. Architecture Comparison: CDC vs CT vs Event Grid / Fabric Change Event Streaming
 --   5. Practical Project Scenarios (Integration Queue for Azure Functions and Logic Apps)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/08-azure-services-integration/04-change-event-handling.md
+--    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
 GO
@@ -124,3 +126,7 @@ SELECT
     'Baixo / Mínimo',
     'Sincronização com Clientes Mobile, Azure Functions Trigger Binding';
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/08-azure-services-integration/04-change-event-handling.md
+-- =================================================================================================

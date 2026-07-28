@@ -23,6 +23,8 @@
 --   FREETEXTTABLE:
 --     https://learn.microsoft.com/en-us/sql/relational-databases/system-functions/freetexttable-transact-sql
 -- =================================================================================
+-- REFERENCIA TEORICA: ../../../certification/10-intelligent-search/01-fulltext-search.md
+--    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
@@ -590,3 +592,7 @@ GO
 
 PRINT CHAR(13)+CHAR(10) + N'>>> PROXIMO: Lab 10-IS 02 - Vector Search (VECTOR_DISTANCE, ANN DiskANN).';
 GO
+
+-- =================================================================================================
+-- PROXIMO PASSO: Revise a teoria em ../../../certification/10-intelligent-search/01-fulltext-search.md
+-- =================================================================================================

@@ -14,6 +14,9 @@
 --   5. Practical Project Scenarios (Simulation of Data Loss Protection Actions in CI/CD)
 -- =================================================================================
 
+-- NOTE: Theory content for this chapter is available at:
+--       ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
+
 USE AdventureWorks2025;
 GO
 
@@ -120,3 +123,7 @@ SELECT
     'OutputPath: ./deploy.sql',
     'Recomendado para revisão por DBAs em ambientes estritos';
 GO
+
+-- =================================================================================================
+-- THEORY REFERENCE: ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
+-- =================================================================================================

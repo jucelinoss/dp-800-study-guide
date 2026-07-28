@@ -2,6 +2,9 @@
 -- DP-800 - PRACTICE LAB: CORRELATED SUBQUERIES AND ADVANCED ERROR HANDLING
 -- Database: AdventureWorks2025 (or similar)
 -- =================================================================================
+-- THEORY REFERENCE: ../../../certification/03-advanced-tsql/05-correlated-queries-error-handling.md
+--    Open the theory guide alongside this lab for conceptual context.
+-- =================================================================================
 -- SETUP NOTE: To run this and other lab scripts, you need to
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -412,3 +415,7 @@ BEGIN
     END CATCH;
 END;
 GO
+
+-- =================================================================================================
+-- NEXT STEP: Review the theory at ../../../certification/03-advanced-tsql/05-correlated-queries-error-handling.md
+-- =================================================================================================

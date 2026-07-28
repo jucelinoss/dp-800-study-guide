@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRÁTICO: ENDPOINTS SEGUROS, FIREWALL E CREDENCIAIS DE ESCOPO
 -- Banco de Dados: AdventureWorks2025 (ou similar)
 -- =================================================================================
+-- REFERÊNCIA TEÓRICA: ../../../certification/05-data-security-compliance/05-secure-endpoints.md
+--    Abra o guia teórico junto com este laboratório para contexto conceitual.
+-- =================================================================================
 -- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
@@ -115,3 +118,7 @@ SELECT
     'NÃO (Endpoint Público continua ativo)',
     'Abordagem legada; reduz latência mas exige regras de firewall';
 GO
+
+-- =================================================================================================
+-- PRÓXIMO PASSO: Revise a teoria em ../../../certification/05-data-security-compliance/05-secure-endpoints.md
+-- =================================================================================================

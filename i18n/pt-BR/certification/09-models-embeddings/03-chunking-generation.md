@@ -429,4 +429,4 @@ WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
 
 ---
 
-**[← Anterior](./02-embedding-maintenance.md) | [↑ Voltar à Seção](./models-embeddings.md)**
+**[← Anterior](./02-embedding-maintenance.md) | [↑ Voltar à Seção](./models-embeddings.md) | [Lab: Chunking e Geração](../../practice/labs/09-models-embeddings/03-chunking-generation-lab.sql)**
