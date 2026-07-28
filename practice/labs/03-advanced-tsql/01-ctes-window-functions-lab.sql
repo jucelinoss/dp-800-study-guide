@@ -523,22 +523,44 @@ BEGIN
     -- STEP 1: STATIC VALIDATION (no dynamic SQL yet)
     DECLARE @obj_id INT = OBJECT_ID(@table_name);
     IF @obj_id IS NULL
+    BEGIN;
         THROW 50001, N'[sp_render_tree] Table does not exist. Use 2-part name if schema is not dbo.', 1;
+        END;
 
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_dad)
+    DECLARE @is_temp_table BIT = CASE
+        WHEN @table_name LIKE N'#%' OR @table_name LIKE N'tempdb..#%' THEN 1
+        ELSE 0
+    END;
+
+    IF (@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_dad))
+       OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_dad))
+    BEGIN;
         THROW 50002, N'[sp_render_tree] Parent column (col_dad) not found in target table.', 1;
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_son)
+    END;
+    IF (@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_son))
+       OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_son))
+    BEGIN;
         THROW 50003, N'[sp_render_tree] Child column (col_son) not found in target table.', 1;
+    END;
     IF @col_label IS NOT NULL AND
-       NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_label)
+       ((@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_label))
+        OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_label)))
+    BEGIN;
         THROW 50004, N'[sp_render_tree] Label column (col_label) not found in target table.', 1;
+    END;
     IF @tree_style NOT IN ('md', 'asc')
+    BEGIN;
         THROW 50005, N'[sp_render_tree] @tree_style must be ''md'' (markdown) or ''asc'' (ascii).', 1;
+    END;
 
     -- Build safe identifiers via QUOTENAME
     DECLARE @schema_name SYSNAME = OBJECT_SCHEMA_NAME(@obj_id);
     DECLARE @table_only  SYSNAME = OBJECT_NAME(@obj_id);
-    DECLARE @q_table NVARCHAR(300) = QUOTENAME(@schema_name) + N'.' + QUOTENAME(@table_only);
+    DECLARE @temp_table_only SYSNAME = PARSENAME(@table_name, 1);
+    DECLARE @q_table NVARCHAR(300) = CASE
+        WHEN @is_temp_table = 1 THEN N'tempdb..' + QUOTENAME(@temp_table_only)
+        ELSE QUOTENAME(@schema_name) + N'.' + QUOTENAME(@table_only)
+    END;
     DECLARE @q_dad   NVARCHAR(150) = QUOTENAME(@col_dad);
     DECLARE @q_son   NVARCHAR(150) = QUOTENAME(@col_son);
     DECLARE @q_label NVARCHAR(150) = CASE WHEN @col_label IS NULL THEN @q_son ELSE QUOTENAME(@col_label) END;
@@ -550,7 +572,7 @@ BEGIN
     --         * CyclePath = ID path delimited for cycle detection
     --         * PrefixAcc = accumulated ASCII prefix for box-drawing
     --         * Level + IsLastSibling
-    DECLARE @sql NVARCHAR(MAX) = N'
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
 ;WITH BaseTable AS (
     SELECT
         ' + @q_dad   + N' AS dad_id,
@@ -590,7 +612,7 @@ RecursiveTree AS (
         b.dad_id, b.son_id, b.node_label, b.son_id_str,
         Level      = rt.Level + 1,
         IsCycle    = CAST(CASE
-                        WHEN CHARINDEX(N''»'' + CONVERT(NVARCHAR(MAX), b.dad_id) + N''«'', rt.CyclePath) > 0
+                        WHEN CHARINDEX(N''»'' + b.son_id_str + N''«'', rt.CyclePath) > 0
                         THEN 1 ELSE 0 END AS BIT),
         PrefixAcc  = CAST(rt.PrefixAcc
                         + CASE WHEN rt.IsLastSibling = 1 THEN N''    ''
@@ -619,7 +641,7 @@ FROM (
                      ELSE PrefixAcc
                         + CASE WHEN IsLastSibling = 1 THEN N''\-- '' ELSE N''|-- '' END END
                 + node_label
-                + CASE WHEN IsCycle = 1 THEN N''  [CYCLE path='' + REPLACE(CyclePath, N''»«'', N''<'') + N'']'' ELSE N'''' END
+                + CASE WHEN IsCycle = 1 THEN N''  [CYCLE DETECTED]'' ELSE N'''' END
         END AS ResultColumn
     FROM RecursiveTree
 ) x
@@ -656,7 +678,8 @@ EXEC lab.sp_render_tree
      @col_dad    = 'ManagerID',
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
-     @tree_style = 'md';
+     @tree_style = 'md',
+     @debug_sql  = 0;
 GO
 
 PRINT '=== Example 2: Same tree in ASCII (box-drawing) ===';
@@ -665,7 +688,8 @@ EXEC lab.sp_render_tree
      @col_dad    = 'ManagerID',
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
-     @tree_style = 'asc';
+     @tree_style = 'asc',
+     @debug_sql  = 0;
 GO
 
 PRINT '=== Example 3: Sub-tree starting from Region A Manager (EmployeeID = 3) ===';
@@ -675,7 +699,8 @@ EXEC lab.sp_render_tree
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
      @root_id    = '3',
-     @tree_style = 'asc';
+     @tree_style = 'asc',
+     @debug_sql  = 0;
 GO
 
 -- Example 4: Real AdventureWorks hierarchy via HIERARCHYID conversion

@@ -18,9 +18,11 @@
 --   Parte 3    → Window Framing: ROWS vs RANGE (Running Total com empates em data)
 --   Parte 4    → Offset Functions: LAG, LEAD, FIRST_VALUE e a ARMADILHA LAST_VALUE
 --   Extra 4.1  → RANGE vs ROWS no LAST_VALUE (linhas empatadas em Amount)
---   Parte 4.2  → 🧠 lab.sp_render_tree: função genérica para renderizar
+--   Parte 4.2  → lab.sp_render_tree: função genérica para renderizar
 --                 QUALQUER hierarquia de adjacency-list em Markdown / ASCII Tree
 --                 (SQL dinâmico SEGURO com QUOTENAME + detecção automática de ciclo)
+--   Parte 4.3  → lab.sp_render_mermaid: diagrama Mermaid de hierarquia (graph TD/LR/BT/RL)
+--                 (SQL dinâmico seguro, validação de colunas via sys.columns)
 --   Parte 5    → Cenários de Produção:
 --      C1. Deduplicação por grupo (ROW_NUMBER + CTE WHERE rn = 1)
 --      C2. Percentis: PERCENTILE_CONT/DISC + CUME_DIST + PERCENT_RANK
@@ -190,7 +192,7 @@ SELECT
                      THEN 'SIM (materializado)' ELSE 'NAO (executado 2x)' END
 FROM CteComGuid a
 INNER JOIN CteComGuid b ON a.SalesPersonID = b.SalesPersonID;
--- 👇 Resultado esperado: MesmoGuid = "NAO" — prova que a CTE rodou duas vezes!
+--  Resultado esperado: MesmoGuid = "NAO" — prova que a CTE rodou duas vezes!
 GO
 
 -- ===== (B) #TEMP referenciada DUAS VEZES → NEWID() igual em ambas as colunas =====
@@ -209,7 +211,7 @@ SELECT
                      THEN 'SIM (materializado)' ELSE 'NAO (executado 2x)' END
 FROM #TempComGuid a
 INNER JOIN #TempComGuid b ON a.SalesPersonID = b.SalesPersonID;
--- 👇 Resultado esperado: MesmoGuid = "SIM" — a #temp é calculada UMA vez e reutilizada.
+--  Resultado esperado: MesmoGuid = "SIM" — a #temp é calculada UMA vez e reutilizada.
 DROP TABLE IF EXISTS #TempComGuid;
 GO
 
@@ -243,9 +245,9 @@ GO
 
 
 -- =================================================================================
--- 🔑 AULA TEÓRICA: O QUE REALMENTE FAZ O "PARTITION BY" DENTRO DE OVER()?
+--  AULA TEÓRICA: O QUE REALMENTE FAZ O "PARTITION BY" DENTRO DE OVER()?
 -- =================================================================================
--- Esta é a explicação que cristaliza o que o MS Learn DP-800 não deixa explícito. 👇
+-- Esta é a explicação que cristaliza o que o MS Learn DP-800 não deixa explícito.
 --
 -- Imagine que a cláusula OVER() tem 3 "botões de configuração" EXECUTADOS NESSA ORDEM:
 --
@@ -254,8 +256,8 @@ GO
 --    3. ROWS/RANGE   →  PEGA UMA "JANELINHA" DESLIZANTE DENTRO DO GRUPO ORDENADO
 --
 -- A regra mais importante:
---    ⚠️  "OVER()" SEM NENHUM PARÂMETRO  =  UMA ÚNICA PARTIÇÃO = TODO O MUNDO JUNTO
---    ⚠️  "OVER(PARTITION BY col)"        =  N PARTIÇÕES INDEPENDENTES, UMA POR VALOR
+--    ATENÇÃO: "OVER()" SEM NENHUM PARÂMETRO  =  UMA ÚNICA PARTIÇÃO = TODO O MUNDO JUNTO
+--    ATENÇÃO: "OVER(PARTITION BY col)"        =  N PARTIÇÕES INDEPENDENTES, UMA POR VALOR
 --
 -- Vamos calcular NA MÃO o efeito de PARTITION BY sobre a função LAG()
 -- usando este mini-subconjunto do nosso lab.SalesData (vendedores 101 e 102):
@@ -275,7 +277,7 @@ GO
 --       Linha L1 → LAG(Amount) = NULL (não tem linha anterior na partição)
 --       Linha L2 → LAG(Amount) = 500  (vem da L1 — mesmo vendedor)
 --       Linha L3 → LAG(Amount) = 800  (vem da L2 — mesmo vendedor)
---       Linha L4 → LAG(Amount) = 1200 (vem da L3 — VENDEDOR DIFERENTE! 🚨BUG)
+--       Linha L4 → LAG(Amount) = 1200 (vem da L3 — VENDEDOR DIFERENTE! BUG)
 --       Linha L5 → LAG(Amount) = 500  (vem da L4)
 --
 --       Resultado: Vendedor 102 pega o Amount do vendedor 101 como "anterior"!
@@ -344,7 +346,7 @@ SELECT
 
 FROM lab.SalesData
 ORDER BY SalesPersonID, Amount DESC, SaleID;
--- 👉 OBSERVAÇÕES didáticas:
+-- OBSERVAÇÕES didáticas:
 --    • Vendedor 101 (R$500, 800, 1200): no LAB A ele aparece como posições 5,3,1 (global)
 --      mas no LAB B ele é 3,2,1 (porque só compete com ele mesmo)
 --    • Vendedor 102 tem Amount EMPATADO em R$500 (2 linhas). No LAB B, DENSE_RANK retorna
@@ -432,7 +434,7 @@ SELECT
 
 FROM lab.SalesData
 ORDER BY SaleDate, SaleID;
--- 👉 OBSERVAÇÕES didáticas cruciais:
+-- OBSERVAÇÕES didáticas cruciais:
 --    • Compare a linha do vendedor 103 em 12/jan (SaleID 6 e 7):
 --        - A_RT_Global_RANGE pulou 2 de uma vez (bloco RANGE 12/jan inteiro)
 --        - B_RT_PorVend_RANGE = 750 em AMBAS as linhas 6 e 7 (bloco por vendedor)
@@ -509,7 +511,7 @@ SELECT
 FROM lab.SalesData
 ORDER BY SaleDate, SaleID;
 GO
--- 👉 OBSERVAÇÕES didáticas cruciais para DP-800:
+-- OBSERVAÇÕES didáticas cruciais para DP-800:
 --    • A_LAG_Global: 1ª linha é 0 (default), 2ª linha pega o valor da 1ª LINHA DA TABELA
 --      (que é do VENDEDOR 104, não do mesmo vendedor!). Já B_LAG_PorVend re-zera para 0
 --      SEMPRE na primeira venda de cada novo vendedor.
@@ -571,17 +573,17 @@ GO
 --        @tree_style = 'md';                      -- 'md' (markdown) | 'ascii'
 --
 -- SEGURANÇA (alinhada com MS Learn Dynamic SQL):
---   ✅ Usa OBJECT_ID() para validar a tabela antes de montar SQL dinâmico
---   ✅ Usa sys.columns para validar colunas de pai/filho/rótulo
---   ✅ TODOS os identificadores são quotados com QUOTENAME() (injeção = impossível)
---   ✅ Dados passados como parâmetros são injetados via sp_executesql tipados
+--   Usa OBJECT_ID() para validar a tabela antes de montar SQL dinâmico
+--   Usa sys.columns para validar colunas de pai/filho/rótulo
+--   TODOS os identificadores são quotados com QUOTENAME() (injeção = impossível)
+--   Dados passados como parâmetros são injetados via sp_executesql tipados
 --
 -- CARACTERÍSTICAS:
---   🧠 Detecção de Ciclo: cada nó carrega um "breadcrumb" dos IDs visitados.
---      Se o pai atual já apareceu no caminho, a recursão pára e marca is_cycle=1.
---   🧠 Renderização ASCII (estilo tree do linux): usa │, ├─, └─ com precisão de
---      "último irmão" → visualização profissional sem monoespaço quebrado.
---   🧠 @root_id opcional: permite renderizar APENAS uma sub-árvore (ex: só a região A).
+--   Detecção de Ciclo: cada nó carrega um "breadcrumb" dos IDs visitados.
+--   Se o filho atual já apareceu no caminho, a recursão pára e marca is_cycle=1.
+--   Renderização ASCII (estilo tree do linux): usa │, ├─, └─ com precisão de
+--   "último irmão" → visualização profissional sem monoespaço quebrado.
+--   @root_id opcional: permite renderizar APENAS uma sub-árvore (ex: só a região A).
 -- =================================================================================
 
 CREATE OR ALTER PROCEDURE lab.sp_render_tree
@@ -602,30 +604,38 @@ BEGIN
     -- =========================================================================
     DECLARE @obj_id INT = OBJECT_ID(@table_name);
     IF @obj_id IS NULL
-    BEGIN
+    BEGIN;
         THROW 50001, N'[sp_render_tree] Tabela não existe. Verifique @table_name (use 2-part name se for schema diferente de dbo).', 1;
         RETURN;
     END;
 
+    DECLARE @is_temp_table BIT = CASE
+        WHEN @table_name LIKE N'#%' OR @table_name LIKE N'tempdb..#%' THEN 1
+        ELSE 0
+    END;
+
     -- Valida @col_dad / @col_son / @col_label via sys.columns
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_dad)
-    BEGIN
+    IF (@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_dad))
+       OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_dad))
+    BEGIN;
         THROW 50002, N'[sp_render_tree] Coluna "pai" (col_dad) não encontrada na tabela alvo.', 1;
         RETURN;
     END;
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_son)
-    BEGIN
+    IF (@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_son))
+       OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_son))
+    BEGIN;
         THROW 50003, N'[sp_render_tree] Coluna "filho" (col_son) não encontrada na tabela alvo.', 1;
         RETURN;
     END;
     IF @col_label IS NOT NULL AND
-       NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_label)
-    BEGIN
+       ((@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_label))
+        OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_label)))
+    BEGIN;
         THROW 50004, N'[sp_render_tree] Coluna de rótulo (col_label) não encontrada na tabela alvo.', 1;
         RETURN;
     END;
     IF @tree_style NOT IN ('md', 'asc')
-    BEGIN
+    BEGIN;
         THROW 50005, N'[sp_render_tree] @tree_style deve ser ''md'' (markdown) ou ''asc'' (ascii).', 1;
         RETURN;
     END;
@@ -633,7 +643,11 @@ BEGIN
     -- Monta identificadores de tabela + colunas SEGUROS via QUOTENAME
     DECLARE @schema_name SYSNAME = OBJECT_SCHEMA_NAME(@obj_id);
     DECLARE @table_only  SYSNAME = OBJECT_NAME(@obj_id);
-    DECLARE @q_table NVARCHAR(300) = QUOTENAME(@schema_name) + N'.' + QUOTENAME(@table_only);
+    DECLARE @temp_table_only SYSNAME = PARSENAME(@table_name, 1);
+    DECLARE @q_table NVARCHAR(300) = CASE
+        WHEN @is_temp_table = 1 THEN QUOTENAME(@temp_table_only)
+        ELSE QUOTENAME(@schema_name) + N'.' + QUOTENAME(@table_only)
+    END;
     DECLARE @q_dad   NVARCHAR(150) = QUOTENAME(@col_dad);
     DECLARE @q_son   NVARCHAR(150) = QUOTENAME(@col_son);
     DECLARE @q_label NVARCHAR(150) = CASE WHEN @col_label IS NULL THEN @q_son ELSE QUOTENAME(@col_label) END;
@@ -651,7 +665,7 @@ BEGIN
     --           e "    " (4 espaços) quando o ancestral era o último filho
     --         * Level + IsLastSibling do nó ATUAL
     -- =========================================================================
-    DECLARE @sql NVARCHAR(MAX) = N'
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
 ;WITH BaseTable AS (
     -- Encapsulamento: lê a tabela de interesse + rótulo já tratado como string
     SELECT
@@ -709,7 +723,7 @@ RecursiveTree AS (
         b.son_id_str,
         Level      = rt.Level + 1,
         IsCycle    = CAST(CASE
-                        WHEN CHARINDEX(N''»'' + CONVERT(NVARCHAR(MAX), b.dad_id) + N''«'', rt.CyclePath) > 0
+                        WHEN CHARINDEX(N''»'' + b.son_id_str + N''«'', rt.CyclePath) > 0
                         THEN 1 ELSE 0 END AS BIT),
         PrefixAcc  = CAST(rt.PrefixAcc
                         + CASE WHEN rt.IsLastSibling = 1 THEN N''    ''
@@ -740,7 +754,7 @@ FROM (
                 -- Markdown: 2 espaços por nível + bullet "- "
                 REPLICATE(N''  '', Level) + N''- ''
                 + node_label
-                + CASE WHEN IsCycle = 1 THEN N'' ⚠️ CICLO DETECTADO'' ELSE N'''' END
+                + CASE WHEN IsCycle = 1 THEN N'' CICLO DETECTADO'' ELSE N'''' END
             ELSE
                 -- ASCII Tree art: combina prefixo ancestral (│ / espaços)
                 -- com o símbolo do nó atual (├─ | └─). Level 0 não tem símbolo.
@@ -748,7 +762,7 @@ FROM (
                      ELSE PrefixAcc
                         + CASE WHEN IsLastSibling = 1 THEN N''└─ '' ELSE N''├─ '' END END
                 + node_label
-                + CASE WHEN IsCycle = 1 THEN N''  [CICLO! path='' + REPLACE(CyclePath, N''»«'', N''<'') + N'']'' ELSE N'''' END
+                + CASE WHEN IsCycle = 1 THEN N''  [CICLO DETECTADO]'' ELSE N'''' END
         END AS ResultColumn
     FROM RecursiveTree
 ) x
@@ -803,7 +817,8 @@ EXEC lab.sp_render_tree
      @col_dad    = 'ManagerID',
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
-     @tree_style = 'asc';
+     @tree_style = 'asc',
+     @debug_sql  = 0;
 GO
 
 PRINT '═══════════════════════════════════════════════════════════════';
@@ -816,7 +831,8 @@ EXEC lab.sp_render_tree
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
      @root_id    = '3',
-     @tree_style = 'asc';
+     @tree_style = 'asc',
+     @debug_sql  = 0;
 GO
 
 PRINT '═══════════════════════════════════════════════════════════════';
@@ -829,11 +845,11 @@ EXEC lab.sp_render_tree
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
      @tree_style = 'md',
-     @debug_sql  = 1;
+     @debug_sql  = 0;
 GO
 
 -- --------------------------------------------------------------------------------
--- 🔥 EXEMPLO 5 - Hierarquia REAL do AdventureWorks (ponte HIERARCHYID → Adjacency List)
+--     EXEMPLO 5 - Hierarquia REAL do AdventureWorks (ponte HIERARCHYID → Adjacency List)
 --     HumanResources.Employee usa o tipo HIERARCHYID e não tem coluna ManagerID direta.
 --     Criamos uma #temp materializando a coluna ManagerID via OrganizationNode.GetAncestor(1)
 --     e depois entregamos à mesma sp_render_tree — prova de que a procedure funciona
@@ -842,7 +858,7 @@ GO
 DROP TABLE IF EXISTS #AWDiretoria;
 CREATE TABLE #AWDiretoria (
     EmployeeID   INT NOT NULL PRIMARY KEY,
-    ManagerID    INT NULL FOREIGN KEY REFERENCES #AWDiretoria(EmployeeID),
+    ManagerID    INT NULL,
     EmployeeName NVARCHAR(300) NOT NULL
 );
 
@@ -863,7 +879,7 @@ PRINT 'Exemplo 5) Dados REAIS do AdventureWorks — Diretoria da empresa';
 PRINT '            (HumanResources.Employee convertido p/ Adjacency List)';
 PRINT '═══════════════════════════════════════════════════════════════';
 EXEC lab.sp_render_tree
-     @table_name = 'tempdb..#AWDiretoria',
+     @table_name = '#AWDiretoria',
      @col_dad    = 'ManagerID',
      @col_son    = 'EmployeeID',
      @col_label  = 'EmployeeName',
@@ -891,6 +907,259 @@ EXEC lab.sp_render_tree
      @col_label  = 'EmployeeName',
      @tree_style = 'asc';
 SELECT * FROM #TreeResult WHERE ResultColumn LIKE N'%Vendedor%'; -- filtrando como tabela!
+GO
+
+
+-- =================================================================================
+-- PARTE 4.3: lab.sp_render_mermaid — RENDERIZA HIERARQUIA EM DIAGRAMA MERMAID
+-- =================================================================================
+-- OBJETIVO: Recebe QUALQUER tabela com estrutura adjacency-list (id → parent_id)
+--   e retorna um bloco Mermaid (graph TD/LR/BT/RL) pronto para colar em README,
+--   documentação, GitHub, etc.
+--
+-- PARÂMETROS:
+--   @table_name  SYSNAME       — Tabela fonte (1 ou 2-partes, ex: 'lab.OrgChart')
+--   @col_id      SYSNAME       — Coluna de ID do nó (ex: 'EmployeeID')
+--   @col_parent  SYSNAME       — Coluna de FK do pai (ex: 'ManagerID')
+--   @col_label   SYSNAME = NULL— Coluna de rótulo p/ exibição. Se NULL, usa @col_id
+--   @root_id     NVARCHAR(MAX) = NULL — ID específico para raiz. NULL = todas as raízes
+--   @max_level   INT = 50      — Profundidade máxima da hierarquia
+--   @direction   CHAR(2) = 'TD'— Direção Mermaid: TD, LR, BT, RL
+--   @debug_sql   BIT = 0       — Se 1, exibe o SQL gerado
+--
+-- USO:
+--   EXEC lab.sp_render_mermaid
+--        @table_name = 'lab.OrgChart',
+--        @col_id     = 'EmployeeID',
+--        @col_parent = 'ManagerID',
+--        @col_label  = 'EmployeeName';
+--
+-- SAÍDA (PRINT):
+--   ```mermaid
+--   graph TD
+--       1[CEO / Presidente] --> 2[VP de Vendas]
+--       2 --> 3[Gerente de Vendas Região A]
+--       ...
+--   ```
+-- =================================================================================
+
+DROP PROCEDURE IF EXISTS lab.sp_render_mermaid;
+GO
+
+CREATE PROCEDURE lab.sp_render_mermaid
+    @table_name  SYSNAME,          -- tabela (ex: 'lab.OrgChart' ou 'HumanResources.Employee')
+    @col_id      SYSNAME,          -- coluna de ID do nó (ex: 'EmployeeID')
+    @col_parent  SYSNAME,          -- coluna de FK do pai (ex: 'ManagerID')
+    @col_label   SYSNAME = NULL,   -- coluna de rótulo. Se NULL, usa @col_id
+    @root_id     NVARCHAR(MAX) = NULL, -- ID da raiz. NULL = WHERE parent IS NULL
+    @max_level   INT = 50,         -- profundidade máxima
+    @direction   CHAR(2) = 'TD',   -- direção Mermaid: TD | LR | BT | RL
+    @debug_sql   BIT = 0           -- se 1, PRINT do SQL dinâmico
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- =========================================================================
+    -- PASSO 1: VALIDAÇÃO ESTÁTICA
+    -- =========================================================================
+    DECLARE @obj_id INT = OBJECT_ID(@table_name);
+    IF @obj_id IS NULL
+    BEGIN;
+        THROW 50001, N'[sp_render_mermaid] Tabela nao existe. Use 2-part name se for schema diferente de dbo.', 1;
+        END;
+
+    DECLARE @is_temp_table BIT = CASE
+        WHEN @table_name LIKE N'#%' OR @table_name LIKE N'tempdb..#%' THEN 1
+        ELSE 0
+    END;
+
+    IF (@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_id))
+       OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_id))
+    BEGIN;
+        THROW 50002, N'[sp_render_mermaid] col_id nao encontrada na tabela alvo.', 1;
+    END;
+
+    IF (@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_parent))
+       OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_parent))
+    BEGIN;
+        THROW 50003, N'[sp_render_mermaid] col_parent nao encontrada na tabela alvo.', 1;
+    END;
+
+    IF @col_label IS NOT NULL AND
+       ((@is_temp_table = 0 AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @obj_id AND name = @col_label))
+        OR (@is_temp_table = 1 AND NOT EXISTS (SELECT 1 FROM tempdb.sys.columns WHERE object_id = @obj_id AND name = @col_label)))
+    BEGIN;
+        THROW 50004, N'[sp_render_mermaid] col_label nao encontrada na tabela alvo.', 1;
+    END;
+
+    IF @direction NOT IN ('TD', 'LR', 'BT', 'RL')
+    BEGIN;
+        THROW 50005, N'[sp_render_mermaid] @direction deve ser TD, LR, BT ou RL.', 1;
+    END;
+
+    -- =========================================================================
+    -- PASSO 2: MONTA IDENTIFICADORES SEGUROS (QUOTENAME)
+    -- =========================================================================
+    DECLARE @schema_name SYSNAME = OBJECT_SCHEMA_NAME(@obj_id);
+    DECLARE @table_only  SYSNAME = OBJECT_NAME(@obj_id);
+    DECLARE @temp_table_only SYSNAME = PARSENAME(@table_name, 1);
+    DECLARE @q_table  NVARCHAR(300) = CASE
+        WHEN @is_temp_table = 1 THEN QUOTENAME(@temp_table_only)
+        ELSE QUOTENAME(@schema_name) + N'.' + QUOTENAME(@table_only)
+    END;
+    DECLARE @q_id     NVARCHAR(150) = QUOTENAME(@col_id);
+    DECLARE @q_parent NVARCHAR(150) = QUOTENAME(@col_parent);
+    DECLARE @q_label  NVARCHAR(150) = CASE WHEN @col_label IS NULL THEN @q_id ELSE QUOTENAME(@col_label) END;
+
+    -- =========================================================================
+    -- PASSO 3: SQL DINÂMICO — EXTRAI ARESTAS VIA CTE RECURSIVA
+    -- =========================================================================
+    -- A CTE navega da raiz até os filhos, netos etc., gerando:
+    --   parent_id → child_id  para cada par (aresta)
+    -- A saída final são linhas no formato:
+    --   parent_id[LabelPai] --> child_id[LabelFilho]
+    -- =========================================================================
+    DECLARE @sql NVARCHAR(MAX) = CAST(N'' AS NVARCHAR(MAX)) + N'
+;WITH Base AS (
+    SELECT
+        ' + @q_id + N'       AS node_id,
+        ' + @q_parent + N'   AS parent_id,
+        CONVERT(NVARCHAR(MAX), ' + @q_label + N') AS node_label,
+        CONVERT(NVARCHAR(MAX), ' + @q_id + N')    AS node_id_str
+    FROM ' + @q_table + N'
+),
+RecursiveEdges AS (
+    -- Âncora: nós raiz (sem pai)
+    SELECT
+        node_id,
+        parent_id,
+        node_label,
+        node_id_str,
+        Level = 0
+    FROM Base
+    WHERE
+        (' + CASE WHEN @root_id IS NULL
+              THEN N'parent_id IS NULL'
+              ELSE N'node_id_str = CONVERT(NVARCHAR(MAX), @p_root_id)' END + N')
+
+    UNION ALL
+
+    SELECT
+        b.node_id,
+        b.parent_id,
+        b.node_label,
+        b.node_id_str,
+        Level = re.Level + 1
+    FROM Base b
+    JOIN RecursiveEdges re ON b.parent_id = re.node_id
+    WHERE re.Level < @p_max_level
+)
+-- Gera arestas: cada linha vira "1[Label] --> 2[Label]" no Mermaid
+SELECT DISTINCT
+    CONVERT(NVARCHAR(MAX),
+        N''    '' + re_pai.node_id_str
+        + N''['' + REPLACE(REPLACE(re_pai.node_label, N''['', N''(''), N'']'', N'')'') + N'']''
+        + N'' --> ''
+        + re_filho.node_id_str
+        + N''['' + REPLACE(REPLACE(re_filho.node_label, N''['', N''(''), N'']'', N'')'') + N'']''
+    ) AS EdgeDefinition
+FROM RecursiveEdges re_filho
+JOIN Base re_pai ON re_filho.parent_id = re_pai.node_id
+ORDER BY EdgeDefinition
+OPTION (MAXRECURSION 0);
+';
+
+    IF @debug_sql = 1
+    BEGIN
+        PRINT N'-- ===== SQL GERADO POR lab.sp_render_mermaid =====';
+        PRINT @sql;
+    END;
+
+    -- =========================================================================
+    -- PASSO 4: EXECUTA + FORMATA COMO BLOCO MERMAID
+    -- =========================================================================
+    DECLARE @params NVARCHAR(MAX) = N'@p_root_id NVARCHAR(MAX), @p_max_level INT';
+    DECLARE @results TABLE (EdgeDefinition NVARCHAR(MAX));
+    DECLARE @edge NVARCHAR(MAX);
+
+    INSERT INTO @results (EdgeDefinition)
+    EXEC sp_executesql @sql,
+        @params,
+        @p_root_id  = @root_id,
+        @p_max_level = @max_level;
+
+    -- Monta o bloco Mermaid linha a linha via cursor
+    DECLARE @output NVARCHAR(MAX) = N'```mermaid' + CHAR(13) + CHAR(10)
+                                    + N'graph ' + @direction + CHAR(13) + CHAR(10);
+
+    DECLARE cur CURSOR LOCAL FAST_FORWARD FOR
+        SELECT EdgeDefinition FROM @results WHERE EdgeDefinition IS NOT NULL ORDER BY EdgeDefinition;
+
+    OPEN cur;
+    FETCH NEXT FROM cur INTO @edge;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @output = @output + @edge + CHAR(13) + CHAR(10);
+        FETCH NEXT FROM cur INTO @edge;
+    END;
+    CLOSE cur;
+    DEALLOCATE cur;
+
+    SET @output = @output + N'```';
+
+    -- Retorna como result set (1 linha) para fácil cópia
+    SELECT @output AS MermaidBlock;
+END;
+GO
+
+-- --------------------------------------------------------------------------------
+-- EXEMPLOS DE USO DA lab.sp_render_mermaid
+-- --------------------------------------------------------------------------------
+PRINT '═══════════════════════════════════════════════════════════════';
+PRINT 'Exemplo 1) lab.OrgChart como diagrama Mermaid (direcao TD)';
+PRINT '═══════════════════════════════════════════════════════════════';
+EXEC lab.sp_render_mermaid
+     @table_name = 'lab.OrgChart',
+     @col_id     = 'EmployeeID',
+     @col_parent = 'ManagerID',
+     @col_label  = 'EmployeeName';
+GO
+
+PRINT '═══════════════════════════════════════════════════════════════';
+PRINT 'Exemplo 2) Mesma arvore, direcao LR (esquerda para direita)';
+PRINT '═══════════════════════════════════════════════════════════════';
+EXEC lab.sp_render_mermaid
+     @table_name = 'lab.OrgChart',
+     @col_id     = 'EmployeeID',
+     @col_parent = 'ManagerID',
+     @col_label  = 'EmployeeName',
+     @direction  = 'LR';
+GO
+
+PRINT '═══════════════════════════════════════════════════════════════';
+PRINT 'Exemplo 3) Sub-arvore a partir do EmployeeID = 3';
+PRINT '═══════════════════════════════════════════════════════════════';
+EXEC lab.sp_render_mermaid
+     @table_name = 'lab.OrgChart',
+     @col_id     = 'EmployeeID',
+     @col_parent = 'ManagerID',
+     @col_label  = 'EmployeeName',
+     @root_id    = '3';
+GO
+
+PRINT '═══════════════════════════════════════════════════════════════';
+PRINT 'Exemplo 4) Dados REAIS do AdventureWorks — Diretoria via HierarchyID';
+PRINT '            (reusa a #AWDiretoria criada no exemplo 5 anterior)';
+PRINT '═══════════════════════════════════════════════════════════════';
+IF OBJECT_ID('tempdb..#AWDiretoria') IS NOT NULL
+    EXEC lab.sp_render_mermaid
+         @table_name = '#AWDiretoria',
+         @col_id     = 'EmployeeID',
+         @col_parent = 'ManagerID',
+         @col_label  = 'EmployeeName',
+         @direction  = 'LR';
+ELSE
+    PRINT 'A tabela #AWDiretoria nao existe. Execute o Exemplo 5 da sp_render_tree primeiro.';
 GO
 
 
@@ -938,13 +1207,13 @@ GO
 
 SELECT DISTINCT
     SalesPersonID,
-    -- 🔴 Mediana (P50) CONTÍNUA (interpolada) — pode não corresponder a nenhuma venda real
+    -- Mediana (P50) CONTÍNUA (interpolada) — pode não corresponder a nenhuma venda real
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY Amount)
         OVER (PARTITION BY SalesPersonID) AS P50_MedianaContinua,
-    -- 🔵 Mediana (P50) DISCRETA — sempre coincide com um Amount real da partição
+    -- Mediana (P50) DISCRETA — sempre coincide com um Amount real da partição
     PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY Amount)
         OVER (PARTITION BY SalesPersonID) AS P50_MedianaDiscreta,
-    -- 🟢 P90 — valor que separa os 10% maiores
+    -- P90 — valor que separa os 10% maiores
     PERCENTILE_DISC(0.90) WITHIN GROUP (ORDER BY Amount)
         OVER (PARTITION BY SalesPersonID) AS P90_Discreto
 FROM lab.SalesData
@@ -1039,7 +1308,7 @@ SELECT
     SaleDate, DataAnterior,
     DATEDIFF(DAY, DataAnterior, SaleDate) AS DiasEntreVendas,
     CASE WHEN DATEDIFF(DAY, DataAnterior, SaleDate) > 14
-              THEN '⚠️ Intervalo >14 dias' ELSE 'ok' END AS StatusIntervalo
+              THEN 'Intervalo >14 dias' ELSE 'ok' END AS StatusIntervalo
 FROM Lacunas
 ORDER BY SalesPersonID, SaleID;
 GO
@@ -1068,20 +1337,21 @@ GO
 -- =================================================================================
 -- CHECKLIST FINAL DP-800: TÓPICOS COBERTOS NESTE LABORATÓRIO
 -- =================================================================================
--- ✅ CTES BÁSICAS e MÚLTIPLAS (WITH A AS (...), B AS (...) FROM A JOIN B)
--- ✅ CTE RECURSIVA (Anchor + Recursive Member + MAXRECURSION + TRY/CATCH)
--- ✅ NÃO-MATERIALIZAÇÃO: CTE referenciada 2x é recalculada 2x (vs #temp 1x)
--- ✅ RANKING: ROW_NUMBER vs RANK vs DENSE_RANK vs NTILE (empates, lacunas, quartis)
--- ✅ FRAME DEFAULT IMPLÍCITO: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (MS Learn)
--- ✅ ROWS vs RANGE em AGREGADOS: Running Total com valores empatados em ORDER BY
--- ✅ OFFSET: LAG / LEAD (NÃO usam framing) vs FIRST_VALUE / LAST_VALUE (USAM framing)
--- ✅ ARMADILHA LAST_VALUE: frame explícito UNBOUNDED FOLLOWING para pegar fim da partição
--- ✅ PERCENTILE_CONT/DISC (WITHIN GROUP) + CUME_DIST + PERCENT_RANK
--- ✅ DETECÇÃO DE CICLO em rCTE (breadcrumb com delimitador » « — evita falso-positivo 1 ∈ 11)
--- ✅ HIERARCHYID: GetLevel / GetAncestor / IsDescendantOf / ToString
--- ✅ DETECÇÃO DE GAPS: LAG + predicado (sequência e datas)
--- ✅ TOP-N POR GRUPO: ROW_NUMBER/DENSE_RANK em CTE + filtro
--- ✅ RENDERIZAÇÃO DE ÁRVORE: lab.sp_render_tree (SQL dinâmico seguro, MD + ASCII)
+-- CTES BÁSICAS e MÚLTIPLAS (WITH A AS (...), B AS (...) FROM A JOIN B)
+-- CTE RECURSIVA (Anchor + Recursive Member + MAXRECURSION + TRY/CATCH)
+-- NÃO-MATERIALIZAÇÃO: CTE referenciada 2x é recalculada 2x (vs #temp 1x)
+-- RANKING: ROW_NUMBER vs RANK vs DENSE_RANK vs NTILE (empates, lacunas, quartis)
+-- FRAME DEFAULT IMPLÍCITO: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (MS Learn)
+-- ROWS vs RANGE em AGREGADOS: Running Total com valores empatados em ORDER BY
+-- OFFSET: LAG / LEAD (NÃO usam framing) vs FIRST_VALUE / LAST_VALUE (USAM framing)
+-- ARMADILHA LAST_VALUE: frame explícito UNBOUNDED FOLLOWING para pegar fim da partição
+-- PERCENTILE_CONT/DISC (WITHIN GROUP) + CUME_DIST + PERCENT_RANK
+-- DETECÇÃO DE CICLO em rCTE (breadcrumb com delimitador » « — evita falso-positivo 1 ∈ 11)
+-- HIERARCHYID: GetLevel / GetAncestor / IsDescendantOf / ToString
+-- DETECÇÃO DE GAPS: LAG + predicado (sequência e datas)
+-- TOP-N POR GRUPO: ROW_NUMBER/DENSE_RANK em CTE + filtro
+-- RENDERIZAÇÃO DE ÁRVORE: lab.sp_render_tree (SQL dinâmico seguro, MD + ASCII)
+-- DIAGRAMA MERMAID: lab.sp_render_mermaid (graph TD/LR/BT/RL, dinâmico via sp_executesql)
 -- =================================================================================
 -- Para reler a teoria oficial MS Learn completa:
 --   • Window Functions: https://learn.microsoft.com/pt-br/training/modules/write-queries-that-use-window-functions/
