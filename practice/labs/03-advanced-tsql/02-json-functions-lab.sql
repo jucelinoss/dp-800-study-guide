@@ -23,6 +23,7 @@ GO
 
 DROP TABLE IF EXISTS lab.JsonFunctionsStage;
 DROP TABLE IF EXISTS lab.JsonFunctionsOrders;
+DROP TABLE IF EXISTS lab.JsonFunctionsCustomers;
 DROP TABLE IF EXISTS lab.JsonFunctionsMapping;
 DROP TABLE IF EXISTS lab.JsonFunctionsProductAttributes;
 DROP PROCEDURE IF EXISTS lab.usp_JsonFunctionsProjection;
@@ -282,41 +283,189 @@ GO
 -- expanding every item; reduce outer orders before OPENJSON.
 
 -- PART 7: ADVANCED METADATA-DRIVEN PROJECTION WITH SAFE DYNAMIC SQL
+-- =================================================================================
+-- This procedure is METADATA-DRIVEN: it reads a projection definition saved
+-- in lab.JsonFunctionsMapping (as JSON) and dynamically builds the SELECT
+-- column list. To reuse on ANY table with a JSON column, simply pass:
+--   @MappingName -> mapping name saved in lab.JsonFunctionsMapping
+--   @TableName   -> fully qualified table name (e.g., lab.JsonFunctionsProducts)
+--   @JsonColumn  -> name of the JSON column in that table (e.g., AttributesJson)
+--   @KeyColumn   -> name of the primary key column returned as 1st SELECT column
+--                   (e.g., ProductID, SalesOrderID, CustomerID, etc.)
+-- =================================================================================
 CREATE TABLE lab.JsonFunctionsMapping
 (
     MappingName sysname NOT NULL CONSTRAINT PK_JsonFunctionsMapping PRIMARY KEY,
-    Definition nvarchar(max) NOT NULL CONSTRAINT CK_JsonFunctionsMapping CHECK (ISJSON(Definition) = 1)
+    Definition  nvarchar(max) NOT NULL CONSTRAINT CK_JsonFunctionsMapping CHECK (ISJSON(Definition) = 1)
 );
-INSERT INTO lab.JsonFunctionsMapping (MappingName, Definition)
-VALUES (N'OrderSummary', N'[
-  {"alias":"OrderNumber","path":"$.order.number","kind":"scalar"},
-  {"alias":"Territory","path":"$.territory.name","kind":"scalar"},
-  {"alias":"Items","path":"$.items","kind":"json"}]');
 GO
-CREATE OR ALTER PROCEDURE lab.usp_JsonFunctionsProjection @MappingName sysname
+INSERT INTO lab.JsonFunctionsMapping (MappingName, Definition) VALUES
+(N'OrderSummary', N'[
+  {"alias":"OrderNumber","path":"$.order.number","kind":"scalar"},
+  {"alias":"Territory",  "path":"$.territory.name","kind":"scalar"},
+  {"alias":"Items",      "path":"$.items",          "kind":"json"}]');
+GO
+
+-- =================================================================================
+-- FULLY GENERIC PROCEDURE: accepts ANY table + JSON column + primary key.
+-- Security validations (aligned with MS Learn Dynamic SQL):
+--   1) sys.tables confirms table exists in the expected schema
+--   2) sys.columns confirms @JsonColumn and @KeyColumn exist in table
+--   3) OBJECT_ID + QUOTENAME isolate identifiers against SQL injection
+--   4) Typed sp_executesql avoids value concatenation
+-- =================================================================================
+CREATE OR ALTER PROCEDURE lab.usp_JsonFunctionsProjection
+     @MappingName sysname,   -- e.g., N'OrderSummary'
+     @TableName   sysname,   -- e.g., N'lab.JsonFunctionsOrders' (2-part required)
+     @JsonColumn  sysname,   -- e.g., N'OrderDocument' (JSON column in table)
+     @KeyColumn   sysname,   -- e.g., N'SalesOrderID'  (PK returned as 1st column)
+     @Debug       bit = 0    -- 1 = PRINT the built SQL before executing
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @definition nvarchar(max), @selectList nvarchar(max), @sql nvarchar(max);
-    SELECT @definition = Definition FROM lab.JsonFunctionsMapping WHERE MappingName = @MappingName;
-    IF @definition IS NULL THROW 50001, 'JSON mapping was not found.', 1;
-    SELECT @selectList = STRING_AGG(CASE WHEN Kind = N'scalar'
-        THEN N'JSON_VALUE(OrderDocument, ''' + REPLACE(JsonPath, '''', '''''') + N''') AS ' + QUOTENAME(AliasName)
-        ELSE N'JSON_QUERY(OrderDocument, ''' + REPLACE(JsonPath, '''', '''''') + N''') AS ' + QUOTENAME(AliasName) END,
+
+    DECLARE @schema sysname, @table sysname, @definition nvarchar(max),
+            @selectList nvarchar(max), @sql nvarchar(max);
+
+    ------------------------------------------------------------------
+    -- 1) Parse @TableName into schema + table (safe 2-part name)
+    ------------------------------------------------------------------
+    SELECT @schema = PARSENAME(@TableName, 2),
+           @table  = PARSENAME(@TableName, 1);
+
+    IF @schema IS NULL OR @table IS NULL
+        THROW 50001, N'Provide table name in schema.table format.', 1;
+
+    ------------------------------------------------------------------
+    -- 2) Validate TABLE exists via sys.tables
+    ------------------------------------------------------------------
+    IF OBJECT_ID(@TableName, 'U') IS NULL
+        THROW 50002, N'Table "' + @TableName + N'" does not exist in current database.', 1;
+
+    ------------------------------------------------------------------
+    -- 3) Validate that @JsonColumn and @KeyColumn EXIST in the table
+    ------------------------------------------------------------------
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.columns c
+        JOIN sys.tables  t ON t.object_id = c.object_id
+        WHERE SCHEMA_NAME(t.schema_id) = @schema
+          AND t.name  = @table
+          AND c.name  = @JsonColumn)
+        THROW 50003, N'JSON column "' + @JsonColumn + N'" does not exist in ' + @TableName + N'.', 1;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.columns c
+        JOIN sys.tables  t ON t.object_id = c.object_id
+        WHERE SCHEMA_NAME(t.schema_id) = @schema
+          AND t.name  = @table
+          AND c.name  = @KeyColumn)
+        THROW 50004, N'Key column "' + @KeyColumn + N'" does not exist in ' + @TableName + N'.', 1;
+
+    ------------------------------------------------------------------
+    -- 4) Read the saved mapping DEFINITION
+    ------------------------------------------------------------------
+    SELECT @definition = Definition
+    FROM   lab.JsonFunctionsMapping
+    WHERE  MappingName = @MappingName;
+
+    IF @definition IS NULL
+        THROW 50005, N'Mapping "' + @MappingName + N'" not found in lab.JsonFunctionsMapping.', 1;
+
+    ------------------------------------------------------------------
+    -- 5) Build the SELECT LIST dynamically
+    --    JSON_VALUE / JSON_QUERY need to know which JSON column to read —
+    --    @JsonColumn is safe because validated against sys.columns (step 3).
+    --    JSON paths from mapping are validated by JsonPath LIKE '$.%'.
+    ------------------------------------------------------------------
+    SELECT @selectList = STRING_AGG(
+        CASE WHEN Kind = N'scalar'
+             THEN N'JSON_VALUE(' + QUOTENAME(@JsonColumn) + N', '''
+                + REPLACE(JsonPath, '''', '''''') + N''') AS ' + QUOTENAME(AliasName)
+             ELSE N'JSON_QUERY(' + QUOTENAME(@JsonColumn) + N', '''
+                + REPLACE(JsonPath, '''', '''''') + N''') AS ' + QUOTENAME(AliasName)
+        END,
         N',' + CHAR(10) + N'    ')
-    FROM OPENJSON(@definition) WITH
-    (AliasName sysname '$.alias', JsonPath nvarchar(400) '$.path', Kind nvarchar(10) '$.kind')
+    FROM OPENJSON(@definition)
+    WITH (
+        AliasName sysname      N'$.alias',
+        JsonPath  nvarchar(400) N'$.path',
+        Kind      nvarchar(10)  N'$.kind'
+    )
     WHERE JsonPath LIKE N'$.%' AND Kind IN (N'scalar', N'json');
-    IF @selectList IS NULL THROW 50002, 'JSON mapping has no allowed paths.', 1;
-    SET @sql = N'SELECT SalesOrderID,' + CHAR(10) + N'    ' + @selectList
-             + CHAR(10) + N'FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0;';
-    PRINT @sql;
+
+    IF @selectList IS NULL
+        THROW 50006, N'Mapping "' + @MappingName + N'" has no allowed paths.', 1;
+
+    ------------------------------------------------------------------
+    -- 6) Build the final SQL — ALL via QUOTENAME (no value concatenation)
+    ------------------------------------------------------------------
+    SET @sql = N'SELECT ' + QUOTENAME(@KeyColumn) + N',' + CHAR(10) + N'    ' + @selectList
+             + CHAR(10) + N'FROM '   + QUOTENAME(@schema) + N'.' + QUOTENAME(@table) + N';';
+
+    IF @Debug = 1
+        PRINT @sql;
+
     EXEC sys.sp_executesql @sql;
 END;
 GO
-EXEC lab.usp_JsonFunctionsProjection @MappingName = N'OrderSummary';
+
+-- =================================================================================
+-- USAGE EXAMPLES — same proc, SAME mapping, different tables/columns.
+-- =================================================================================
+
+-- (A) OrderSummary against the ORDERS table (the original)
+EXEC lab.usp_JsonFunctionsProjection
+     @MappingName = N'OrderSummary',
+     @TableName   = N'lab.JsonFunctionsOrders',
+     @JsonColumn  = N'OrderDocument',
+     @KeyColumn   = N'SalesOrderID',
+     @Debug       = 1;
 GO
--- QUOTENAME protects aliases; it does not make an unvalidated JSON path trustworthy.
+
+-- (B) Demonstrating mapping REUSE: same proc, SAME JSON, SAME structure,
+--     but pointing to a hypothetical customers table (example only).
+--     The proc validates via sys.columns before building SQL, so any
+--     valid @TableName.@JsonColumn combination works:
+IF OBJECT_ID('lab.JsonFunctionsCustomers', 'U') IS NULL
+BEGIN
+    CREATE TABLE lab.JsonFunctionsCustomers (
+        CustomerID   int NOT NULL PRIMARY KEY,
+        CustomerName sysname NOT NULL,
+        CustomerData nvarchar(max) NOT NULL
+            CONSTRAINT CK_JsonFunctionsCustomers_Data CHECK (ISJSON(CustomerData) = 1)
+    );
+    INSERT INTO lab.JsonFunctionsCustomers (CustomerID, CustomerName, CustomerData) VALUES
+    (1, N'ACME Corp.', N'{"order":{"number":"AC-001"},"territory":{"name":"North"},"items":[{"sku":"X","qty":2}]}'),
+    (2, N'Globex',    N'{"order":{"number":"GB-002"},"territory":{"name":"South"},"items":[]}');
+END;
+GO
+-- To reuse the same "OrderSummary" structure for the customers table,
+-- declare a new mapping pointing to CustomerData:
+INSERT INTO lab.JsonFunctionsMapping (MappingName, Definition) VALUES
+(N'CustomerOrderSummary', N'[
+  {"alias":"OrderNumber","path":"$.order.number","kind":"scalar"},
+  {"alias":"Territory",  "path":"$.territory.name","kind":"scalar"},
+  {"alias":"Items",      "path":"$.items",          "kind":"json"}]');
+GO
+EXEC lab.usp_JsonFunctionsProjection
+     @MappingName = N'CustomerOrderSummary',
+     @TableName   = N'lab.JsonFunctionsCustomers',
+     @JsonColumn  = N'CustomerData',
+     @KeyColumn   = N'CustomerID';
+GO
+
+-- =================================================================================
+-- (C) Safe FAILURE demonstration — passing a non-existent column, the proc REJECTS
+--     before attempting any dynamic SQL (protection against typos and SQL injection):
+-- =================================================================================
+EXEC lab.usp_JsonFunctionsProjection
+     @MappingName = N'OrderSummary',
+     @TableName   = N'lab.JsonFunctionsOrders',
+     @JsonColumn  = N'ColunaInexistente',
+     @KeyColumn   = N'SalesOrderID';
+-- (expected error: "JSON column 'ColunaInexistente' does not exist in lab.JsonFunctionsOrders.")
+GO
+-- QUOTENAME protects aliases; it does NOT make an unvalidated JSON path trustworthy.
 -- Optional cleanup:
 -- DROP TABLE IF EXISTS lab.JsonFunctionsStage;
 -- DROP TABLE IF EXISTS lab.JsonFunctionsOrders;
