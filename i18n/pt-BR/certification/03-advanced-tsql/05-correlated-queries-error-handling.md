@@ -44,7 +44,10 @@ As subconsultas correlacionadas (correlated subqueries) fazem referência direta
 
 > [!tip] O que o Exame Testa
 >
-> - `XACT_STATE() = -1` = transação ativa corrompida e não confirmável (uncommittable transaction), exigindo a execução obrigatória de `ROLLBACK`; `= 1` = transação ativa confirmável; `= 0` = ausência de transações ativas.
+> - `XACT_STATE()
+>   - `-1` = transação ativa corrompida e não confirmável (uncommittable transaction), exigindo a execução obrigatória de `ROLLBACK`;
+>   - `1` = transação ativa confirmável; 
+>   - `0` = ausência de transações ativas.
 > - A instrução `THROW` propaga exceções de volta preservando os metadados, gravidade e código originais; o comando `RAISERROR` cria novos códigos personalizados permitindo configurar a gravidade (severity).
 > - `EXISTS` expressa teste de existência e evita a semântica problemática de `NOT IN` quando a subconsulta pode retornar `NULL`. Não há garantia de que seja sempre mais rápido que `IN`.
 
@@ -93,6 +96,31 @@ SELECT
 FROM dbo.Customers c;
 ```
 
+Uma alternativa sem subconsulta correlacionada é classificar os pedidos em uma CTE e manter apenas o primeiro de cada cliente:
+
+```sql
+WITH RankedOrders AS (
+    SELECT
+        o.CustomerId,
+        o.TotalAmount,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerId
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM dbo.Orders AS o
+)
+SELECT
+    c.CustomerId,
+    c.Name,
+    ro.TotalAmount AS LastOrderAmount
+FROM dbo.Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId
+   AND ro.OrderRank = 1;
+```
+
+O `LEFT JOIN` mantém clientes sem pedidos e retorna `NULL` em `LastOrderAmount`, assim como a subconsulta escalar original.
+
 ### IN / NOT IN com Subconsultas (IN / NOT IN with Subquery)
 
 ```sql
@@ -104,6 +132,23 @@ WHERE CategoryId IN (
     GROUP BY CategoryId
     HAVING COUNT(*) > 100
 );
+```
+
+A mesma filtragem pode ser expressa com uma CTE e um `JOIN`, deixando a lista de categorias elegíveis explícita:
+
+```sql
+WITH LargeCategories AS (
+    SELECT CategoryId
+    FROM dbo.Products
+    GROUP BY CategoryId
+    HAVING COUNT(*) > 100
+)
+SELECT
+    p.ProductId,
+    p.Name
+FROM dbo.Products AS p
+INNER JOIN LargeCategories AS lc
+    ON lc.CategoryId = p.CategoryId;
 ```
 
 ### UPDATE e DELETE Correlacionados (Correlated UPDATE / DELETE)
@@ -126,6 +171,33 @@ WHERE NOT EXISTS (
     WHERE o.OrderId = oi.OrderId
 );
 ```
+
+As mesmas operações podem ser escritas sem subconsultas correlacionadas. Essa forma separa o cálculo dos totais da atualização e torna explícito o `JOIN` usado para localizar cada registro:
+
+```sql
+-- Alternativa ao UPDATE correlacionado: calcular os totais uma única vez e fazer JOIN
+WITH OrderTotals AS (
+    SELECT
+        OrderId,
+        SUM(Quantity * UnitPrice) AS TotalAmount
+    FROM dbo.OrderItems
+    GROUP BY OrderId
+)
+UPDATE o
+SET o.TotalAmount = ot.TotalAmount
+FROM dbo.Orders AS o
+LEFT JOIN OrderTotals AS ot
+    ON ot.OrderId = o.OrderId;
+
+-- Alternativa ao DELETE com NOT EXISTS: localizar órfãos com LEFT JOIN
+DELETE oi
+FROM dbo.OrderItems AS oi
+LEFT JOIN dbo.Orders AS o
+    ON o.OrderId = oi.OrderId
+WHERE o.OrderId IS NULL;
+```
+
+O `LEFT JOIN` mantém também os pedidos sem itens, cujo total ficará `NULL`, como na consulta correlacionada original. Para gravar zero nesses casos, use `COALESCE(ot.TotalAmount, 0)`.
 
 ### Operadores APPLY (APPLY Operators)
 
@@ -152,6 +224,52 @@ OUTER APPLY (
     ORDER BY OrderDate DESC
 ) AS last_order;
 ```
+
+As mesmas consultas também podem ser escritas com uma CTE e a função de janela `ROW_NUMBER()`. Essa abordagem é útil quando se deseja classificar todas as linhas primeiro e depois filtrá-las com um `JOIN`:
+
+```sql
+-- Alternativa ao CROSS APPLY: INNER JOIN mantém apenas clientes com pedidos
+WITH RankedOrders AS (
+    SELECT
+        o.CustomerId,
+        o.OrderId,
+        o.OrderDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerId
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM dbo.Orders AS o
+)
+SELECT
+    c.Name,
+    ro.OrderId,
+    ro.OrderDate
+FROM dbo.Customers AS c
+INNER JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId
+   AND ro.OrderRank <= 3;
+
+-- Alternativa ao OUTER APPLY: LEFT JOIN mantém clientes sem pedidos
+WITH RankedOrders AS (
+    SELECT
+        o.CustomerId,
+        o.OrderDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerId
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM dbo.Orders AS o
+)
+SELECT
+    c.Name,
+    ro.OrderDate
+FROM dbo.Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId
+   AND ro.OrderRank = 1;
+```
+
+O `INNER JOIN` reproduz o comportamento do `CROSS APPLY`, enquanto o `LEFT JOIN` reproduz o comportamento do `OUTER APPLY`.
 
 > [!warning] Erro Comum
 > Nem todos os erros do banco são capturáveis por blocos `TRY/CATCH` — erros com gravidade (severity) de 20 ou superior (erros fatais que encerram a conexão de rede com o banco) e erros de sintaxe ou compilação de código ignoram e contornam o bloco `CATCH`. Sempre valide o retorno de `XACT_STATE()` antes de invocar `COMMIT` ou `ROLLBACK` de dentro do CATCH; tentar executar commit com `XACT_STATE() = -1` gerará nova falha no banco de dados.
@@ -372,6 +490,216 @@ GO
 - **CROSS/OUTER APPLY**: Consultar Top N por categoria, ou interagir de forma parametrizada com TVFs para cada linha.
 - **TRY/CATCH + THROW**: Implementação em Stored Procedures transacionais contendo comandos DML.
 - **TRY_CONVERT/TRY_PARSE**: Validação estrutural de tipos e dados em cargas de tabelas de staging para evitar abortos abruptos em tempo de execução.
+
+---
+
+## Laboratório Prático: Consultas Alternativas (Hands-on Lab)
+
+Execute o script de preparação uma vez em uma mesma sessão e, em seguida, compare cada consulta original com sua alternativa. As tabelas temporárias são usadas para que o laboratório não altere dados permanentes:
+
+> Para comparar as duas formas de `UPDATE` ou `DELETE`, execute o script de preparação novamente antes da segunda forma, pois essas instruções alteram os dados temporários.
+
+```sql
+DROP TABLE IF EXISTS #OrderItems;
+DROP TABLE IF EXISTS #Orders;
+DROP TABLE IF EXISTS #Customers;
+DROP TABLE IF EXISTS #Products;
+
+CREATE TABLE #Customers (
+    CustomerId int PRIMARY KEY,
+    Name       varchar(50) NOT NULL
+);
+
+CREATE TABLE #Orders (
+    OrderId     int PRIMARY KEY,
+    CustomerId  int NOT NULL,
+    OrderDate   date NOT NULL,
+    TotalAmount decimal(10, 2) NULL
+);
+
+CREATE TABLE #OrderItems (
+    OrderId  int NOT NULL,
+    ProductId int NOT NULL,
+    Quantity int NOT NULL,
+    UnitPrice decimal(10, 2) NOT NULL
+);
+
+CREATE TABLE #Products (
+    ProductId int IDENTITY PRIMARY KEY,
+    Name      varchar(50) NOT NULL,
+    CategoryId int NOT NULL
+);
+
+INSERT INTO #Customers VALUES
+    (1, 'Alice'), (2, 'Bruno'), (3, 'Carla');
+
+INSERT INTO #Orders (OrderId, CustomerId, OrderDate, TotalAmount) VALUES
+    (101, 1, '2026-01-10', 20.00),
+    (102, 1, '2026-02-15', 25.00),
+    (103, 2, '2026-01-20', 15.00);
+
+INSERT INTO #OrderItems VALUES
+    (101, 1, 2, 10.00),
+    (102, 2, 1, 25.00),
+    (103, 3, 3, 5.00),
+    (999, 4, 1, 99.00); -- item órfão para o teste do DELETE
+
+INSERT INTO #Products (Name, CategoryId)
+VALUES ('Produto avulso', 2);
+
+;WITH Numbers AS (
+    SELECT TOP (101)
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS Number
+    FROM sys.all_objects AS a
+    CROSS JOIN sys.all_objects AS b
+)
+INSERT INTO #Products (Name, CategoryId)
+SELECT CONCAT('Produto ', Number), 1
+FROM Numbers;
+```
+
+### 1. Último pedido por cliente
+
+```sql
+-- Forma correlacionada
+SELECT c.CustomerId, c.Name,
+       (SELECT TOP 1 o.TotalAmount
+        FROM #Orders AS o
+        WHERE o.CustomerId = c.CustomerId
+        ORDER BY o.OrderDate DESC) AS LastOrderAmount
+FROM #Customers AS c;
+
+-- Alternativa com ROW_NUMBER e LEFT JOIN
+WITH RankedOrders AS (
+    SELECT o.CustomerId, o.TotalAmount,
+           ROW_NUMBER() OVER (
+               PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC
+           ) AS OrderRank
+    FROM #Orders AS o
+)
+SELECT c.CustomerId, c.Name, ro.TotalAmount AS LastOrderAmount
+FROM #Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId AND ro.OrderRank = 1;
+```
+
+### 2. Categorias com mais de 100 produtos
+
+```sql
+-- Forma com IN
+SELECT ProductId, Name
+FROM #Products
+WHERE CategoryId IN (
+    SELECT CategoryId
+    FROM #Products
+    GROUP BY CategoryId
+    HAVING COUNT(*) > 100
+);
+
+-- Alternativa com CTE e INNER JOIN
+WITH LargeCategories AS (
+    SELECT CategoryId
+    FROM #Products
+    GROUP BY CategoryId
+    HAVING COUNT(*) > 100
+)
+SELECT p.ProductId, p.Name
+FROM #Products AS p
+INNER JOIN LargeCategories AS lc
+    ON lc.CategoryId = p.CategoryId;
+```
+
+### 3. UPDATE e DELETE sem subconsulta correlacionada
+
+```sql
+-- Forma correlacionada: atualizar os totais
+UPDATE o
+SET o.TotalAmount = (
+    SELECT SUM(oi.Quantity * oi.UnitPrice)
+    FROM #OrderItems AS oi
+    WHERE oi.OrderId = o.OrderId
+)
+FROM #Orders AS o;
+
+-- Atualizar totais com CTE e LEFT JOIN
+WITH OrderTotals AS (
+    SELECT OrderId, SUM(Quantity * UnitPrice) AS TotalAmount
+    FROM #OrderItems
+    GROUP BY OrderId
+)
+UPDATE o
+SET o.TotalAmount = ot.TotalAmount
+FROM #Orders AS o
+LEFT JOIN OrderTotals AS ot ON ot.OrderId = o.OrderId;
+
+SELECT * FROM #Orders;
+
+-- Forma correlacionada: remover órfãos
+DELETE oi
+FROM #OrderItems AS oi
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM #Orders AS o
+    WHERE o.OrderId = oi.OrderId
+);
+
+-- Remover órfãos com LEFT JOIN
+DELETE oi
+FROM #OrderItems AS oi
+LEFT JOIN #Orders AS o ON o.OrderId = oi.OrderId
+WHERE o.OrderId IS NULL;
+```
+
+### 4. CROSS APPLY e OUTER APPLY
+
+```sql
+-- Formas originais com APPLY
+SELECT c.Name, recent.OrderId, recent.OrderDate
+FROM #Customers AS c
+CROSS APPLY (
+    SELECT TOP 3 OrderId, OrderDate
+    FROM #Orders
+    WHERE CustomerId = c.CustomerId
+    ORDER BY OrderDate DESC
+) AS recent;
+
+SELECT c.Name, last_order.OrderDate
+FROM #Customers AS c
+OUTER APPLY (
+    SELECT TOP 1 OrderDate
+    FROM #Orders
+    WHERE CustomerId = c.CustomerId
+    ORDER BY OrderDate DESC
+) AS last_order;
+
+-- Alternativa ao CROSS APPLY: INNER JOIN mantém apenas clientes com pedidos
+WITH RankedOrders AS (
+    SELECT o.CustomerId, o.OrderId, o.OrderDate,
+           ROW_NUMBER() OVER (
+               PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC
+           ) AS OrderRank
+    FROM #Orders AS o
+)
+SELECT c.Name, ro.OrderId, ro.OrderDate
+FROM #Customers AS c
+INNER JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId AND ro.OrderRank <= 3;
+
+-- Alternativa ao OUTER APPLY: LEFT JOIN mantém clientes sem pedidos
+WITH RankedOrders AS (
+    SELECT o.CustomerId, o.OrderDate,
+           ROW_NUMBER() OVER (
+               PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC
+           ) AS OrderRank
+    FROM #Orders AS o
+)
+SELECT c.Name, ro.OrderDate
+FROM #Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId AND ro.OrderRank = 1;
+```
+
+Compare também essas consultas com as versões `CROSS APPLY` e `OUTER APPLY` apresentadas anteriormente. Os resultados devem ser equivalentes, respeitando a diferença entre `INNER JOIN` e `LEFT JOIN`.
 
 ---
 

@@ -24,6 +24,10 @@ IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'usp_ProcessBatchWithSavepo
 DROP TABLE IF EXISTS lab.StagingData;
 DROP TABLE IF EXISTS lab.LedgerEntries;
 DROP TABLE IF EXISTS lab.Accounts;
+DROP TABLE IF EXISTS lab.OrderItems;
+DROP TABLE IF EXISTS lab.Orders;
+DROP TABLE IF EXISTS lab.Customers;
+DROP TABLE IF EXISTS lab.Products;
 GO
 
 -- Estrutura de Tabelas para Teste
@@ -43,6 +47,60 @@ CREATE TABLE lab.StagingData (
     RawID INT IDENTITY(1,1) PRIMARY KEY,
     RawValue NVARCHAR(50) NOT NULL
 );
+
+CREATE TABLE lab.Customers (
+    CustomerID INT PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL
+);
+
+CREATE TABLE lab.Orders (
+    OrderID INT PRIMARY KEY,
+    CustomerID INT NOT NULL,
+    OrderDate DATE NOT NULL,
+    TotalAmount DECIMAL(18,2) NULL
+);
+
+CREATE TABLE lab.OrderItems (
+    OrderID INT NOT NULL,
+    ProductID INT NOT NULL,
+    Quantity INT NOT NULL,
+    UnitPrice DECIMAL(18,2) NOT NULL
+);
+
+CREATE TABLE lab.Products (
+    ProductID INT IDENTITY(1,1) PRIMARY KEY,
+    ProductName NVARCHAR(100) NOT NULL,
+    CategoryID INT NOT NULL
+);
+
+INSERT INTO lab.Customers (CustomerID, Name)
+VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie');
+
+INSERT INTO lab.Orders (OrderID, CustomerID, OrderDate, TotalAmount)
+VALUES
+    (101, 1, '2026-01-10', 20.00),
+    (102, 1, '2026-02-15', 25.00),
+    (103, 2, '2026-01-20', 15.00);
+
+INSERT INTO lab.OrderItems (OrderID, ProductID, Quantity, UnitPrice)
+VALUES
+    (101, 1, 2, 10.00),
+    (102, 2, 1, 25.00),
+    (103, 3, 3, 5.00),
+    (999, 4, 1, 99.00); -- Item órfão para o teste do DELETE
+
+INSERT INTO lab.Products (ProductName, CategoryID)
+VALUES ('Produto avulso', 2);
+
+;WITH Numbers AS (
+    SELECT TOP (101)
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS Number
+    FROM sys.all_objects AS a
+    CROSS JOIN sys.all_objects AS b
+)
+INSERT INTO lab.Products (ProductName, CategoryID)
+SELECT CONCAT('Produto ', Number), 1
+FROM Numbers;
 GO
 
 
@@ -73,6 +131,167 @@ WHERE NOT EXISTS (
     SELECT 1 FROM lab.LedgerEntries l 
     WHERE l.AccountID = a.AccountID
 );
+GO
+
+
+-- =================================================================================
+-- PARTE 1B: FORMAS ALTERNATIVAS DE SUBQUERIES CORRELACIONADAS
+-- =================================================================================
+-- Compare cada consulta original com sua alternativa usando JOIN/CTE.
+-- Execute um reset do laboratório antes de comparar as linhas afetadas por UPDATE/DELETE.
+
+-- Subconsulta escalar correlacionada: valor do último pedido por cliente
+SELECT
+    c.CustomerID,
+    c.Name,
+    (SELECT TOP 1 o.TotalAmount
+     FROM lab.Orders AS o
+     WHERE o.CustomerID = c.CustomerID
+     ORDER BY o.OrderDate DESC) AS LastOrderAmount
+FROM lab.Customers AS c;
+
+-- Alternativa: ROW_NUMBER() com LEFT JOIN
+;WITH RankedOrders AS (
+    SELECT
+        o.CustomerID,
+        o.TotalAmount,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerID
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM lab.Orders AS o
+)
+SELECT c.CustomerID, c.Name, ro.TotalAmount AS LastOrderAmount
+FROM lab.Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerID = c.CustomerID
+   AND ro.OrderRank = 1;
+GO
+
+-- Subconsulta IN: produtos em categorias com mais de 100 produtos
+SELECT ProductID, ProductName
+FROM lab.Products
+WHERE CategoryID IN (
+    SELECT CategoryID
+    FROM lab.Products
+    GROUP BY CategoryID
+    HAVING COUNT(*) > 100
+);
+
+-- Alternativa: CTE com INNER JOIN
+;WITH LargeCategories AS (
+    SELECT CategoryID
+    FROM lab.Products
+    GROUP BY CategoryID
+    HAVING COUNT(*) > 100
+)
+SELECT p.ProductID, p.ProductName
+FROM lab.Products AS p
+INNER JOIN LargeCategories AS lc
+    ON lc.CategoryID = p.CategoryID;
+GO
+
+-- UPDATE correlacionado
+UPDATE o
+SET o.TotalAmount = (
+    SELECT SUM(oi.Quantity * oi.UnitPrice)
+    FROM lab.OrderItems AS oi
+    WHERE oi.OrderID = o.OrderID
+)
+FROM lab.Orders AS o;
+
+-- Alternativa: agregar uma vez e atualizar por LEFT JOIN
+;WITH OrderTotals AS (
+    SELECT OrderID, SUM(Quantity * UnitPrice) AS TotalAmount
+    FROM lab.OrderItems
+    GROUP BY OrderID
+)
+UPDATE o
+SET o.TotalAmount = ot.TotalAmount
+FROM lab.Orders AS o
+LEFT JOIN OrderTotals AS ot
+    ON ot.OrderID = o.OrderID;
+
+SELECT * FROM lab.Orders;
+GO
+
+-- DELETE correlacionado: exibir linhas afetadas e desfazer para comparação
+BEGIN TRANSACTION;
+DELETE oi
+OUTPUT deleted.*
+FROM lab.OrderItems AS oi
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM lab.Orders AS o
+    WHERE o.OrderID = oi.OrderID
+);
+ROLLBACK TRANSACTION;
+
+-- Alternativa: anti-join com LEFT JOIN, também desfeito após a inspeção
+BEGIN TRANSACTION;
+DELETE oi
+OUTPUT deleted.*
+FROM lab.OrderItems AS oi
+LEFT JOIN lab.Orders AS o
+    ON o.OrderID = oi.OrderID
+WHERE o.OrderID IS NULL;
+ROLLBACK TRANSACTION;
+GO
+
+-- CROSS APPLY: três pedidos mais recentes por cliente
+SELECT c.Name, recent.OrderID, recent.OrderDate
+FROM lab.Customers AS c
+CROSS APPLY (
+    SELECT TOP 3 OrderID, OrderDate
+    FROM lab.Orders
+    WHERE CustomerID = c.CustomerID
+    ORDER BY OrderDate DESC
+) AS recent;
+
+-- Alternativa: ROW_NUMBER() com INNER JOIN
+;WITH RankedOrders AS (
+    SELECT
+        o.CustomerID,
+        o.OrderID,
+        o.OrderDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerID
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM lab.Orders AS o
+)
+SELECT c.Name, ro.OrderID, ro.OrderDate
+FROM lab.Customers AS c
+INNER JOIN RankedOrders AS ro
+    ON ro.CustomerID = c.CustomerID
+   AND ro.OrderRank <= 3;
+
+-- OUTER APPLY: último pedido, incluindo clientes sem pedidos
+SELECT c.Name, last_order.OrderDate
+FROM lab.Customers AS c
+OUTER APPLY (
+    SELECT TOP 1 OrderDate
+    FROM lab.Orders
+    WHERE CustomerID = c.CustomerID
+    ORDER BY OrderDate DESC
+) AS last_order;
+
+-- Alternativa: ROW_NUMBER() com LEFT JOIN
+;WITH RankedOrders AS (
+    SELECT
+        o.CustomerID,
+        o.OrderDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerID
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM lab.Orders AS o
+)
+SELECT c.Name, ro.OrderDate
+FROM lab.Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerID = c.CustomerID
+   AND ro.OrderRank = 1;
 GO
 
 

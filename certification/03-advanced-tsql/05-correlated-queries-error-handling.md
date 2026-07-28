@@ -67,6 +67,31 @@ SELECT
 FROM dbo.Customers c;
 ```
 
+An alternative without a correlated subquery is to rank the orders in a CTE and keep only the first order for each customer:
+
+```sql
+WITH RankedOrders AS (
+    SELECT
+        o.CustomerId,
+        o.TotalAmount,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerId
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM dbo.Orders AS o
+)
+SELECT
+    c.CustomerId,
+    c.Name,
+    ro.TotalAmount AS LastOrderAmount
+FROM dbo.Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId
+   AND ro.OrderRank = 1;
+```
+
+The `LEFT JOIN` keeps customers without orders and returns `NULL` for `LastOrderAmount`, just like the original scalar subquery.
+
 ### IN / NOT IN with Subquery
 
 ```sql
@@ -78,6 +103,23 @@ WHERE CategoryId IN (
     GROUP BY CategoryId
     HAVING COUNT(*) > 100
 );
+```
+
+The same filter can be expressed with a CTE and a `JOIN`, making the eligible category list explicit:
+
+```sql
+WITH LargeCategories AS (
+    SELECT CategoryId
+    FROM dbo.Products
+    GROUP BY CategoryId
+    HAVING COUNT(*) > 100
+)
+SELECT
+    p.ProductId,
+    p.Name
+FROM dbo.Products AS p
+INNER JOIN LargeCategories AS lc
+    ON lc.CategoryId = p.CategoryId;
 ```
 
 ### Correlated UPDATE / DELETE
@@ -100,6 +142,33 @@ WHERE NOT EXISTS (
     WHERE o.OrderId = oi.OrderId
 );
 ```
+
+The same operations can be written without correlated subqueries. This version separates the total calculation from the update and makes the `JOIN` used to locate each row explicit:
+
+```sql
+-- Alternative to the correlated UPDATE: calculate totals once and join them
+WITH OrderTotals AS (
+    SELECT
+        OrderId,
+        SUM(Quantity * UnitPrice) AS TotalAmount
+    FROM dbo.OrderItems
+    GROUP BY OrderId
+)
+UPDATE o
+SET o.TotalAmount = ot.TotalAmount
+FROM dbo.Orders AS o
+LEFT JOIN OrderTotals AS ot
+    ON ot.OrderId = o.OrderId;
+
+-- Alternative to DELETE with NOT EXISTS: find orphans with a LEFT JOIN
+DELETE oi
+FROM dbo.OrderItems AS oi
+LEFT JOIN dbo.Orders AS o
+    ON o.OrderId = oi.OrderId
+WHERE o.OrderId IS NULL;
+```
+
+The `LEFT JOIN` also keeps orders without items, whose total remains `NULL`, matching the original correlated query. To store zero in those cases, use `COALESCE(ot.TotalAmount, 0)`.
 
 ### APPLY Operators
 
@@ -126,6 +195,52 @@ OUTER APPLY (
     ORDER BY OrderDate DESC
 ) AS last_order;
 ```
+
+The same queries can also be written with a CTE and the `ROW_NUMBER()` window function. This approach is useful when all rows should be ranked first and then filtered with a `JOIN`:
+
+```sql
+-- Alternative to CROSS APPLY: INNER JOIN keeps only customers with orders
+WITH RankedOrders AS (
+    SELECT
+        o.CustomerId,
+        o.OrderId,
+        o.OrderDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerId
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM dbo.Orders AS o
+)
+SELECT
+    c.Name,
+    ro.OrderId,
+    ro.OrderDate
+FROM dbo.Customers AS c
+INNER JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId
+   AND ro.OrderRank <= 3;
+
+-- Alternative to OUTER APPLY: LEFT JOIN keeps customers without orders
+WITH RankedOrders AS (
+    SELECT
+        o.CustomerId,
+        o.OrderDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerId
+            ORDER BY o.OrderDate DESC
+        ) AS OrderRank
+    FROM dbo.Orders AS o
+)
+SELECT
+    c.Name,
+    ro.OrderDate
+FROM dbo.Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId
+   AND ro.OrderRank = 1;
+```
+
+The `INNER JOIN` reproduces `CROSS APPLY`, while the `LEFT JOIN` reproduces `OUTER APPLY`.
 
 > [!warning] Common Mistake
 > Not all errors are catchable in TRY/CATCH — severity 20+ errors (fatal connection-terminating errors) and syntax/compile errors bypass the CATCH block. Always check XACT_STATE() before COMMIT or ROLLBACK inside CATCH; committing with XACT_STATE() = -1 will throw an error.
@@ -315,14 +430,16 @@ BEGIN
             COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
+        -- Roll back only to the local savepoint or perform a full rollback
         IF @TranCount > 0
             ROLLBACK TRANSACTION MySavepoint;  -- partial rollback
         ELSE
-            ROLLBACK TRANSACTION;
+            ROLLBACK TRANSACTION;              -- full rollback
 
         THROW;
     END CATCH;
 END;
+GO
 ```
 
 ---
@@ -334,6 +451,216 @@ END;
 - **TRY/CATCH + THROW**: All stored procedures with DML operations
 - **Correlated UPDATE**: Refreshing denormalized columns
 - **TRY_CONVERT/TRY_PARSE**: Validating staging data types without CATCH overhead
+
+---
+
+## Hands-on Lab: Alternative Queries
+
+Run the setup script once in the same session and then compare each original query with its alternative. Temporary tables are used so the lab does not modify permanent data:
+
+> To compare both `UPDATE` or `DELETE` forms, rerun the setup script before the second form because these statements modify the temporary data.
+
+```sql
+DROP TABLE IF EXISTS #OrderItems;
+DROP TABLE IF EXISTS #Orders;
+DROP TABLE IF EXISTS #Customers;
+DROP TABLE IF EXISTS #Products;
+
+CREATE TABLE #Customers (
+    CustomerId int PRIMARY KEY,
+    Name       varchar(50) NOT NULL
+);
+
+CREATE TABLE #Orders (
+    OrderId     int PRIMARY KEY,
+    CustomerId  int NOT NULL,
+    OrderDate   date NOT NULL,
+    TotalAmount decimal(10, 2) NULL
+);
+
+CREATE TABLE #OrderItems (
+    OrderId  int NOT NULL,
+    ProductId int NOT NULL,
+    Quantity int NOT NULL,
+    UnitPrice decimal(10, 2) NOT NULL
+);
+
+CREATE TABLE #Products (
+    ProductId int IDENTITY PRIMARY KEY,
+    Name      varchar(50) NOT NULL,
+    CategoryId int NOT NULL
+);
+
+INSERT INTO #Customers VALUES
+    (1, 'Alice'), (2, 'Bruno'), (3, 'Carla');
+
+INSERT INTO #Orders (OrderId, CustomerId, OrderDate, TotalAmount) VALUES
+    (101, 1, '2026-01-10', 20.00),
+    (102, 1, '2026-02-15', 25.00),
+    (103, 2, '2026-01-20', 15.00);
+
+INSERT INTO #OrderItems VALUES
+    (101, 1, 2, 10.00),
+    (102, 2, 1, 25.00),
+    (103, 3, 3, 5.00),
+    (999, 4, 1, 99.00); -- orphan for the DELETE test
+
+INSERT INTO #Products (Name, CategoryId)
+VALUES ('Standalone product', 2);
+
+;WITH Numbers AS (
+    SELECT TOP (101)
+        ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS Number
+    FROM sys.all_objects AS a
+    CROSS JOIN sys.all_objects AS b
+)
+INSERT INTO #Products (Name, CategoryId)
+SELECT CONCAT('Product ', Number), 1
+FROM Numbers;
+```
+
+### 1. Latest order per customer
+
+```sql
+-- Correlated form
+SELECT c.CustomerId, c.Name,
+       (SELECT TOP 1 o.TotalAmount
+        FROM #Orders AS o
+        WHERE o.CustomerId = c.CustomerId
+        ORDER BY o.OrderDate DESC) AS LastOrderAmount
+FROM #Customers AS c;
+
+-- Alternative with ROW_NUMBER and LEFT JOIN
+WITH RankedOrders AS (
+    SELECT o.CustomerId, o.TotalAmount,
+           ROW_NUMBER() OVER (
+               PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC
+           ) AS OrderRank
+    FROM #Orders AS o
+)
+SELECT c.CustomerId, c.Name, ro.TotalAmount AS LastOrderAmount
+FROM #Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId AND ro.OrderRank = 1;
+```
+
+### 2. Categories with more than 100 products
+
+```sql
+-- IN form
+SELECT ProductId, Name
+FROM #Products
+WHERE CategoryId IN (
+    SELECT CategoryId
+    FROM #Products
+    GROUP BY CategoryId
+    HAVING COUNT(*) > 100
+);
+
+-- Alternative with CTE and INNER JOIN
+WITH LargeCategories AS (
+    SELECT CategoryId
+    FROM #Products
+    GROUP BY CategoryId
+    HAVING COUNT(*) > 100
+)
+SELECT p.ProductId, p.Name
+FROM #Products AS p
+INNER JOIN LargeCategories AS lc
+    ON lc.CategoryId = p.CategoryId;
+```
+
+### 3. UPDATE and DELETE without a correlated subquery
+
+```sql
+-- Correlated form: update totals
+UPDATE o
+SET o.TotalAmount = (
+    SELECT SUM(oi.Quantity * oi.UnitPrice)
+    FROM #OrderItems AS oi
+    WHERE oi.OrderId = o.OrderId
+)
+FROM #Orders AS o;
+
+-- Update totals with a CTE and LEFT JOIN
+WITH OrderTotals AS (
+    SELECT OrderId, SUM(Quantity * UnitPrice) AS TotalAmount
+    FROM #OrderItems
+    GROUP BY OrderId
+)
+UPDATE o
+SET o.TotalAmount = ot.TotalAmount
+FROM #Orders AS o
+LEFT JOIN OrderTotals AS ot ON ot.OrderId = o.OrderId;
+
+SELECT * FROM #Orders;
+
+-- Correlated form: remove orphans
+DELETE oi
+FROM #OrderItems AS oi
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM #Orders AS o
+    WHERE o.OrderId = oi.OrderId
+);
+
+-- Remove orphans with a LEFT JOIN
+DELETE oi
+FROM #OrderItems AS oi
+LEFT JOIN #Orders AS o ON o.OrderId = oi.OrderId
+WHERE o.OrderId IS NULL;
+```
+
+### 4. CROSS APPLY and OUTER APPLY
+
+```sql
+-- Original APPLY forms
+SELECT c.Name, recent.OrderId, recent.OrderDate
+FROM #Customers AS c
+CROSS APPLY (
+    SELECT TOP 3 OrderId, OrderDate
+    FROM #Orders
+    WHERE CustomerId = c.CustomerId
+    ORDER BY OrderDate DESC
+) AS recent;
+
+SELECT c.Name, last_order.OrderDate
+FROM #Customers AS c
+OUTER APPLY (
+    SELECT TOP 1 OrderDate
+    FROM #Orders
+    WHERE CustomerId = c.CustomerId
+    ORDER BY OrderDate DESC
+) AS last_order;
+
+-- Alternative to CROSS APPLY: INNER JOIN keeps only customers with orders
+WITH RankedOrders AS (
+    SELECT o.CustomerId, o.OrderId, o.OrderDate,
+           ROW_NUMBER() OVER (
+               PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC
+           ) AS OrderRank
+    FROM #Orders AS o
+)
+SELECT c.Name, ro.OrderId, ro.OrderDate
+FROM #Customers AS c
+INNER JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId AND ro.OrderRank <= 3;
+
+-- Alternative to OUTER APPLY: LEFT JOIN keeps customers without orders
+WITH RankedOrders AS (
+    SELECT o.CustomerId, o.OrderDate,
+           ROW_NUMBER() OVER (
+               PARTITION BY o.CustomerId ORDER BY o.OrderDate DESC
+           ) AS OrderRank
+    FROM #Orders AS o
+)
+SELECT c.Name, ro.OrderDate
+FROM #Customers AS c
+LEFT JOIN RankedOrders AS ro
+    ON ro.CustomerId = c.CustomerId AND ro.OrderRank = 1;
+```
+
+Compare these queries with the `CROSS APPLY` and `OUTER APPLY` versions shown earlier. The results should be equivalent, respecting the difference between `INNER JOIN` and `LEFT JOIN`.
 
 ---
 
