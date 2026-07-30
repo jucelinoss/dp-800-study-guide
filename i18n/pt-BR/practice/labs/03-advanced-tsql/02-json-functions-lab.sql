@@ -86,9 +86,14 @@ SELECT TOP (5)
 FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0;
 
 DECLARE @doc nvarchar(max) = N'{"customer":{"name":"Ada"},"address line":"One"}';
+-- Esta projeção demonstra como citar no JSONPath uma propriedade que contém espaço.
+-- O caminho lax da propriedade ausente retorna NULL sem gerar erro, o que é útil
+-- durante a inspeção inicial de documentos semiestruturados.
 SELECT JSON_VALUE(@doc, '$."address line"') AS QuotedKey,
        JSON_VALUE(@doc, 'lax $.missing') AS LaxMissing;
 BEGIN TRY
+    -- O caminho strict falha de propósito porque $.missing não existe. O TRY/CATCH
+    -- transforma essa violação contratual esperada em uma mensagem visível no lab.
     SELECT JSON_VALUE(@doc, 'strict $.missing') AS StrictMissing;
 END TRY
 BEGIN CATCH
@@ -104,37 +109,104 @@ GO
 -- preserva um objeto/array para uma segunda etapa de parsing.
 DECLARE @oneOrder nvarchar(max) =
     (SELECT TOP (1) OrderDocument FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0);
+
+-- Consulta 1 — OPENJSON no modo padrão:
+-- Sem WITH, OPENJSON expõe o primeiro nível do documento em três colunas:
+-- [key] é o nome ou índice da propriedade, [value] é o valor textual e [type]
+-- informa o tipo JSON (0 = null, 1 = texto, 2 = número, 3 = booleano,
+-- 4 = array e 5 = objeto). Objetos e arrays aninhados continuam serializados
+-- em [value]. Esse formato é ideal para explorar um documento desconhecido antes
+-- de definir os caminhos e tipos que serão usados na projeção.
 SELECT [key], [value], [type] FROM OPENJSON(@oneOrder);
+
+-- Consulta 2 — OPENJSON com WITH e AS JSON:
+-- WITH transforma propriedades JSON em colunas relacionais tipadas. Os caminhos
+-- $.order.number e $.territory.name navegam por objetos aninhados usando JSONPath.
+--
+-- Items é um array, portanto AS JSON preserva o array completo como texto JSON.
+-- Isso permite passá-lo para outra chamada OPENJSON em uma segunda etapa de
+-- parsing. Sem AS JSON, a projeção tentaria tratar o array como um valor escalar.
 SELECT OrderNumber, Territory, Items
 FROM OPENJSON(@oneOrder)
-WITH (OrderNumber nvarchar(25) '$.order.number', Territory nvarchar(50) '$.territory.name',
-      Items nvarchar(max) '$.items' AS JSON);
+WITH (
+        OrderNumber nvarchar(25) '$.order.number',
+        Territory nvarchar(50) '$.territory.name',
+        Items nvarchar(max) '$.items' AS JSON
+      );
 
-SELECT o.SalesOrderID, item.Sku, item.Qty, item.Price
-FROM lab.JsonFunctionsOrders AS o
-CROSS APPLY OPENJSON(o.OrderDocument, '$.items')
-WITH (Sku nvarchar(25) '$.sku', Qty int '$.qty', Price money '$.price') AS item
-WHERE o.SalesOrderID IN (-1, 43659);
-SELECT o.SalesOrderID, item.Sku, item.Qty
-FROM lab.JsonFunctionsOrders AS o
-OUTER APPLY OPENJSON(o.OrderDocument, '$.items')
-WITH (Sku nvarchar(25) '$.sku', Qty int '$.qty') AS item
-WHERE o.SalesOrderID IN (-1, 43659);
-GO
+-- Consulta 3 — CROSS APPLY para decompor o array de itens:
+-- A segunda sintaxe de OPENJSON recebe o caminho '$.items' e visita o array de cada
+-- pedido. O WITH converte cada elemento em uma linha com Sku, Qty e Price, enquanto
+-- CROSS APPLY associa essas linhas ao SalesOrderID da tabela externa.
+--
+-- CROSS APPLY tem comportamento semelhante a um INNER JOIN lateral: se o array
+-- estiver vazio ou ausente, o pedido não gera linhas. Por isso o pedido de teste -1,
+-- que possui items: [], não aparece neste resultado; o pedido 43659 aparece com
+-- uma linha para cada item.
+SELECT o.SalesOrderID,
+       item.Sku,
+       item.Qty,
+       item.Price
+FROM   lab.JsonFunctionsOrders AS o
+CROSS APPLY 
+    OPENJSON (o.OrderDocument, '$.items') 
+    WITH (
+            Sku NVARCHAR (25) '$.sku',
+            Qty INT '$.qty',
+            Price MONEY '$.price'
+    ) AS item
+WHERE  o.SalesOrderID IN (-1, 43659);
+
+-- Consulta 4 — OUTER APPLY para preservar pedidos sem itens:
+-- A abertura do array é igual à consulta anterior, mas OUTER APPLY tem comportamento
+-- semelhante a um LEFT JOIN lateral. Quando OPENJSON não encontra elementos, a linha
+-- do pedido externo é preservada e as colunas de item recebem NULL.
+
 -- Compare os dois resultados: CROSS APPLY não retorna SalesOrderID = -1; OUTER
 -- APPLY o preserva com valores NULL no lado interno. Para cada pedido externo,
 -- OPENJSON pode multiplicar linhas: filtre pedidos antes do APPLY quando possível.
+SELECT o.SalesOrderID, item.Sku, item.Qty
+FROM lab.JsonFunctionsOrders AS o
+OUTER APPLY 
+    OPENJSON(o.OrderDocument, '$.items')
+    WITH (
+            Sku nvarchar(25) '$.sku', 
+            Qty int '$.qty'
+          ) AS item
+WHERE o.SalesOrderID IN (-1, 43659);
+GO
+
 
 -- PARTE 4: TRIAR STAGING COM LAX E CARREGAR COM STRICT
 -- Não aplique strict diretamente a dados possivelmente inválidos: um único texto
 -- malformado interrompe a instrução. A primeira consulta separa rejeitos; a segunda
 -- só lê documentos já aprovados e com os campos obrigatórios presentes.
-CREATE TABLE lab.JsonFunctionsStage (RowId int IDENTITY PRIMARY KEY, JsonData nvarchar(max) NULL);
+CREATE TABLE lab.JsonFunctionsStage 
+    (
+        RowId int IDENTITY PRIMARY KEY, 
+        JsonData nvarchar(max) NULL
+     );
+
 INSERT INTO lab.JsonFunctionsStage (JsonData)
 VALUES (N'{"id":1,"name":"valid"}'), (N'{"id":2}'), (N'{"id":');
+
+-- Consulta 4.1 — triagem das linhas recebidas no staging:
+-- ISJSON identifica documentos malformados antes de confiarmos nos caminhos JSON.
+-- JSON_VALUE usa aqui o comportamento padrão lax: quando uma propriedade não existe,
+-- retorna NULL em vez de interromper a instrução. As condições com OR sinalizam três
+-- situações: JSON inválido, id ausente/nulo ou name ausente/nulo. Esta consulta é um
+-- relatório de rejeitos; ela não exclui nem altera as linhas do staging.
 SELECT RowId, JsonData FROM lab.JsonFunctionsStage
 WHERE ISJSON(JsonData) = 0 OR JSON_VALUE(JsonData, '$.id') IS NULL
    OR JSON_VALUE(JsonData, '$.name') IS NULL;
+
+   
+-- Consulta 4.2 — leitura somente das linhas aprovadas:
+-- ISJSON = 1 elimina o texto malformado, e o teste de name elimina documentos sem
+-- a propriedade obrigatória. Os caminhos strict tornam o contrato explícito: se uma
+-- propriedade obrigatória estiver ausente em uma linha que chegar até aqui, o SQL
+-- Server gera erro em vez de retornar NULL silenciosamente. Neste exemplo, somente o
+-- documento com id = 1 e name = 'valid' é retornado.
 SELECT JSON_VALUE(JsonData, 'strict $.id') AS Id,
        JSON_VALUE(JsonData, 'strict $.name') AS Name
 FROM lab.JsonFunctionsStage
@@ -144,16 +216,28 @@ GO
 -- PARTE 5: JSON_MODIFY E SAÍDA JSON, SEM ALTERAR OBJETOS ADVENTUREWORKS
 -- JSON_MODIFY retorna um novo documento; a tabela não é atualizada nesta parte.
 -- Resultado esperado: cidade é mascarada no resultado e temporary não aparece.
+-- Esta consulta cria uma projeção segura: troca a cidade e remove temporary apenas
+-- no JSON retornado, sem atualizar a coluna OrderDocument.
 SELECT TOP (3) SalesOrderID,
     JSON_MODIFY(JSON_MODIFY(OrderDocument, '$.shipping.city', N'Redacted'),
                 '$.temporary', NULL) AS SafeProjection
 FROM lab.JsonFunctionsOrders;
+
+-- FOR JSON PATH permite controlar explicitamente nomes e níveis das propriedades.
+-- Os aliases abaixo formam um payload de pedido/cliente devolvido como resultado.
+-- Como FOR JSON serializa todas as linhas selecionadas em um único documento JSON,
+-- o SSMS exibe uma linha e uma coluna contendo o payload completo. TOP (3) limita
+-- os pedidos dentro desse documento; não cria três linhas na grade. Remova FOR JSON
+-- PATH para visualizar as colunas relacionais diretamente no grid do SSMS.
 SELECT TOP (3) h.SalesOrderID AS [order.id], h.OrderDate AS [order.date],
     p.FirstName AS [customer.firstName], p.LastName AS [customer.lastName]
 FROM Sales.SalesOrderHeader AS h
 JOIN Sales.Customer AS c ON c.CustomerID = h.CustomerID
 LEFT JOIN Person.Person AS p ON p.BusinessEntityID = c.PersonID
 FOR JSON PATH, ROOT('orders');
+
+-- FOR JSON AUTO deriva a hierarquia dos aliases das tabelas e do formato do JOIN.
+-- Compare esta saída concisa com os nomes explícitos usados em FOR JSON PATH.
 SELECT TOP (3) h.SalesOrderID, d.SalesOrderDetailID, d.OrderQty
 FROM Sales.SalesOrderHeader AS h JOIN Sales.SalesOrderDetail AS d ON d.SalesOrderID = h.SalesOrderID
 FOR JSON AUTO;
@@ -166,10 +250,22 @@ GO
 -- caminho precisa existir e NULL representa o valor JSON null. JSON_MODIFY trata
 -- texto comum como string e faz escape; JSON_QUERY marca um fragmento como JSON.
 DECLARE @config nvarchar(max) = N'{"env":"dev","tags":["dp800","json"]}';
+-- Esta consulta retorna dois documentos JSON independentes, em duas colunas:
+--
+--   RemoveEmLax = {"tags":["dp800","json"]}
+--   MantemArray = {"env":"dev","tags":["dp800","json"]}
+--
+-- Na primeira expressão, atribuir NULL a $.env no modo padrão lax remove a
+-- propriedade do documento retornado. Na segunda, JSON_QUERY marca o valor de
+-- $.tags como um array JSON válido; por isso JSON_MODIFY o incorpora como array.
+-- Sem JSON_QUERY, o array seria escapado e viraria texto, semelhante a:
+-- {"env":"dev","tags":"[\"dp800\",\"json\"]"}.
 SELECT JSON_MODIFY(@config, '$.env', NULL) AS RemoveEmLax,
        JSON_MODIFY(@config, '$.tags', JSON_QUERY(@config, '$.tags')) AS MantemArray;
 
 BEGIN TRY
+    -- O caminho strict falha de propósito porque $.missing ainda não existe. O
+    -- TRY/CATCH mantém essa falha esperada visível sem interromper o restante do lab.
     SELECT JSON_MODIFY(@config, 'strict $.missing', N'x') AS StrictFalha;
 END TRY
 BEGIN CATCH
@@ -177,53 +273,40 @@ BEGIN CATCH
 END CATCH;
 GO
 
--- SQL Server 2025 on-premises (17.x) pode executar JSON_ARRAYAGG e JSON_CONTAINS.
--- As instruções ficam documentadas e o bloco dinâmico seguinte as executa quando
--- versão e compatibilidade permitem. SQL dinâmico evita erro de compilação em
--- instâncias on-premises mais antigas.
--- SELECT JSON_ARRAYAGG(SalesOrderID ORDER BY SalesOrderID)
--- FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0;
---
--- SELECT JSON_OBJECTAGG(CONVERT(nvarchar(20), SalesOrderID): OrderDate)
--- FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0;
---
--- SELECT JSON_CONTAINS(OrderDocument, '"Northwest"', '$.territory.name')
--- FROM lab.JsonFunctionsOrders;
--- Fallback: SELECT ... FOR JSON PATH; disponível no caminho principal do lab.
+-- SQL Server 2025: agregação e busca nativas em documentos JSON.
+-- A premissa deste lab é SQL Server 2025 com compatibilidade 170; por isso as
+-- consultas são executadas diretamente, sem detecção de versão ou SQL dinâmico.
 
-DECLARE @MajorVersion int = TRY_CONVERT(int, SERVERPROPERTY(N'ProductMajorVersion'));
-DECLARE @CompatibilityLevel int = CONVERT(int, DATABASEPROPERTYEX(DB_NAME(), N'CompatibilityLevel'));
+-- Consulta 1 — JSON_ARRAYAGG:
+-- Agrega os SalesOrderID em um único array JSON ordenado. O resultado é uma única
+-- linha e coluna, com conteúdo semelhante a [43659,43660,...].
+SELECT JSON_ARRAYAGG(SalesOrderID ORDER BY SalesOrderID) AS OrderIdsJson
+FROM lab.JsonFunctionsOrders
+WHERE SalesOrderID > 0;
 
-IF @MajorVersion >= 17 AND @CompatibilityLevel >= 170
-BEGIN
-    PRINT N'Executando recursos JSON do SQL Server 2025 on-premises.';
+-- Consulta 2 — JSON_OBJECTAGG:
+-- Constrói um único objeto JSON usando SalesOrderID como chave e OrderDate como
+-- valor, por exemplo {"43659":"2022-05-30T00:00:00"}. As chaves devem ser únicas.
+SELECT JSON_OBJECTAGG(CONVERT(nvarchar(20), SalesOrderID): OrderDate) AS OrderDatesJson
+FROM lab.JsonFunctionsOrders
+WHERE SalesOrderID > 0;
 
-    -- Caso 1: ordenar IDs dentro do array. Resultado: um array JSON ordenado.
-    EXEC sys.sp_executesql N'
-        SELECT JSON_ARRAYAGG(SalesOrderID ORDER BY SalesOrderID) AS OrderIdsJson
-        FROM lab.JsonFunctionsOrders
-        WHERE SalesOrderID > 0;';
-
-    -- Caso 2: teste de contenção no documento. JSON_CONTAINS exige tipo json;
-    -- o CAST é intencional porque a tabela principal permanece nvarchar(max) para
-    -- também rodar em versões anteriores. Compare-o com JSON_VALUE: aqui a
-    -- intenção é perguntar se o valor JSON está contido naquele caminho.
-    EXEC sys.sp_executesql N'
-        SELECT SalesOrderID,
-               JSON_CONTAINS(CAST(OrderDocument AS json), ''"Northwest"'', ''$.territory.name'') AS IsNorthwest
-        FROM lab.JsonFunctionsOrders
-        WHERE SalesOrderID > 0
-          AND JSON_CONTAINS(CAST(OrderDocument AS json), ''"Northwest"'', ''$.territory.name'') = 1;';
-END
-ELSE
-BEGIN
-    PRINT N'Recursos JSON 2025 não executados: exigem SQL Server 2025 (17.x) e compatibilidade 170. O fallback FOR JSON deste lab foi executado normalmente.';
-END;
+-- Consulta 3 — JSON_CONTAINS:
+-- Verifica se a string SQL N'Northwest' aparece em $.territory.name. Não inclua as
+-- aspas JSON no valor pesquisado: '"Northwest"' procura um valor que contenha
+-- literalmente os caracteres de aspas e por isso retornaria 0 neste caso. O CAST
+-- converte nvarchar(max) para json; o filtro retorna somente os pedidos encontrados.
+SELECT SalesOrderID,
+       JSON_CONTAINS(CAST(OrderDocument AS json), N'Northwest', '$.territory.name') AS IsNorthwest
+FROM lab.JsonFunctionsOrders
+WHERE SalesOrderID > 0
+  AND JSON_CONTAINS(CAST(OrderDocument AS json), N'Northwest', '$.territory.name') = 1;
 GO
 
 -- PARTE 5C: AGREGAÇÃO DE ATRIBUTOS E PAYLOAD PARA API/IA
 -- Em uma integração real, atributos flexíveis podem chegar como linhas e precisam
 -- ser agrupados em JSON. A tabela é isolada e usa produtos reais como referência.
+DROP TABLE LAB.JSONFUNCTIONSPRODUCTATTRIBUTES
 CREATE TABLE lab.JsonFunctionsProductAttributes
 (
     ProductID int NOT NULL,
@@ -233,13 +316,21 @@ CREATE TABLE lab.JsonFunctionsProductAttributes
 );
 
 INSERT INTO lab.JsonFunctionsProductAttributes (ProductID, AttributeName, AttributeValue)
+-- O SELECT abaixo fornece as linhas para o INSERT. CROSS APPLY (VALUES) transforma
+-- três colunas de cada produto em três linhas de atributos (productNumber, color e
+-- class), funcionando como um padrão compacto de unpivot. COALESCE substitui cores
+-- ou classes NULL por um valor legível, e CONVERT deixa todos os atributos com o
+-- mesmo tipo nvarchar. TOP (12) limita as linhas de atributos de saída (não 12
+-- produtos); com três atributos por produto, normalmente cobre cerca de quatro
+-- produtos. ORDER BY define quais linhas entram nesse limite.
 SELECT TOP (12) p.ProductID, v.AttributeName, v.AttributeValue
 FROM Production.Product AS p
-CROSS APPLY (VALUES
-    (N'productNumber', CONVERT(nvarchar(100), p.ProductNumber)),
-    (N'color', COALESCE(p.Color, N'not-specified')),
-    (N'class', COALESCE(p.Class, N'not-specified'))
-) AS v(AttributeName, AttributeValue)
+CROSS APPLY (
+    VALUES
+        (N'productNumber', CONVERT(nvarchar(100), p.ProductNumber)),
+        (N'color', COALESCE(p.Color, N'not-specified')),
+        (N'class', COALESCE(p.Class, N'not-specified'))
+    ) AS v(AttributeName, AttributeValue)
 WHERE p.ProductNumber IS NOT NULL
 ORDER BY p.ProductID, v.AttributeName;
 GO
@@ -247,7 +338,8 @@ GO
 -- Fallback portável: uma matriz de atributos por produto. Ele executa hoje em
 -- SQL Server compatível com AdventureWorks e preserva tipos/ordem do SELECT.
 SELECT a.ProductID,
-       JSON_QUERY((
+       JSON_QUERY(
+            (
            SELECT a2.AttributeName AS [name], a2.AttributeValue AS [value]
            FROM lab.JsonFunctionsProductAttributes AS a2
            WHERE a2.ProductID = a.ProductID
@@ -293,6 +385,9 @@ DECLARE @SystemPrompt nvarchar(400) =
 DECLARE @UserPrompt nvarchar(400) =
     N'Resuma produtos de bicicleta disponíveis e destaque cor e número do produto.';
 
+-- Esta consulta monta um payload de chat com modelo, parâmetros, mensagens e
+-- contexto de produtos. JSON_QUERY incorpora os arrays internos sem escapá-los
+-- como texto JSON.
 SELECT
 (
     SELECT N'gpt-4.1' AS [model],
@@ -325,17 +420,45 @@ GO
 -- A primeira consulta pode usar a projeção indexada porque repete a expressão.
 -- A segunda reduz pedidos por data/território e só depois expande itens; sem esse
 -- filtro externo, a cardinalidade e os operadores posteriores podem crescer muito.
-ALTER TABLE lab.JsonFunctionsOrders
-ADD TerritoryName AS CONVERT(nvarchar(50), JSON_VALUE(OrderDocument, '$.territory.name'));
-CREATE INDEX IX_JsonFunctionsOrders_TerritoryName ON lab.JsonFunctionsOrders (TerritoryName);
+-- As verificações permitem executar a Parte 6 isoladamente ou várias vezes. O índice
+-- é removido antes de qualquer alteração porque depende da coluna computada.
+IF EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'lab.JsonFunctionsOrders')
+      AND name = N'IX_JsonFunctionsOrders_TerritoryName'
+)
+    DROP INDEX IX_JsonFunctionsOrders_TerritoryName ON lab.JsonFunctionsOrders;
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'lab.JsonFunctionsOrders')
+      AND name = N'TerritoryName'
+)
+BEGIN
+    ALTER TABLE lab.JsonFunctionsOrders
+    ADD TerritoryName AS CONVERT(nvarchar(50), JSON_VALUE(OrderDocument, '$.territory.name'));
+END;
+
+CREATE INDEX IX_JsonFunctionsOrders_TerritoryName
+    ON lab.JsonFunctionsOrders (TerritoryName);
 GO
 SET STATISTICS IO, TIME ON;
+-- Esta consulta extrai um escalar de cada documento. Compare leituras e CPU com a
+-- alternativa que usa a coluna computada indexada ao analisar o plano de execução.
 SELECT SalesOrderID FROM lab.JsonFunctionsOrders
 WHERE CONVERT(nvarchar(50), JSON_VALUE(OrderDocument, '$.territory.name')) = N'Northwest';
+-- Esta consulta demonstra multiplicação de linhas: cada pedido pode gerar vários
+-- itens. Filtrar a tabela externa antes do CROSS APPLY reduz a expansão do JSON.
 SELECT o.SalesOrderID, item.Sku, item.Qty
 FROM lab.JsonFunctionsOrders AS o
 CROSS APPLY OPENJSON(o.OrderDocument, '$.items')
-WITH (Sku nvarchar(25) '$.sku', Qty int '$.qty') AS item
+WITH (
+        Sku nvarchar(25) '$.sku', 
+        Qty int '$.qty') AS item
 WHERE o.OrderDate >= '20070101'
   AND CONVERT(nvarchar(50), JSON_VALUE(o.OrderDocument, '$.territory.name')) = N'Northwest';
 SET STATISTICS IO, TIME OFF;
@@ -357,12 +480,12 @@ GO
 --   @KeyColumn   → nome da coluna de chave primária retornada como 1ª coluna
 --                  (ex: SalesOrderID, ProductID, CustomerID, etc.)
 -- =================================================================================
-CREATE TABLE lab.JsonFunctionsMapping
-(
-    MappingName sysname NOT NULL CONSTRAINT PK_JsonFunctionsMapping PRIMARY KEY,
-    Definition  nvarchar(max) NOT NULL CONSTRAINT CK_JsonFunctionsMapping CHECK (ISJSON(Definition) = 1)
-);
-GO
+--CREATE TABLE lab.JsonFunctionsMapping
+--(
+--    MappingName sysname NOT NULL CONSTRAINT PK_JsonFunctionsMapping PRIMARY KEY,
+--    Definition  nvarchar(max) NOT NULL CONSTRAINT CK_JsonFunctionsMapping CHECK (ISJSON(Definition) = 1)
+--);
+--GO
 
 INSERT INTO lab.JsonFunctionsMapping (MappingName, Definition) VALUES
 (N'PedidoResumo', N'[

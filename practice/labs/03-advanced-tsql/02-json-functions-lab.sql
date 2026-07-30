@@ -68,6 +68,8 @@ INSERT INTO lab.JsonFunctionsOrders (SalesOrderID, OrderDate, OrderDocument)
 VALUES (-1, GETDATE(), N'{"order":{"number":"LAB-EMPTY"},"territory":{"name":"Lab"},"items":[]}');
 GO
 
+-- This summary confirms that the fixture was loaded and that the controlled order
+-- with an empty items array is available for the APPLY comparison later in the lab.
 SELECT COUNT(*) AS Documents,
        SUM(CASE WHEN SalesOrderID = -1 THEN 1 ELSE 0 END) AS EmptyArrayDocuments
 FROM lab.JsonFunctionsOrders;
@@ -85,9 +87,14 @@ WHERE SalesOrderID > 0;
 GO
 
 DECLARE @doc nvarchar(max) = N'{"customer":{"name":"Ada"},"address line":"One"}';
+-- This projection demonstrates JSONPath quoting for a property name containing a
+-- space. The lax path for the missing property returns NULL instead of raising an
+-- error, which is useful while inspecting semi-structured input.
 SELECT JSON_VALUE(@doc, '$."address line"') AS QuotedKey,
        JSON_VALUE(@doc, 'lax $.missing') AS LaxMissing;
 BEGIN TRY
+    -- The strict path deliberately raises an error because $.missing is absent. The
+    -- TRY/CATCH turns that expected contract violation into a visible lab message.
     SELECT JSON_VALUE(@doc, 'strict $.missing') AS StrictMissing;
 END TRY
 BEGIN CATCH
@@ -105,8 +112,22 @@ GO
 DECLARE @oneOrder nvarchar(max) =
     (SELECT TOP (1) OrderDocument FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0);
 
+-- Query 1 — OPENJSON in default mode:
+-- Without a WITH clause, OPENJSON exposes the first level of the document through
+-- three columns: [key] is the property name or array index, [value] is the textual
+-- value, and [type] identifies the JSON type (0 = null, 1 = string, 2 = number,
+-- 3 = Boolean, 4 = array, and 5 = object). Nested objects and arrays remain
+-- serialized in [value]. This mode is useful for exploring an unknown document
+-- before defining the paths and data types for the final projection.
 SELECT [key], [value], [type] FROM OPENJSON(@oneOrder);
 
+-- Query 2 — OPENJSON with WITH and AS JSON:
+-- WITH projects JSON properties as typed relational columns. The paths
+-- $.order.number and $.territory.name navigate nested objects using JSONPath.
+--
+-- Items is an array, so AS JSON preserves the complete array as JSON text. This
+-- allows a second OPENJSON call to parse its elements in a later step. Without
+-- AS JSON, the projection would try to treat the array as a scalar value.
 SELECT OrderNumber, Territory, Items
 FROM OPENJSON(@oneOrder)
 WITH
@@ -116,12 +137,28 @@ WITH
     Items nvarchar(max) '$.items' AS JSON
 );
 
+-- Query 3 — CROSS APPLY to shred the items array:
+-- The second OPENJSON syntax navigates to '$.items' for each order. WITH converts
+-- each array element into a typed row containing Sku, Qty, and Price, while CROSS
+-- APPLY associates those rows with the SalesOrderID from the outer table.
+--
+-- CROSS APPLY behaves like a lateral INNER JOIN: when the array is empty or missing,
+-- the order produces no rows. Therefore, test order -1, which has items: [], is not
+-- returned; order 43659 returns one row for each item.
 SELECT o.SalesOrderID, item.Sku, item.Qty, item.Price
 FROM lab.JsonFunctionsOrders AS o
 CROSS APPLY OPENJSON(o.OrderDocument, '$.items')
 WITH (Sku nvarchar(25) '$.sku', Qty int '$.qty', Price money '$.price') AS item
 WHERE o.SalesOrderID IN (-1, 43659);
 
+-- Query 4 — OUTER APPLY to preserve orders without items:
+-- The array expansion is the same as in the previous query, but OUTER APPLY behaves
+-- like a lateral LEFT JOIN. When OPENJSON finds no elements, the outer order is kept
+-- and the item columns are returned as NULL.
+--
+-- Compare the results: here SalesOrderID = -1 appears even though items: [] is empty,
+-- whereas CROSS APPLY removes it. This pattern is useful when missing child rows
+-- must also be identified during audits or data loads.
 SELECT o.SalesOrderID, item.Sku, item.Qty
 FROM lab.JsonFunctionsOrders AS o
 OUTER APPLY OPENJSON(o.OrderDocument, '$.items')
@@ -138,12 +175,24 @@ CREATE TABLE lab.JsonFunctionsStage (RowId int IDENTITY PRIMARY KEY, JsonData nv
 INSERT INTO lab.JsonFunctionsStage (JsonData)
 VALUES (N'{"id":1,"name":"valid"}'), (N'{"id":2}'), (N'{"id":');
 
+-- Query 1 — triage untrusted staging rows:
+-- ISJSON identifies malformed documents before any path is treated as reliable.
+-- JSON_VALUE uses the default lax behavior here: a missing property returns NULL
+-- instead of aborting the statement. The OR conditions therefore flag three cases:
+-- invalid JSON, a missing/null id, or a missing/null name. This query is a rejection
+-- report; it does not delete or modify the staged rows.
 SELECT RowId, JsonData
 FROM lab.JsonFunctionsStage
 WHERE ISJSON(JsonData) = 0
    OR JSON_VALUE(JsonData, '$.id') IS NULL
    OR JSON_VALUE(JsonData, '$.name') IS NULL;
 
+-- Query 2 — load only rows that passed the minimum validation:
+-- ISJSON = 1 excludes malformed text, and the name check excludes documents without
+-- the required name property. The strict paths now make the contract explicit:
+-- if a required property is absent in a row that reaches this query, SQL Server
+-- raises an error instead of silently returning NULL. In this sample, only the
+-- document with id = 1 and name = 'valid' is returned.
 SELECT JSON_VALUE(JsonData, 'strict $.id') AS Id,
        JSON_VALUE(JsonData, 'strict $.name') AS Name
 FROM lab.JsonFunctionsStage
@@ -152,11 +201,19 @@ GO
 
 -- PART 4: MODIFY AND SERIALIZE WITHOUT CHANGING ADVENTUREWORKS TABLES
 -- JSON_MODIFY returns a new document. The source table is not updated here.
+-- This query returns a safe projection: it replaces the shipping city and removes
+-- the temporary property in the returned JSON without updating OrderDocument.
 SELECT TOP (3) SalesOrderID,
     JSON_MODIFY(JSON_MODIFY(OrderDocument, '$.shipping.city', N'Redacted'),
                 '$.temporary', NULL) AS SafeProjection
 FROM lab.JsonFunctionsOrders;
 
+-- FOR JSON PATH gives explicit control over property names and nesting. These aliases
+-- create an order/customer-shaped payload returned as a result set. Because FOR JSON
+-- serializes all selected rows into one JSON document, SSMS displays one row and one
+-- column containing the complete payload. TOP (3) limits the orders inside that JSON
+-- document; it does not produce three result-grid rows. Remove FOR JSON PATH when you
+-- want to inspect the relational columns directly in the SSMS grid.
 SELECT TOP (3)
     h.SalesOrderID AS [order.id], h.OrderDate AS [order.date],
     p.FirstName AS [customer.firstName], p.LastName AS [customer.lastName]
@@ -165,6 +222,8 @@ JOIN Sales.Customer AS c ON c.CustomerID = h.CustomerID
 LEFT JOIN Person.Person AS p ON p.BusinessEntityID = c.PersonID
 FOR JSON PATH, ROOT('orders');
 
+-- FOR JSON AUTO derives the JSON hierarchy from table aliases and join shape. Compare
+-- this concise output with the explicit property names produced by FOR JSON PATH.
 SELECT TOP (3) h.SalesOrderID, d.SalesOrderDetailID, d.OrderQty
 FROM Sales.SalesOrderHeader AS h
 JOIN Sales.SalesOrderDetail AS d ON d.SalesOrderID = h.SalesOrderID
@@ -173,9 +232,21 @@ GO
 
 -- PART 4B: JSON_MODIFY DETAILS AND SQL SERVER 2025 ON-PREMISES TESTS
 DECLARE @config nvarchar(max) = N'{"env":"dev","tags":["dp800","json"]}';
+-- This query returns two independent JSON documents in two result columns:
+--
+--   RemoveInLax  = {"tags":["dp800","json"]}
+--   ArrayNotEscaped = {"env":"dev","tags":["dp800","json"]}
+--
+-- In the first expression, assigning NULL to $.env in the default lax mode removes
+-- the property from the returned document. In the second expression, JSON_QUERY
+-- marks the value of $.tags as an already-valid JSON array, so JSON_MODIFY embeds it
+-- as an array. Without JSON_QUERY, the array would be escaped and become a string,
+-- similar to {"env":"dev","tags":"[\"dp800\",\"json\"]"}.
 SELECT JSON_MODIFY(@config, '$.env', NULL) AS RemovedInLax,
        JSON_MODIFY(@config, '$.tags', JSON_QUERY(@config, '$.tags')) AS ArrayNotEscaped;
 BEGIN TRY
+    -- The strict path deliberately fails because $.missing does not exist. TRY/CATCH
+    -- keeps the expected failure visible without stopping the rest of the lab.
     SELECT JSON_MODIFY(@config, 'strict $.missing', N'x') AS StrictFailure;
 END TRY
 BEGIN CATCH
@@ -183,27 +254,35 @@ BEGIN CATCH
 END CATCH;
 GO
 
--- SQL Server 2025 on-premises can run these tests. Dynamic SQL prevents parsing
--- failures on earlier on-premises versions; FOR JSON remains the portable fallback.
--- SELECT JSON_OBJECT('orderId': SalesOrderID) FROM lab.JsonFunctionsOrders;
--- SELECT JSON_ARRAYAGG(SalesOrderID) FROM lab.JsonFunctionsOrders;
--- SELECT JSON_CONTAINS(OrderDocument, '"Lab"', '$.territory.name')
--- FROM lab.JsonFunctionsOrders;
-DECLARE @FeatureMajorVersion int = TRY_CONVERT(int, SERVERPROPERTY(N'ProductMajorVersion'));
-DECLARE @FeatureCompatibility int = CONVERT(int, DATABASEPROPERTYEX(DB_NAME(), N'CompatibilityLevel'));
-IF @FeatureMajorVersion >= 17 AND @FeatureCompatibility >= 170
-BEGIN
-    EXEC sys.sp_executesql N'
-        SELECT JSON_ARRAYAGG(SalesOrderID ORDER BY SalesOrderID) AS OrderIdsJson
-        FROM lab.JsonFunctionsOrders WHERE SalesOrderID > 0;
-        SELECT SalesOrderID,
-               JSON_CONTAINS(CAST(OrderDocument AS json), ''"Northwest"'', ''$.territory.name'') AS IsNorthwest
-        FROM lab.JsonFunctionsOrders
-        WHERE SalesOrderID > 0
-          AND JSON_CONTAINS(CAST(OrderDocument AS json), ''"Northwest"'', ''$.territory.name'') = 1;';
-END
-ELSE
-    PRINT N'SQL Server 2025 JSON features skipped: version 17.x and compatibility 170 are required.';
+-- SQL Server 2025: native JSON aggregation and containment queries.
+-- This lab assumes SQL Server 2025 with compatibility level 170, so the statements
+-- run directly without version detection, dynamic SQL, or an older-version fallback.
+
+-- Query 1 — JSON_ARRAYAGG:
+-- Aggregates SalesOrderID values into one ordered JSON array. The result is one row
+-- and one column containing a value such as [43659,43660,...].
+SELECT JSON_ARRAYAGG(SalesOrderID ORDER BY SalesOrderID) AS OrderIdsJson
+FROM lab.JsonFunctionsOrders
+WHERE SalesOrderID > 0;
+
+-- Query 2 — JSON_OBJECTAGG:
+-- Builds one JSON object using SalesOrderID as the key and OrderDate as the value,
+-- for example {"43659":"2022-05-30T00:00:00"}. Keys should be unique.
+SELECT JSON_OBJECTAGG(CONVERT(nvarchar(20), SalesOrderID): OrderDate) AS OrderDatesJson
+FROM lab.JsonFunctionsOrders
+WHERE SalesOrderID > 0;
+
+-- Query 3 — JSON_CONTAINS:
+-- Checks whether the SQL string N'Northwest' appears at $.territory.name. Do not
+-- include JSON quotation marks in the search value: '"Northwest"' searches for a
+-- value that literally contains quote characters and therefore returns 0 here.
+-- CAST converts the nvarchar(max) column to json; the filter returns only matching
+-- orders, while IsNorthwest exposes the successful result as 1.
+SELECT SalesOrderID,
+       JSON_CONTAINS(CAST(OrderDocument AS json), N'Northwest', '$.territory.name') AS IsNorthwest
+FROM lab.JsonFunctionsOrders
+WHERE SalesOrderID > 0
+  AND JSON_CONTAINS(CAST(OrderDocument AS json), N'Northwest', '$.territory.name') = 1;
 GO
 
 -- PART 4C: ROW AGGREGATION AND AN API/LLM PAYLOAD
@@ -215,6 +294,13 @@ CREATE TABLE lab.JsonFunctionsProductAttributes
     CONSTRAINT PK_JsonFunctionsProductAttributes PRIMARY KEY (ProductID, AttributeName)
 );
 INSERT INTO lab.JsonFunctionsProductAttributes (ProductID, AttributeName, AttributeValue)
+-- The SELECT below supplies the rows for the INSERT. CROSS APPLY (VALUES) turns
+-- three columns from each product into three attribute rows (productNumber, color,
+-- and class), which is a compact unpivot pattern. COALESCE replaces NULL colors or
+-- classes with a readable placeholder, and the conversion gives all attribute values
+-- one compatible nvarchar type. TOP (12) limits the output attribute rows (not 12
+-- products); with three attributes per product, it normally covers about four
+-- products. ORDER BY defines which rows are selected for that limit.
 SELECT TOP (12) p.ProductID, v.AttributeName, v.AttributeValue
 FROM Production.Product AS p
 CROSS APPLY (VALUES
@@ -225,6 +311,8 @@ CROSS APPLY (VALUES
 WHERE p.ProductNumber IS NOT NULL ORDER BY p.ProductID, v.AttributeName;
 GO
 -- Portable fallback: attributes as an array for each product.
+-- This correlated query builds one JSON array per product with FOR JSON PATH.
+-- JSON_QUERY marks the nested array as JSON so the outer result does not double-escape it.
 SELECT a.ProductID, JSON_QUERY((
     SELECT a2.AttributeName AS [name], a2.AttributeValue AS [value]
     FROM lab.JsonFunctionsProductAttributes AS a2
@@ -235,6 +323,8 @@ GROUP BY a.ProductID ORDER BY a.ProductID;
 GO
 DECLARE @AttributeMajorVersion int = TRY_CONVERT(int, SERVERPROPERTY(N'ProductMajorVersion'));
 IF @AttributeMajorVersion >= 17
+    -- SQL Server 2025 supports these native JSON aggregation SELECT statements; the
+    -- dynamic batch prevents parsing failures on earlier SQL Server versions.
     EXEC sys.sp_executesql N'
         SELECT ProductID, JSON_ARRAYAGG(AttributeName ORDER BY AttributeName) AS AttributeNamesJson,
                JSON_OBJECTAGG(AttributeName: AttributeValue) AS AttributesObjectJson
@@ -245,6 +335,8 @@ GO
 -- to an AI service and stores no secrets. JSON_QUERY avoids escaped nested arrays.
 DECLARE @SystemPrompt nvarchar(400) = N'Answer only with catalog recommendations based on the supplied context.';
 DECLARE @UserPrompt nvarchar(400) = N'Summarize available bicycle products and highlight color and product number.';
+-- This query assembles a chat-completion payload with model settings, messages, and
+-- product context. JSON_QUERY embeds the nested arrays without escaping them as text.
 SELECT (
     SELECT N'gpt-4.1' AS [model], CONVERT(decimal(3,1), 0.2) AS [temperature],
            JSON_QUERY((SELECT m.[role], m.[content] FROM (
@@ -260,17 +352,43 @@ SELECT (
 GO
 
 -- PART 6: PLAN AND ROW EXPANSION
-ALTER TABLE lab.JsonFunctionsOrders
-ADD TerritoryName AS CONVERT(nvarchar(50), JSON_VALUE(OrderDocument, '$.territory.name'));
-CREATE INDEX IX_JsonFunctionsOrders_TerritoryName ON lab.JsonFunctionsOrders (TerritoryName);
+-- The guards make Part 6 safe to run independently or repeatedly. Drop the index
+-- before changing the computed-column definition because the index depends on it.
+IF EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'lab.JsonFunctionsOrders')
+      AND name = N'IX_JsonFunctionsOrders_TerritoryName'
+)
+    DROP INDEX IX_JsonFunctionsOrders_TerritoryName ON lab.JsonFunctionsOrders;
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'lab.JsonFunctionsOrders')
+      AND name = N'TerritoryName'
+)
+BEGIN
+    ALTER TABLE lab.JsonFunctionsOrders
+    ADD TerritoryName AS CONVERT(nvarchar(50), JSON_VALUE(OrderDocument, '$.territory.name'));
+END;
+
+CREATE INDEX IX_JsonFunctionsOrders_TerritoryName
+    ON lab.JsonFunctionsOrders (TerritoryName);
 GO
 
 SET STATISTICS IO, TIME ON;
+-- This predicate extracts a scalar from every document. Compare its reads and CPU with
+-- the indexed computed-column approach when reviewing the execution plan.
 SELECT SalesOrderID
 FROM lab.JsonFunctionsOrders
 WHERE CONVERT(nvarchar(50), JSON_VALUE(OrderDocument, '$.territory.name')) = N'Northwest';
 
 -- Compare estimated and actual rows around APPLY. Restrict outer orders first.
+-- This query demonstrates row multiplication: each qualifying order can produce
+-- multiple item rows. Filtering the outer table before CROSS APPLY reduces expansion.
 SELECT o.SalesOrderID, item.Sku, item.Qty
 FROM lab.JsonFunctionsOrders AS o
 CROSS APPLY OPENJSON(o.OrderDocument, '$.items')
