@@ -36,8 +36,12 @@ Regex functions follow POSIX-style regular expressions.
 ### REGEXP_LIKE — Pattern Test
 
 ```sql
--- Returns 1 if the string matches the pattern, 0 otherwise
-SELECT REGEXP_LIKE('user@example.com', '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$') AS IsValidEmail;
+-- REGEXP_LIKE is a predicate. Use CASE WHEN when the result must be projected
+-- as a column; calling it directly in the SELECT list is not valid T-SQL.
+SELECT CASE
+           WHEN REGEXP_LIKE('user@example.com', '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+           THEN 1 ELSE 0
+       END AS IsValidEmail;
 -- Returns: 1
 
 -- Filter rows matching a pattern

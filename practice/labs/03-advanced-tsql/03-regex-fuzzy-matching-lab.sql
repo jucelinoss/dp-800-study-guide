@@ -26,7 +26,7 @@ GO
 
 -- Test table structure
 CREATE TABLE lab.RawContacts (
-    ContactID INT IDENTITY(1,1) PRIMARY KEY,
+    ContactID INT IDENTITY(1,1) CONSTRAINT PK_lab_RawContacts PRIMARY KEY,
     FullName NVARCHAR(100) NOT NULL,
     Phone NVARCHAR(50) NULL,
     ProductCode NVARCHAR(20) NULL
@@ -82,14 +82,44 @@ GO
 --   - STRING_SPLIT(string, delimiter, 1): As of SQL Server 2022, the `enable_ordinal = 1` parameter
 --     adds the `ordinal` column that preserves the original position of the item in the array.
 
--- 1. Normalize phone numbers by removing parentheses, dots, and dashes at once
+-- 1. Positional example: the first character in the second argument is replaced
+--    by the first character in the third argument, the second by the second, and so on.
+--    Input characters may map to the same output character or to different output
+--    characters.
+SELECT TRANSLATE('2*[3+4]/{7-2}', '[]{}', '()()') AS NormalizedExpression;
+-- Result: 2*(3+4)/(7-2)
+GO
+
+-- 2. Each input character is mapped to a different output character:
+--    a -> X, b -> Y, c -> Z, and 1 -> 9.
+SELECT TRANSLATE('abc-123', 'abc1', 'XYZ9') AS Result;
+-- Result: XYZ-923
+GO
+
+-- 3. Different input characters may share the same destination.
+--    Both '/' and '.' become '-', because their corresponding destinations are equal.
+SELECT TRANSLATE('2025/07.30', '/.', '--') AS NormalizedDate;
+-- Result: 2025-07-30
+GO
+
+-- 4. For phone numbers, four input characters are mapped to four spaces.
+--    The arguments must have the same length: '().-' has 4 and '    ' has 4.
 SELECT 
     ContactID,
     Phone AS TelefoneBruto,
-    TRANSLATE(Phone, '().- ', '     ') AS TelefoneFormatado,
-    REPLACE(TRANSLATE(Phone, '().- ', '     '), ' ', '') AS ApenasDigitos
+    TRANSLATE(Phone, '().-', '    ') AS TelefoneFormatado
 FROM lab.RawContacts;
 GO
+
+-- 5. TRANSLATE changes punctuation to spaces; REPLACE removes the spaces.
+SELECT ContactID,
+       Phone,
+       REPLACE(TRANSLATE(Phone, '().-', '    '), ' ', '') AS ApenasDigitos
+FROM lab.RawContacts;
+GO
+
+-- Error 9828: '().- ' has 5 characters, but ' ' has only 1.
+-- TRANSLATE(Phone, '().- ', ' ') is invalid.
 
 -- 2. STRING_SPLIT with ordinal preservation (SQL Server 2022+)
 DECLARE @tags NVARCHAR(200) = N'SQL,Azure,Database,Security,AI';
@@ -117,10 +147,15 @@ SELECT
     DIFFERENCE('Smith', 'Brown') AS ScoreSmithBrown; -- Returns 1 or 0
 GO
 
--- Find contacts whose name sounds like 'Smith'
-SELECT ContactID, FullName, DIFFERENCE(FullName, 'Smith') AS PontuacaoFonetica
-FROM lab.RawContacts
-WHERE DIFFERENCE(FullName, 'Smith') >= 3;
+-- Find contacts whose last name sounds like 'Smith'. Bob Smyth is a practical
+-- example: DIFFERENCE('Smyth', 'Smith') returns 4.
+SELECT r.ContactID,
+       r.FullName,
+       s.LastName,
+       DIFFERENCE(s.LastName, 'Smith') AS PhoneticScore
+FROM lab.RawContacts AS r
+CROSS APPLY (VALUES (PARSENAME(REPLACE(r.FullName, ' ', '.'), 1))) AS s(LastName)
+WHERE DIFFERENCE(s.LastName, 'Smith') >= 4;
 GO
 
 
@@ -132,49 +167,249 @@ GO
 --   - EDIT_DISTANCE_SIMILARITY: Returns a normalized score from 0 (different) to 100 (identical).
 --   - JARO_WINKLER_DISTANCE: Returns a value between 0.0 and 1.0, weighting matching initial characters.
 
+-- IMPORTANT NOTE ABOUT THE SCALES:
+--   - EDIT_DISTANCE is an absolute operation count; its value depends on string length.
+--   - EDIT_DISTANCE_SIMILARITY is normalized to a score from 0 to 100.
+--   - JARO_WINKLER_DISTANCE ranges from 0 to 1; lower means closer.
+--   - JARO_WINKLER_SIMILARITY ranges from 0 to 100; higher means closer.
+--   - For Jaro-Winkler, similarity is approximately (1 - distance) * 100.
+--     Example: distance 0.33 corresponds to approximately 67% similarity.
+--   - Do not compare EDIT_DISTANCE = 6 directly with JARO_WINKLER_DISTANCE = 0.33:
+--     they are different metrics with different scales.
+--   - Use thresholds appropriate to each metric, such as EditSimilarity >= 80
+--     or JaroWinklerDistance <= 0.20.
+
 -- Compatibility Note: EDIT_DISTANCE, EDIT_DISTANCE_SIMILARITY, and the JARO_WINKLER functions
 -- are in preview in SQL Server 2025. Input values cannot be varchar(max)/nvarchar(max).
 -- In earlier versions, SOUNDEX/DIFFERENCE are the native alternatives available.
 -- To enable preview features in this study database, run separately (requires ALTER ANY DATABASE permission):
 -- ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
 
--- Compare the modern metrics. Lower distance means higher proximity; higher similarity means better match.
--- Dynamic SQL allows the rest of the lab to run even if PREVIEW_FEATURES is disabled.
-IF EXISTS (
-    SELECT 1
-    FROM sys.database_scoped_configurations
-    WHERE name = 'PREVIEW_FEATURES' AND value = 1
-)
-BEGIN
-    EXEC sys.sp_executesql N'
-        SELECT
-            FullName,
-            EDIT_DISTANCE(FullName, N''Alice Smith'') AS DistanciaEdicao,
-            EDIT_DISTANCE_SIMILARITY(FullName, N''Alice Smith'') AS SimilaridadeEdicao,
-            JARO_WINKLER_DISTANCE(FullName, N''Alice Smith'') AS DistanciaJaroWinkler,
-            JARO_WINKLER_SIMILARITY(FullName, N''Alice Smith'') AS SimilaridadeJaroWinkler
-        FROM lab.RawContacts;';
-END
-ELSE
-    PRINT 'PREVIEW_FEATURES está desabilitado; execute a instrução comentada acima para praticar as métricas fuzzy.';
+-- Compare the modern metrics. Lower distance means higher proximity;
+-- higher similarity means better matching.
+SELECT FullName,
+       EDIT_DISTANCE(FullName, N'Alice Smith') AS EditDistance,
+       EDIT_DISTANCE_SIMILARITY(FullName, N'Alice Smith') AS EditSimilarity,
+       JARO_WINKLER_DISTANCE(FullName, N'Alice Smith') AS JaroWinklerDistance,
+       JARO_WINKLER_SIMILARITY(FullName, N'Alice Smith') AS JaroWinklerSimilarity
+FROM lab.RawContacts;
+GO
+
+-- Deduplication: thresholds reduce candidates before any merge.
+-- `EditSimilarity >= 80` keeps pairs with at least 80% edit similarity.
+-- `JaroWinklerDistance <= 0.20` keeps pairs with at most 20% Jaro-Winkler
+-- distance, approximately 80% similarity or higher.
+-- These values are starting points, not universal rules: tune them according
+-- to data quality and the cost of false positives.
+-- A value below 80 may include more unrelated pairs; a value above 80 may miss
+-- duplicates with more spelling errors. For sensitive data, consider 95 or 98;
+-- for very noisy data, 70 or 75 may be more suitable. Review candidates before MERGE.
+-- `OR` keeps pairs approved by either metric; with `AND`, both metrics must approve.
+SELECT c1.ContactID AS ID1,
+       c1.FullName AS Name1,
+       c2.ContactID AS ID2,
+       c2.FullName AS Name2,
+       EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) AS EditSimilarity,
+       JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) AS JaroWinklerDistance
+FROM lab.RawContacts AS c1
+JOIN lab.RawContacts AS c2 ON c1.ContactID < c2.ContactID
+WHERE EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) >= 80
+   OR JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) <= 0.20;
 GO
 
 
 -- =================================================================================
--- PART 5: PRACTICAL PROJECT SCENARIOS
+-- PART 5: FULL-TEXT SEARCH (CONTAINS AND FREETEXT)
+-- =================================================================================
+-- Full-Text Search is created only when the feature is installed, a default
+-- Full-Text catalog exists, and the table does not already have an index.
+-- Population is asynchronous; if no rows are returned, wait and run the query again.
+IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') = 1
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE is_default = 1)
+        PRINT 'Create or designate a default Full-Text catalog before running this section.';
+    ELSE
+    BEGIN
+        IF NOT EXISTS (SELECT 1
+                       FROM sys.fulltext_indexes
+                       WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
+        BEGIN
+            BEGIN TRY
+                CREATE FULLTEXT INDEX ON lab.RawContacts (FullName LANGUAGE 1033)
+                KEY INDEX PK_lab_RawContacts
+                WITH CHANGE_TRACKING AUTO;
+            END TRY
+            BEGIN CATCH
+                PRINT CONCAT('Full-Text index could not be created: ', ERROR_MESSAGE());
+            END CATCH;
+        END;
+
+    END;
+END
+ELSE
+    PRINT 'Full-Text Search is not installed on this instance; this section was skipped.';
+GO
+
+-- Batch 2: run the searches after the index-creation batch has completed.
+-- Full-Text population is asynchronous; if no rows are returned, wait and retry.
+-- PLAN IMPACT:
+--   - CONTAINS and FREETEXT use the inverted Full-Text index. In the plan,
+--     look for a Full-Text Match operation and a join back to the table by its
+--     unique full-text key. The base-table access can still be a lookup when
+--     selected columns are not covered by the full-text key.
+--   - CONTAINS is more precise: terms, phrases, prefixes, Boolean operators,
+--     and NEAR are translated into a structured full-text search condition.
+--   - FREETEXT is broader: SQL Server analyzes the phrase with the word breaker
+--     and stemmer, and searches by meaning/inflectional forms. This can return
+--     more candidates and require more full-text processing than an exact term.
+--   - Predicates only filter rows and do not return a relevance score. Use
+--     CONTAINSTABLE or FREETEXTTABLE when the plan needs a RANK column for ordering.
+--   - LIKE does not use the Full-Text index. `LIKE '%Smith%'` commonly requires
+--     a scan because of the leading wildcard; a prefix such as `LIKE 'Smith%'
+--     can be seekable with a suitable ordinary index.
+IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') = 1
+   AND EXISTS (SELECT 1 FROM sys.fulltext_indexes
+               WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
+BEGIN
+    -- Prefix search: matches words that start with Smith.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Smith*"');
+
+    -- Exact term search: matches the word Smith, not an arbitrary substring.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Smith"');
+
+    -- Phrase search: words must appear together and in this order.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Alice Smith"');
+
+    -- Boolean searches: both terms, or at least one term.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Alice" AND "Smith"');
+
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Smith" OR "Smyth"');
+
+    -- Proximity search: Alice and Smith within five terms, in this order.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, 'NEAR((Alice, Smith), 5, TRUE)');
+
+    -- FREETEXT delegates linguistic interpretation to Full-Text Search.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE FREETEXT(FullName, N'Alice Smith');
+
+    -- CONTAINSTABLE returns the matching key and RANK, which can be used to order
+    -- results. The key joins the Full-Text result back to the base table.
+    SELECT c.ContactID, c.FullName, ft.RANK AS RelevanceRank
+    FROM CONTAINSTABLE(lab.RawContacts, FullName, N'"Smith"') AS ft
+    JOIN lab.RawContacts AS c ON c.ContactID = ft.[KEY]
+    ORDER BY ft.RANK DESC;
+
+    -- FREETEXTTABLE applies the broader natural-language search and also returns RANK.
+    SELECT c.ContactID, c.FullName, ft.RANK AS RelevanceRank
+    FROM FREETEXTTABLE(lab.RawContacts, FullName, N'Alice Smith') AS ft
+    JOIN lab.RawContacts AS c ON c.ContactID = ft.[KEY]
+    ORDER BY ft.RANK DESC;
+
+    -- LIKE is the substring equivalent: % can match Smith anywhere in the text.
+    -- CONTAINS with "Smith*" searches a word prefix, not an arbitrary substring.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE FullName LIKE N'%Smith%';
+END
+ELSE
+    PRINT 'A Full-Text index could not be found on lab.RawContacts.';
+GO
+
+
+-- PART 6: PRACTICAL PROJECT SCENARIOS
 -- =================================================================================
 
---- SCENARIO 1: Deduplication and Name Cleaning before Vectorization (Embeddings for RAG)
--- In AI pipelines, duplicate names with incorrect spellings must be 
--- cleaned via TRANSLATE and grouped by SOUNDEX/DIFFERENCE code to avoid noise in vectors.
+-- SCENARIO 1: Deduplication and name preparation before vectorization (Embeddings/RAG).
+-- The workflow is intentionally read-only: generate candidates, score them, classify
+-- confidence, and review the result before any UPDATE or MERGE.
 
-SELECT 
-    c1.ContactID AS ID1, c1.FullName AS Nome1,
-    c2.ContactID AS ID2, c2.FullName AS Nome2,
-    DIFFERENCE(c1.FullName, c2.FullName) AS GrauSimilaridade
-FROM lab.RawContacts c1
-JOIN lab.RawContacts c2 ON c1.ContactID < c2.ContactID
-WHERE DIFFERENCE(c1.FullName, c2.FullName) >= 3;
+-- 1. Normalize the text used by matching and embedding pipelines.
+--    The original value is preserved for display and auditing.
+SELECT ContactID,
+       FullName AS OriginalName,
+       UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NormalizedName,
+       SOUNDEX(FullName) AS SoundexCode
+FROM lab.RawContacts;
+GO
+
+-- 2. Generate candidate pairs. ContactID < ContactID avoids comparing a row
+--    with itself and avoids returning the same pair twice.
+WITH Prepared AS
+(
+    SELECT ContactID,
+           FullName,
+           UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NormalizedName
+    FROM lab.RawContacts
+), CandidatePairs AS
+(
+    SELECT p1.ContactID AS ID1,
+           p1.FullName AS Name1,
+           p2.ContactID AS ID2,
+           p2.FullName AS Name2,
+           EDIT_DISTANCE_SIMILARITY(p1.NormalizedName, p2.NormalizedName) AS EditSimilarity,
+           JARO_WINKLER_DISTANCE(p1.NormalizedName, p2.NormalizedName) AS JaroWinklerDistance,
+           DIFFERENCE(p1.NormalizedName, p2.NormalizedName) AS SoundexDifference
+    FROM Prepared AS p1
+    JOIN Prepared AS p2 ON p1.ContactID < p2.ContactID
+)
+SELECT ID1, Name1, ID2, Name2,
+       EditSimilarity,
+       JaroWinklerDistance,
+       SoundexDifference
+FROM CandidatePairs
+WHERE EditSimilarity >= 80
+   OR JaroWinklerDistance <= 0.20
+   OR SoundexDifference >= 3;
+GO
+
+-- 3. Classify candidates instead of merging automatically.
+--    HIGH requires stronger evidence from two metrics; REVIEW is a manual queue.
+WITH Prepared AS
+(
+    SELECT ContactID,
+           FullName,
+           UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NormalizedName
+    FROM lab.RawContacts
+), ScoredPairs AS
+(
+    SELECT p1.ContactID AS ID1, p1.FullName AS Name1,
+           p2.ContactID AS ID2, p2.FullName AS Name2,
+           EDIT_DISTANCE_SIMILARITY(p1.NormalizedName, p2.NormalizedName) AS EditSimilarity,
+           JARO_WINKLER_DISTANCE(p1.NormalizedName, p2.NormalizedName) AS JaroWinklerDistance,
+           DIFFERENCE(p1.NormalizedName, p2.NormalizedName) AS SoundexDifference
+    FROM Prepared AS p1
+    JOIN Prepared AS p2 ON p1.ContactID < p2.ContactID
+)
+SELECT ID1, Name1, ID2, Name2,
+       EditSimilarity,
+       JaroWinklerDistance,
+       SoundexDifference,
+       CASE
+           WHEN EditSimilarity >= 95 AND JaroWinklerDistance <= 0.10 THEN 'HIGH'
+           WHEN EditSimilarity >= 80 OR JaroWinklerDistance <= 0.20
+                OR SoundexDifference >= 3 THEN 'REVIEW'
+           ELSE 'LOW'
+       END AS MatchConfidence
+FROM ScoredPairs
+WHERE EditSimilarity >= 80
+   OR JaroWinklerDistance <= 0.20
+   OR SoundexDifference >= 3;
+GO
+
+-- 4. Prepare a clean, unique name list for downstream embeddings or search.
+--    This query does not merge source rows; it only shows the intended grain
+--    of a normalized representation.
+SELECT UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NormalizedName,
+       COUNT(*) AS SourceRowCount,
+       STRING_AGG(CONVERT(varchar(12), ContactID), ', ') AS SourceContactIDs
+FROM lab.RawContacts
+GROUP BY UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' '))))
+ORDER BY NormalizedName;
 GO
 
 -- =================================================================================================

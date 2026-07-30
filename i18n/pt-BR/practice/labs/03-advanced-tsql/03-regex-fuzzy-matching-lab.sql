@@ -84,40 +84,61 @@ GO
 -- =================================================================================
 -- PARTE 2: FUNÇÕES REGEX (SQL SERVER 2025 / AZURE SQL / FABRIC)
 -- =================================================================================
--- REGEXP_LIKE requer nível de compatibilidade 170. A verificação dinâmica evita erro de compilação
--- em versões sem Regex e deixa o restante do lab executável.
-DECLARE @RegexDisponivel BIT = 0;
+-- As consultas abaixo usam diretamente os recursos do SQL Server 2025.
+-- Execute cada bloco separadamente para observar o resultado de cada função.
 
-BEGIN TRY
-    EXEC sys.sp_executesql N'SELECT REGEXP_LIKE(N''ABC-1234'', N''^[A-Z]{3}-\d{4}$'');';
-    SET @RegexDisponivel = 1;
-END TRY
-BEGIN CATCH
-    PRINT 'Regex nativo indisponível nesta instância ou nível de compatibilidade. A seção Regex será ignorada.';
-END CATCH;
+-- 1. REGEXP_LIKE: testa se o valor inteiro segue o padrão ABC-1234.
+-- Como REGEXP_LIKE é um predicado, CASE transforma o resultado lógico em 1 ou 0.
+SELECT CASE
+           WHEN REGEXP_LIKE(N'ABC-1234', N'^[A-Z]{3}-\d{4}$')
+           THEN 1 ELSE 0
+       END AS IsMatch;
+GO
 
-IF @RegexDisponivel = 1
-BEGIN
-    EXEC sys.sp_executesql N'
-        -- REGEXP_LIKE: validação de formato.
-        SELECT ContactID, ProductCode
-        FROM lab.RawContacts
-        WHERE REGEXP_LIKE(ProductCode, ''^[A-Z]{3}-\d{4}$'');
+-- 2. REGEXP_LIKE no WHERE: retorna somente os códigos com três letras maiúsculas,
+-- hífen e quatro dígitos.
+SELECT ContactID, ProductCode
+FROM lab.RawContacts
+WHERE REGEXP_LIKE(ProductCode, N'^[A-Z]{3}-\d{4}$');
+GO
 
-        -- REGEXP_REPLACE: limpeza e normalização de espaços.
-        SELECT Phone, REGEXP_REPLACE(Phone, ''[^0-9]'', '''') AS ApenasDigitos,
-               REGEXP_REPLACE(N''  muitos   espaços  '', ''\s+'', '' '') AS EspacosNormalizados
-        FROM lab.RawContacts;
+-- 3. REGEXP_REPLACE: remove todos os caracteres que não sejam dígitos do telefone.
+-- A expressão [^0-9] representa qualquer caractere fora do intervalo de 0 a 9.
+SELECT Phone,
+       REGEXP_REPLACE(Phone, N'[^0-9]', N'') AS ApenasDigitos
+FROM lab.RawContacts;
+GO
 
-        -- REGEXP_SUBSTR, REGEXP_INSTR e REGEXP_COUNT: extrair, localizar e contar padrões.
-        SELECT REGEXP_SUBSTR(N''Pedido #12345 e #67890'', ''[0-9]+'') AS PrimeiroPedido,
-               REGEXP_INSTR(N''Pedido #12345'', ''[0-9]+'') AS PosicaoDoPedido,
-               REGEXP_COUNT(N''2025-01-15 e 2025-02-20'', ''[0-9]{4}-[0-9]{2}-[0-9]{2}'') AS QuantidadeDeDatas;
+-- 4. REGEXP_REPLACE: substitui uma ou mais ocorrências consecutivas de espaço
+-- por um único espaço, ajudando a normalizar textos.
+SELECT REGEXP_REPLACE(N'  muitos   espaços  ', N'\s+', N' ') AS EspacosNormalizados;
+GO
 
-        -- Funções tabulares: SELECT * também exibe metadados de captura e posição quando aplicáveis.
-        SELECT * FROM REGEXP_MATCHES(N''one two three'', ''([a-z]+)'');
-        SELECT value, ordinal FROM REGEXP_SPLIT_TO_TABLE(N''a,b,,c'', '',+'');';
-END;
+-- 5. REGEXP_SUBSTR: extrai a primeira sequência numérica encontrada no texto.
+SELECT REGEXP_SUBSTR(N'Pedido #12345 e #67890', N'[0-9]+') AS PrimeiroPedido;
+GO
+
+-- 6. REGEXP_INSTR: retorna a posição inicial, baseada em 1, da primeira sequência
+-- numérica encontrada no texto.
+SELECT REGEXP_INSTR(N'Pedido #12345', N'[0-9]+') AS PosicaoDoPedido;
+GO
+
+-- 7. REGEXP_COUNT: conta quantas ocorrências de datas no formato AAAA-MM-DD
+-- existem na string informada.
+SELECT REGEXP_COUNT(N'2025-01-15 e 2025-02-20', N'[0-9]{4}-[0-9]{2}-[0-9]{2}') AS QuantidadeDeDatas;
+GO
+
+-- 8. REGEXP_MATCHES: retorna uma linha para cada ocorrência que corresponde
+-- ao padrão informado. SELECT * exibe todas as colunas fornecidas pela função.
+SELECT *
+FROM REGEXP_MATCHES(N'one two three', N'([a-z]+)');
+GO
+
+-- 9. REGEXP_SPLIT_TO_TABLE: divide o texto usando uma expressão regular como
+-- separador e retorna o valor de cada parte junto com sua posição ordinal.
+SELECT value, ordinal
+FROM REGEXP_SPLIT_TO_TABLE(N'a,b,,c', N',+');
+GO
 GO
 
 
@@ -129,14 +150,45 @@ GO
 --     Evita encadeamento de múltiplos `REPLACE(REPLACE(REPLACE(...)))`.
 --     Requisito: `chars_origem` e `chars_destino` devem ter exatamente o mesmo comprimento!
 
--- 1. Normalizar números de telefone removendo parenteses, pontos e traços de uma só vez
+-- 1. Exemplo posicional: o primeiro caractere do segundo argumento é trocado
+--    pelo primeiro caractere do terceiro argumento, o segundo pelo segundo, e assim por diante.
+--    Os caracteres de entrada podem ser mapeados para o mesmo caractere de saída
+--    ou para caracteres de saída diferentes.
+SELECT TRANSLATE('2*[3+4]/{7-2}', '[]{}', '()()') AS ExpressaoNormalizada;
+-- Resultado: 2*(3+4)/(7-2)
+GO
+
+-- 2. Cada caractere de entrada é mapeado para um caractere diferente de saída:
+--    a -> X, b -> Y, c -> Z e 1 -> 9.
+SELECT TRANSLATE('abc-123', 'abc1', 'XYZ9') AS Resultado;
+-- Resultado: XYZ-923
+GO
+
+-- 3. Caracteres diferentes de entrada podem compartilhar o mesmo destino.
+--    Tanto '/' quanto '.' são convertidos em '-', pois os destinos nas posições
+--    correspondentes são iguais.
+SELECT TRANSLATE('2025/07.30', '/.', '--') AS DataNormalizada;
+-- Resultado: 2025-07-30
+GO
+
+-- 4. No telefone, quatro caracteres de entrada são mapeados para quatro espaços.
+--    Os argumentos precisam ter o mesmo tamanho: '().-' tem 4 e '    ' tem 4.
 SELECT 
     ContactID,
     Phone AS TelefoneBruto,
-    TRANSLATE(Phone, '().- ', '     ') AS TelefoneFormatado,
-    REPLACE(TRANSLATE(Phone, '().- ', '     '), ' ', '') AS ApenasDigitos
+    TRANSLATE(Phone, '().-', '    ') AS TelefoneFormatado
 FROM lab.RawContacts;
 GO
+
+-- 5. TRANSLATE troca a pontuação por espaços; REPLACE remove os espaços.
+SELECT ContactID,
+       Phone,
+       REPLACE(TRANSLATE(Phone, '().-', '    '), ' ', '') AS ApenasDigitos
+FROM lab.RawContacts;
+GO
+
+-- Erro 9828: '().- ' tem 5 caracteres, mas ' ' tem apenas 1.
+-- TRANSLATE(Phone, '().- ', ' ') não é válido.
 
 
 -- =================================================================================
@@ -154,13 +206,19 @@ SELECT
     SOUNDEX('Smith') AS SoundexSmith,
     SOUNDEX('Smyth') AS SoundexSmyth,
     DIFFERENCE('Smith', 'Smyth') AS ScoreSmithSmyth, -- Retorna 4 (Máxima similaridade)
+    DIFFERENCE('Smidt', 'Smyth') AS ScoreSmidtBrown, -- Retorna 1 ou 0
     DIFFERENCE('Smith', 'Brown') AS ScoreSmithBrown; -- Retorna 1 ou 0
 GO
 
--- Buscar contatos cujo nome soe semelhante a 'Smith'
-SELECT ContactID, FullName, DIFFERENCE(FullName, 'Smith') AS PontuacaoFonetica
-FROM lab.RawContacts
-WHERE DIFFERENCE(FullName, 'Smith') >= 3;
+-- Buscar contatos cujo sobrenome soe semelhante a 'Smith'. Bob Smyth é um
+-- exemplo prático: DIFFERENCE('Smyth', 'Smith') retorna 4.
+SELECT r.ContactID,
+       r.FullName,
+       s.LastName AS Sobrenome,
+       DIFFERENCE(s.LastName, 'Smith') AS PontuacaoFonetica
+FROM lab.RawContacts AS r
+CROSS APPLY (VALUES (PARSENAME(REPLACE(r.FullName, ' ', '.'), 1))) AS s(LastName)
+WHERE DIFFERENCE(s.LastName, 'Smith') >= 4;
 GO
 
 
@@ -178,84 +236,155 @@ GO
 -- Para habilitar os recursos de preview neste banco de estudo, execute separadamente (requer permissão ALTER ANY DATABASE):
 -- ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
 
--- Comparar as métricas modernas. Distância menor significa maior proximidade; similaridade maior significa melhor match.
--- O SQL dinâmico permite que o restante do lab rode mesmo se PREVIEW_FEATURES estiver desabilitado.
-IF EXISTS (
-    SELECT 1
-    FROM sys.database_scoped_configurations
-    WHERE name = 'PREVIEW_FEATURES' AND value = 1
-)
-BEGIN
-    EXEC sys.sp_executesql N'
-        SELECT
-            FullName,
-            EDIT_DISTANCE(FullName, N''Alice Smith'') AS DistanciaEdicao,
-            EDIT_DISTANCE_SIMILARITY(FullName, N''Alice Smith'') AS SimilaridadeEdicao,
-            JARO_WINKLER_DISTANCE(FullName, N''Alice Smith'') AS DistanciaJaroWinkler,
-            JARO_WINKLER_SIMILARITY(FullName, N''Alice Smith'') AS SimilaridadeJaroWinkler
-        FROM lab.RawContacts;';
+-- OBSERVAÇÃO IMPORTANTE SOBRE AS ESCALAS:
+--   - EDIT_DISTANCE é uma contagem absoluta de operações; seu valor depende do tamanho das strings.
+--   - EDIT_DISTANCE_SIMILARITY é uma pontuação normalizada de 0 a 100.
+--   - JARO_WINKLER_DISTANCE varia de 0 a 1; quanto menor, maior a proximidade.
+--   - JARO_WINKLER_SIMILARITY varia de 0 a 100; quanto maior, maior a proximidade.
+--   - Para Jaro-Winkler, a similaridade é aproximadamente (1 - distância) * 100.
+--     Exemplo: distância 0,33 corresponde a aproximadamente 67% de similaridade.
+--   - Não compare diretamente EDIT_DISTANCE = 6 com JARO_WINKLER_DISTANCE = 0,33:
+--     são métricas diferentes e estão em escalas diferentes.
+--   - Use limiares adequados à métrica, por exemplo SimilaridadeEdicao >= 80
+--     ou DistanciaJaroWinkler <= 0,20.
 
-    EXEC sys.sp_executesql N'
-        -- Deduplicação: use limiares para reduzir candidatos antes de qualquer merge.
-        SELECT c1.ContactID AS ID1, c1.FullName AS Nome1,
-               c2.ContactID AS ID2, c2.FullName AS Nome2,
-               EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) AS SimilaridadeEdicao,
-               JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) AS DistanciaJaroWinkler
-        FROM lab.RawContacts AS c1
-        JOIN lab.RawContacts AS c2 ON c1.ContactID < c2.ContactID
-        WHERE EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) >= 80
-           OR JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) <= 0.20;';
-END
-ELSE
-    PRINT 'PREVIEW_FEATURES está desabilitado; execute a instrução comentada acima para praticar as métricas fuzzy.';
+-- Comparar as métricas modernas. Distância menor significa maior proximidade;
+-- similaridade maior significa melhor correspondência.
+SELECT FullName,
+       EDIT_DISTANCE(FullName, N'Alice Smith') AS DistanciaEdicao,
+       EDIT_DISTANCE_SIMILARITY(FullName, N'Alice Smith') AS SimilaridadeEdicao,
+       JARO_WINKLER_DISTANCE(FullName, N'Alice Smith') AS DistanciaJaroWinkler,
+       JARO_WINKLER_SIMILARITY(FullName, N'Alice Smith') AS SimilaridadeJaroWinkler
+FROM lab.RawContacts;
+GO
+
+-- Deduplicação: os limiares reduzem os candidatos antes de qualquer merge.
+-- `SimilaridadeEdicao >= 80` aceita pares com pelo menos 80% de similaridade
+-- de edição. `DistanciaJaroWinkler <= 0,20` aceita pares com no máximo 20% de
+-- distância Jaro-Winkler, aproximadamente 80% ou mais de similaridade.
+-- Esses valores são pontos de partida para a triagem, não regras universais:
+-- ajuste-os conforme a qualidade dos dados e o custo dos falsos positivos.
+-- O valor 80 busca equilibrar falsos positivos e falsos negativos: abaixo de 80,
+-- mais pares diferentes podem ser considerados iguais; acima de 80, duplicatas
+-- com mais erros podem ser perdidas. Em dados sensíveis, considere 95 ou 98;
+-- em dados muito sujos, 70 ou 75 pode ser mais adequado, sempre com revisão antes
+-- de executar o MERGE.
+-- O `OR` retorna o par quando qualquer métrica aprova; com `AND`, as duas
+-- métricas precisariam aprovar o par.
+SELECT c1.ContactID AS ID1,
+       c1.FullName AS Nome1,
+       c2.ContactID AS ID2,
+       c2.FullName AS Nome2,
+       EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) AS SimilaridadeEdicao,
+       JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) AS DistanciaJaroWinkler
+FROM lab.RawContacts AS c1
+JOIN lab.RawContacts AS c2 ON c1.ContactID < c2.ContactID
+WHERE EDIT_DISTANCE_SIMILARITY(c1.FullName, c2.FullName) >= 80
+   OR JARO_WINKLER_DISTANCE(c1.FullName, c2.FullName) <= 0.20;
 GO
 
 
 -- =================================================================================
 -- PARTE 6: FULL-TEXT SEARCH (CONTAINS E FREETEXT)
 -- =================================================================================
--- A instalação do serviço, um catálogo existente e as permissões para criar o índice são verificados. A população é assíncrona:
--- se a primeira consulta ainda não retornar linhas, aguarde o índice terminar de ser preenchido e execute novamente.
+-- O Full-Text é criado somente quando o recurso está instalado, existe um
+-- catálogo Full-Text padrão e a tabela ainda não possui um índice.
+-- A população é assíncrona; se não houver resultados, aguarde e execute novamente.
 IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') = 1
 BEGIN
-    DECLARE @CatalogoFullText SYSNAME;
-    DECLARE @ComandoFullText NVARCHAR(MAX);
-    SELECT TOP (1) @CatalogoFullText = name
-    FROM sys.fulltext_catalogs
-    ORDER BY is_default DESC, fulltext_catalog_id;
-
-    BEGIN TRY
-        IF @CatalogoFullText IS NULL
-            PRINT 'Não há catálogo Full-Text neste banco; a seção será ignorada.';
-        ELSE IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
+    IF NOT EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE is_default = 1)
+        PRINT 'Crie ou designe um catálogo Full-Text padrão antes de executar esta seção.';
+    ELSE
+    BEGIN
+        IF NOT EXISTS (SELECT 1
+                       FROM sys.fulltext_indexes
+                       WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
         BEGIN
-            SET @ComandoFullText = N'CREATE FULLTEXT INDEX ON lab.RawContacts (FullName LANGUAGE 1033)
-                KEY INDEX PK_lab_RawContacts ON ' + QUOTENAME(@CatalogoFullText) + N' WITH CHANGE_TRACKING AUTO;';
-            EXEC sys.sp_executesql @ComandoFullText;
+            BEGIN TRY
+                CREATE FULLTEXT INDEX ON lab.RawContacts (FullName LANGUAGE 1033)
+                KEY INDEX PK_lab_RawContacts
+                WITH CHANGE_TRACKING AUTO;
+            END TRY
+            BEGIN CATCH
+                PRINT CONCAT('O índice Full-Text não pôde ser criado: ', ERROR_MESSAGE());
+            END CATCH;
         END;
 
-        IF EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
-        BEGIN
-            -- As consultas também são dinâmicas: o otimizador só valida CONTAINS/FREETEXT
-            -- depois que o índice acaba de ser criado neste mesmo batch.
-            EXEC sys.sp_executesql N'
-                -- CONTAINS é uma busca estruturada: prefixo Smith*.
-                SELECT ContactID, FullName
-                FROM lab.RawContacts
-                WHERE CONTAINS(FullName, ''"Smith*"'');
-
-                -- FREETEXT delega a interpretação linguística ao mecanismo de Full-Text Search.
-                SELECT ContactID, FullName
-                FROM lab.RawContacts
-                WHERE FREETEXT(FullName, N''Alice Smith'');';
-        END;
-    END TRY
-    BEGIN CATCH
-        PRINT CONCAT('Full-Text Search não pôde ser configurado: ', ERROR_MESSAGE());
-    END CATCH;
+    END;
 END
 ELSE
     PRINT 'Full-Text Search não está instalado nesta instância; a seção será ignorada.';
+GO
+
+-- Batch 2: executar as buscas depois que o batch de criação do índice terminar.
+-- A população do Full-Text é assíncrona; se não houver resultados, aguarde e repita.
+-- IMPACTO NO PLANO:
+--   - CONTAINS e FREETEXT usam o índice Full-Text invertido. No plano, procure
+--     uma operação Full-Text Match e uma junção de volta à tabela pela chave
+--     exclusiva do Full-Text. O acesso à tabela pode ser lookup quando as colunas
+--     selecionadas não estiverem cobertas pela chave do índice.
+--   - CONTAINS é mais preciso: termos, frases, prefixos, operadores booleanos
+--     e NEAR são transformados em uma condição estruturada de busca.
+--   - FREETEXT é mais amplo: analisa a frase com word breaker e stemmer e busca
+--     significado/formas flexionadas. Pode retornar mais candidatos e exigir mais
+--     processamento Full-Text que um termo exato.
+--   - Predicados apenas filtram linhas e não retornam relevância. Use CONTAINSTABLE
+--     ou FREETEXTTABLE quando precisar da coluna RANK para ordenar resultados.
+--   - LIKE não usa o índice Full-Text. `LIKE '%Smith%'` normalmente exige scan
+--     por começar com curinga; um prefixo `LIKE 'Smith%'` pode usar seek com
+--     um índice comum adequado.
+IF FULLTEXTSERVICEPROPERTY('IsFullTextInstalled') = 1
+   AND EXISTS (SELECT 1 FROM sys.fulltext_indexes
+               WHERE object_id = OBJECT_ID(N'lab.RawContacts'))
+BEGIN
+    -- Busca por prefixo: encontra palavras que começam com Smith.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Smith*"');
+
+    -- Busca por termo exato: encontra a palavra Smith, não uma substring arbitrária.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Smith"');
+
+    -- Busca por frase: as palavras devem aparecer juntas e nesta ordem.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Alice Smith"');
+
+    -- Buscas booleanas: os dois termos 
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Alice" AND "Smith"');
+
+        -- Buscas booleanas: pelo menos um dos termos.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, '"Smith" OR "Smyth"');
+
+    -- Busca por proximidade: Alice e Smith em até cinco termos, nesta ordem.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE CONTAINS(FullName, 'NEAR((Alice, Smith), 5, TRUE)');
+
+    -- FREETEXT delega a interpretação linguística ao mecanismo Full-Text Search.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE FREETEXT(FullName, N'Alice Smith');
+
+    -- CONTAINSTABLE retorna a chave correspondente e RANK para ordenar os resultados.
+    -- A chave permite juntar o resultado Full-Text novamente à tabela de origem.
+    SELECT c.ContactID, c.FullName, ft.RANK AS RelevanceRank
+    FROM CONTAINSTABLE(lab.RawContacts, FullName, N'"Smith"') AS ft
+    JOIN lab.RawContacts AS c ON c.ContactID = ft.[KEY]
+    ORDER BY ft.RANK DESC;
+
+    -- FREETEXTTABLE faz a busca linguística mais ampla e também retorna RANK.
+    SELECT c.ContactID, c.FullName, ft.RANK AS RelevanceRank
+    FROM FREETEXTTABLE(lab.RawContacts, FullName, N'Alice Smith') AS ft
+    JOIN lab.RawContacts AS c ON c.ContactID = ft.[KEY]
+    ORDER BY ft.RANK DESC;
+
+    -- LIKE é o equivalente à busca por substring: % encontra Smith em qualquer posição.
+    -- CONTAINS com "Smith*" procura prefixo de palavra, não uma substring arbitrária.
+    SELECT ContactID, FullName FROM lab.RawContacts
+    WHERE FullName LIKE N'%Smith%';
+END
+ELSE
+    PRINT 'Não foi possível encontrar um índice Full-Text em lab.RawContacts.';
 GO
 
 
@@ -263,17 +392,93 @@ GO
 -- PARTE 7: CENÁRIOS PRÁTICOS DE PROJETO
 -- =================================================================================
 
---- CENÁRIO 1: Deduplicação e Limpeza de Nomes antes da Vetorização (Embeddings para RAG)
--- Em pipelines de Inteligência Artificial, nomes duplicados com grafias incorretas devem ser 
--- limpos via TRANSLATE e agrupados por código SOUNDEX/DIFFERENCE para evitar ruído nos vetores.
+-- CENÁRIO 1: Deduplicação e preparação de nomes antes da vetorização (Embeddings/RAG).
+-- O fluxo é somente leitura: gera candidatos, calcula pontuações, classifica a
+-- confiança e permite revisão antes de qualquer UPDATE ou MERGE.
 
-SELECT 
-    c1.ContactID AS ID1, c1.FullName AS Nome1,
-    c2.ContactID AS ID2, c2.FullName AS Nome2,
-    DIFFERENCE(c1.FullName, c2.FullName) AS GrauSimilaridade
-FROM lab.RawContacts c1
-JOIN lab.RawContacts c2 ON c1.ContactID < c2.ContactID
-WHERE DIFFERENCE(c1.FullName, c2.FullName) >= 3;
+-- 1. Normalizar o texto usado pelos pipelines de matching e embeddings.
+--    O valor original é preservado para exibição e auditoria.
+SELECT ContactID,
+       FullName AS NomeOriginal,
+       UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NomeNormalizado,
+       SOUNDEX(FullName) AS CodigoSoundex
+FROM lab.RawContacts;
+GO
+
+-- 2. Gerar pares candidatos. ContactID < ContactID evita comparar uma linha
+--    consigo mesma e evita retornar o mesmo par duas vezes.
+WITH Preparados AS
+(
+    SELECT ContactID,
+           FullName,
+           UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NomeNormalizado
+    FROM lab.RawContacts
+), ParesCandidatos AS
+(
+    SELECT p1.ContactID AS ID1,
+           p1.FullName AS Nome1,
+           p2.ContactID AS ID2,
+           p2.FullName AS Nome2,
+           EDIT_DISTANCE_SIMILARITY(p1.NomeNormalizado, p2.NomeNormalizado) AS SimilaridadeEdicao,
+           JARO_WINKLER_DISTANCE(p1.NomeNormalizado, p2.NomeNormalizado) AS DistanciaJaroWinkler,
+           DIFFERENCE(p1.NomeNormalizado, p2.NomeNormalizado) AS DiferencaSoundex
+    FROM Preparados AS p1
+    JOIN Preparados AS p2 ON p1.ContactID < p2.ContactID
+)
+SELECT ID1, Nome1, ID2, Nome2,
+       SimilaridadeEdicao,
+       DistanciaJaroWinkler,
+       DiferencaSoundex
+FROM ParesCandidatos
+WHERE SimilaridadeEdicao >= 80
+   OR DistanciaJaroWinkler <= 0.20
+   OR DiferencaSoundex >= 3;
+GO
+
+-- 3. Classificar candidatos em vez de fazer merge automaticamente.
+--    HIGH exige evidência mais forte de duas métricas; REVIEW forma uma fila
+--    para análise manual.
+WITH Preparados AS
+(
+    SELECT ContactID,
+           FullName,
+           UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NomeNormalizado
+    FROM lab.RawContacts
+), ParesPontuados AS
+(
+    SELECT p1.ContactID AS ID1, p1.FullName AS Nome1,
+           p2.ContactID AS ID2, p2.FullName AS Nome2,
+           EDIT_DISTANCE_SIMILARITY(p1.NomeNormalizado, p2.NomeNormalizado) AS SimilaridadeEdicao,
+           JARO_WINKLER_DISTANCE(p1.NomeNormalizado, p2.NomeNormalizado) AS DistanciaJaroWinkler,
+           DIFFERENCE(p1.NomeNormalizado, p2.NomeNormalizado) AS DiferencaSoundex
+    FROM Preparados AS p1
+    JOIN Preparados AS p2 ON p1.ContactID < p2.ContactID
+)
+SELECT ID1, Nome1, ID2, Nome2,
+       SimilaridadeEdicao,
+       DistanciaJaroWinkler,
+       DiferencaSoundex,
+       CASE
+           WHEN SimilaridadeEdicao >= 95 AND DistanciaJaroWinkler <= 0.10 THEN 'HIGH'
+           WHEN SimilaridadeEdicao >= 80 OR DistanciaJaroWinkler <= 0.20
+                OR DiferencaSoundex >= 3 THEN 'REVIEW'
+           ELSE 'LOW'
+       END AS ConfiancaMatch
+FROM ParesPontuados
+WHERE SimilaridadeEdicao >= 80
+   OR DistanciaJaroWinkler <= 0.20
+   OR DiferencaSoundex >= 3;
+GO
+
+-- 4. Preparar uma lista de nomes normalizados para embeddings ou pesquisa.
+--    A consulta não mescla as linhas de origem; apenas demonstra a granularidade
+--    desejada para uma representação normalizada.
+SELECT UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' ')))) AS NomeNormalizado,
+       COUNT(*) AS QuantidadeLinhasOrigem,
+       STRING_AGG(CONVERT(varchar(12), ContactID), ', ') AS IDsContatosOrigem
+FROM lab.RawContacts
+GROUP BY UPPER(LTRIM(RTRIM(REPLACE(FullName, '  ', ' '))))
+ORDER BY NomeNormalizado;
 GO
 
 -- =================================================================================================

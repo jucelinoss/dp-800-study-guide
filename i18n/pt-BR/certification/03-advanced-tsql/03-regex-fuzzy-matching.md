@@ -63,8 +63,12 @@ As funções de Regex do Microsoft Fabric SQL adotam o padrão de expressões re
 ### REGEXP_LIKE — Validação de Padrão
 
 ```sql
--- Retorna 1 se o texto for compatível com o padrão de e-mail, 0 caso contrário
-SELECT REGEXP_LIKE('user@example.com', '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$') AS IsValidEmail;
+-- REGEXP_LIKE é um predicado. Use CASE WHEN quando o resultado precisar ser
+-- exibido como coluna; chamá-la diretamente na lista do SELECT não é válido no T-SQL.
+SELECT CASE
+           WHEN REGEXP_LIKE('user@example.com', '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+           THEN 1 ELSE 0
+       END AS IsValidEmail;
 -- Retorno: 1
 
 -- Filtrar linhas de clientes com telefones válidos
