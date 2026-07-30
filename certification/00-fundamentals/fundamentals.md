@@ -47,7 +47,8 @@ Part 0 is a self-contained SQL Server and T-SQL prerequisite course. It teaches 
 | 08 | [Integrity rules](./08-integrity-rules.md) | Protect valid data |
 | 09 | [CTEs and temporary query structures](./09-subqueries-and-ctes.md) | Name and reuse intermediate results |
 | 10 | [Index fundamentals](./10-index-fundamentals.md) | Understand read/write trade-offs |
-| 11 | [Ready for DP-800](./11-ready-for-dp800.md) | Choose your next module |
+| 11 | [PIVOT and UNPIVOT](./11-pivot-unpivot.md) | Reshape long and wide result sets |
+| 12 | [Ready for DP-800](./12-ready-for-dp800.md) | Choose your next module |
 
 ## Recommended study rhythm
 

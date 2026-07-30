@@ -341,7 +341,7 @@ A CTE is referenced twice in a query. Does SQL Server materialize the result onc
 - [WITH common table expression](https://learn.microsoft.com/sql/t-sql/queries/with-common-table-expression-transact-sql)
 - [CREATE TABLE (temporary)](https://learn.microsoft.com/sql/t-sql/statements/create-table-transact-sql)
 - [Table variables](https://learn.microsoft.com/sql/t-sql/language-elements/declare-local-variable-transact-sql)
-- [Derived tables](https://learn.microsoft.com/sql/t-sql/queries/from-using-pivotal-and-unpivotal)
+- [PIVOT and UNPIVOT](./11-pivot-unpivot.md)
 
 ---
 

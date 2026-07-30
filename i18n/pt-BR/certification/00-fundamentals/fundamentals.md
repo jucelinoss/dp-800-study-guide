@@ -47,7 +47,8 @@ A Parte 0 é um curso pré-requisito autossuficiente de SQL Server e T-SQL. Ela 
 | 08 | [Regras de integridade](./08-integrity-rules.md) | Proteja dados válidos |
 | 09 | [CTEs e estruturas temporárias de consulta](./09-subqueries-and-ctes.md) | Nomeie e reutilize resultados intermediários |
 | 10 | [Fundamentos de índices](./10-index-fundamentals.md) | Entenda as compensações leitura/escrita |
-| 11 | [Pronto para o DP-800](./11-ready-for-dp800.md) | Escolha seu próximo módulo |
+| 11 | [PIVOT e UNPIVOT](./11-pivot-unpivot.md) | Remodele resultados longos e largos |
+| 12 | [Pronto para o DP-800](./12-ready-for-dp800.md) | Escolha seu próximo módulo |
 
 ## Ritmo de estudo recomendado
 

@@ -341,7 +341,7 @@ Uma CTE é referenciada duas vezes em uma consulta. O SQL Server materializa o r
 - [WITH common table expression](https://learn.microsoft.com/sql/t-sql/queries/with-common-table-expression-transact-sql)
 - [CREATE TABLE (temporária)](https://learn.microsoft.com/sql/t-sql/statements/create-table-transact-sql)
 - [Variáveis de tabela](https://learn.microsoft.com/sql/t-sql/language-elements/declare-local-variable-transact-sql)
-- [Derived tables](https://learn.microsoft.com/sql/t-sql/queries/from-using-pivotal-and-unpivotal)
+- [PIVOT e UNPIVOT](./11-pivot-unpivot.md)
 
 ---
 

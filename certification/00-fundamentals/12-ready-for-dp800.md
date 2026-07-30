@@ -109,4 +109,4 @@ This approach turns later examples into experiments rather than copy-paste exerc
 
 ---
 
-**[← Previous](./10-index-fundamentals.md) | [↑ Back to Section](./fundamentals.md) | [Start Section 01 →](../01-database-objects/database-objects.md)**
+**[← Previous](./11-pivot-unpivot.md) | [↑ Back to Section](./fundamentals.md) | [Start Section 01 →](../01-database-objects/database-objects.md)**

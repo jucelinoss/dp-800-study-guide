@@ -109,4 +109,4 @@ Esta abordagem transforma exemplos posteriores em experimentos em vez de exercí
 
 ---
 
-**[← Anterior](./10-index-fundamentals.md) | [↑ Voltar à Seção](./fundamentals.md) | [Iniciar Seção 01 →](../01-database-objects/database-objects.md)**
+**[← Anterior](./11-pivot-unpivot.md) | [↑ Voltar à Seção](./fundamentals.md) | [Iniciar Seção 01 →](../01-database-objects/database-objects.md)**

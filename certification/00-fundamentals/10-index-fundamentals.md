@@ -278,4 +278,4 @@ Index fundamentals are the base for two deeper DP-800 exam topics:
 
 ---
 
-**[← Previous](./09-subqueries-and-ctes.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Review and Cleanup](../../practice/labs/00-fundamentals/10-review-and-cleanup.sql) | [Next →](./11-ready-for-dp800.md)**
+**[← Previous](./09-subqueries-and-ctes.md) | [↑ Back to Section](./fundamentals.md) | [Lab: Review and Cleanup](../../practice/labs/00-fundamentals/10-review-and-cleanup.sql) | [Next →](./11-pivot-unpivot.md)**
