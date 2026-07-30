@@ -62,6 +62,7 @@ flowchart TD
 | [03-permissions-access.md](03-permissions-access.md) | Object-level permissions, passwordless access | High |
 | [04-auditing.md](04-auditing.md) | Database and server auditing | Medium |
 | [05-secure-endpoints.md](05-secure-endpoints.md) | Managed Identity, GraphQL/REST/MCP endpoint security | Medium |
+| [Lab: Sensitivity Classification](../../practice/labs/05-data-security-compliance/06-sensitivity-classification-lab.sql) | `ADD SENSITIVITY CLASSIFICATION`, `sys.sensitivity_classifications` | Medium |
 
 ## Key Concepts
 
@@ -71,6 +72,7 @@ flowchart TD
 - **Row-Level Security (RLS)**: Inline table-valued function predicates control row visibility per user
 - **Managed Identity**: Passwordless authentication to Azure services
 - **Auditing**: Track database events to storage account, Event Hub, or Log Analytics
+- **Sensitivity Classification**: Metadata labels that describe sensitive columns; classification alone does not mask or encrypt values
 
 ## Related Resources
 
