@@ -76,15 +76,15 @@ SELECT
     SCHEMA_NAME(o.schema_id) AS SchemaName,
     o.name                  AS TableName,
     c.name                  AS ColumnName,
-    sc.information_type_name,
-    sc.label_name,
+    sc.information_type,
+    sc.label,
     sc.rank_desc
 FROM sys.sensitivity_classifications AS sc
 JOIN sys.objects AS o ON o.object_id = sc.major_id
 JOIN sys.columns AS c
   ON c.object_id = sc.major_id
  AND c.column_id = sc.minor_id
-WHERE sc.label_name IN ('Confidential', 'Highly Confidential')
+WHERE sc.label IN ('Confidential', 'Highly Confidential')
 ORDER BY SchemaName, TableName, ColumnName;
 ```
 

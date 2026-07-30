@@ -70,10 +70,22 @@ GO
 -- -- [PONTO DE ATENÇÃO DP-800]
 -- 1. Aplicar classificação de sensibilidade nas colunas críticas de PII
 ADD SENSITIVITY CLASSIFICATION TO lab.CustomerPII.SSN
-WITH (LABEL = 'Confidential', LABEL_ID = '33221100-0000-0000-0000-000000000000', INFORMATION_TYPE = 'National ID', INFORMATION_TYPE_ID = '11223344-0000-0000-0000-000000000000', RANK = HIGH);
+WITH (
+        LABEL = 'Confidential',
+        LABEL_ID = '33221100-0000-0000-0000-000000000000',
+        INFORMATION_TYPE = 'National ID',
+        INFORMATION_TYPE_ID = '11223344-0000-0000-0000-000000000000',
+        RANK = HIGH
+     );
 
 ADD SENSITIVITY CLASSIFICATION TO lab.CustomerPII.CreditCard
-WITH (LABEL = 'Highly Confidential', LABEL_ID = '44332211-0000-0000-0000-000000000000', INFORMATION_TYPE = 'Credit Card', INFORMATION_TYPE_ID = '22334455-0000-0000-0000-000000000000', RANK = CRITICAL);
+WITH (
+        LABEL = 'Highly Confidential',
+        LABEL_ID = '44332211-0000-0000-0000-000000000000',
+        INFORMATION_TYPE = 'Credit Card',
+        INFORMATION_TYPE_ID = '22334455-0000-0000-0000-000000000000',
+        RANK = CRITICAL
+     );
 GO
 
 -- 2. Consultar o catálogo de classificação de sensibilidade (Purview Integration)
@@ -81,8 +93,8 @@ SELECT
     schema_name(o.schema_id) AS SchemaName,
     o.name                   AS TableName,
     c.name                   AS ColumnName,
-    sc.information_type_name AS TipoInformacao,
-    sc.label_name            AS RotuloSensibilidade,
+    sc.information_type      AS TipoInformacao,
+    sc.label                 AS RotuloSensibilidade,
     sc.rank_desc             AS NivelRisco
 FROM sys.sensitivity_classifications sc
 JOIN sys.objects o ON sc.major_id = o.object_id
@@ -156,6 +168,8 @@ GRANT SELECT ON OBJECT::lab.CustomerPII TO ai_rls_user;
 
 EXECUTE AS USER = 'ai_rls_user';
 EXEC sys.sp_set_session_context @key = N'CustomerID', @value = 1;
+
+
 SELECT CustomerID, FullName, Email
 FROM lab.CustomerPII;
 REVERT;
@@ -183,14 +197,27 @@ REVERT;
 GO
 
 -- CASO 5: MANTER SEGREDOS FORA DE PROMPTS E DO CÓDIGO-FONTE
--- Não execute o exemplo inseguro. O padrão seguro recupera o segredo em runtime.
+-- Um segredo é qualquer valor que permita autenticar ou obter acesso: senha,
+-- connection string, chave de API, token, certificado privado ou secret do Key Vault.
+-- Não execute nem cole o exemplo inseguro. Mesmo como texto de um prompt, a credencial
+-- pode ser armazenada no histórico, nos logs, na telemetria, no código gerado ou no Git.
 -- PROMPT INSEGURO: Server=prod.database.windows.net;User ID=admin;Password=<secret>
+-- O problema não é somente a execução do SQL: o texto já expôs a credencial e também
+-- incentiva o uso de uma conta administrativa, ampliando o impacto de um vazamento.
 -- PROMPT SEGURO:   Use a conexão ProductionReadOnly fornecida pelo runtime gerenciado.
+-- Aqui o prompt contém apenas um identificador lógico. O runtime resolve esse nome,
+-- autentica a aplicação e obtém o segredo em tempo de execução, sem entregá-lo ao
+-- modelo de IA nem gravá-lo no código-fonte.
+-- A proteção depende de o runtime realmente controlar a conexão: o prompt não deve
+-- pedir a senha, o SQL gerado não deve imprimir a connection string e a identidade
+-- usada deve ter apenas a permissão necessária (neste caso, leitura).
 --
 -- Execute fora do SQL Server com Azure CLI/PowerShell, nunca dentro de um prompt:
 --   az keyvault secret set --vault-name contoso-vault --name sql-readonly --value <secret>
 --   az webapp identity assign --name contoso-app --resource-group contoso-rg
 -- Conceda à identidade gerenciada apenas a permissão de leitura desse segredo no Key Vault.
+-- Em produção, prefira identidade gerenciada a uma senha fixa, faça rotação do segredo
+-- e revise logs/saídas para garantir que o valor nunca seja exibido.
 PRINT 'Caso de segredos: use Key Vault e identidade gerenciada; nunca cole credenciais no contexto da IA.';
 GO
 

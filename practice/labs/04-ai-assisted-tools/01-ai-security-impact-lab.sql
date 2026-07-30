@@ -183,14 +183,27 @@ REVERT;
 GO
 
 -- CASE 5: KEEP SECRETS OUT OF PROMPTS AND SOURCE CODE
--- Do not run the unsafe example. The safe pattern retrieves the secret at runtime.
+-- A secret is any value that authenticates or grants access: a password, connection
+-- string, API key, access token, private certificate, or Key Vault secret.
+-- Do not run or paste the unsafe example. Even as prompt text, the credential may be
+-- retained in history, logs, telemetry, generated code, or source control.
 -- UNSAFE PROMPT: Server=prod.database.windows.net;User ID=admin;Password=<secret>
+-- The problem is not only whether the SQL executes: the credential has already been
+-- exposed, and an administrative account increases the impact of a possible leak.
 -- SAFE PROMPT:   Use the ProductionReadOnly connection supplied by the managed runtime.
+-- The prompt contains only a logical connection name. The runtime resolves that name,
+-- authenticates the application, and retrieves the secret at runtime without exposing
+-- it to the AI model or storing it in source code.
+-- This protection depends on the runtime controlling the connection: the prompt must
+-- not request the password, generated SQL must not print the connection string, and
+-- the calling identity must have only the required permission (read access here).
 --
 -- Run the following outside SQL Server with Azure CLI/PowerShell, not in a prompt:
 --   az keyvault secret set --vault-name contoso-vault --name sql-readonly --value <secret>
 --   az webapp identity assign --name contoso-app --resource-group contoso-rg
 -- Grant the app's managed identity only the Key Vault secret read permission.
+-- In production, prefer a managed identity over a fixed password, rotate the secret,
+-- and review logs/output to ensure that the value is never displayed.
 PRINT 'Secret-handling case: use Key Vault and managed identity; never paste credentials into AI context.';
 GO
 

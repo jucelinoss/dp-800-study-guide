@@ -67,7 +67,7 @@ GO
 
 
 -- =================================================================================
--- PARTE 2: CONFORMIDADE COM REGRAS DO ARCHIVO .GITHUB/COPILOT-INSTRUCTIONS.MD
+-- PARTE 2: CONFORMIDADE COM REGRAS DO ARQUIVO .GITHUB/COPILOT-INSTRUCTIONS.MD
 -- =================================================================================
 -- CONCEITOS E DEFINIÇÕES CHAVE:
 --   - COPILOT INSTRUCTIONS: Arquivo localizado na raiz em `.github/copilot-instructions.md`.
