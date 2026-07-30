@@ -148,8 +148,8 @@ SELECT o.SalesOrderID,
        item.Qty,
        item.Price
 FROM   lab.JsonFunctionsOrders AS o
-CROSS APPLY 
-    OPENJSON (o.OrderDocument, '$.items') 
+CROSS APPLY
+    OPENJSON (o.OrderDocument, '$.items')
     WITH (
             Sku NVARCHAR (25) '$.sku',
             Qty INT '$.qty',
@@ -167,10 +167,10 @@ WHERE  o.SalesOrderID IN (-1, 43659);
 -- OPENJSON pode multiplicar linhas: filtre pedidos antes do APPLY quando possível.
 SELECT o.SalesOrderID, item.Sku, item.Qty
 FROM lab.JsonFunctionsOrders AS o
-OUTER APPLY 
+OUTER APPLY
     OPENJSON(o.OrderDocument, '$.items')
     WITH (
-            Sku nvarchar(25) '$.sku', 
+            Sku nvarchar(25) '$.sku',
             Qty int '$.qty'
           ) AS item
 WHERE o.SalesOrderID IN (-1, 43659);
@@ -181,9 +181,9 @@ GO
 -- Não aplique strict diretamente a dados possivelmente inválidos: um único texto
 -- malformado interrompe a instrução. A primeira consulta separa rejeitos; a segunda
 -- só lê documentos já aprovados e com os campos obrigatórios presentes.
-CREATE TABLE lab.JsonFunctionsStage 
+CREATE TABLE lab.JsonFunctionsStage
     (
-        RowId int IDENTITY PRIMARY KEY, 
+        RowId int IDENTITY PRIMARY KEY,
         JsonData nvarchar(max) NULL
      );
 
@@ -200,7 +200,6 @@ SELECT RowId, JsonData FROM lab.JsonFunctionsStage
 WHERE ISJSON(JsonData) = 0 OR JSON_VALUE(JsonData, '$.id') IS NULL
    OR JSON_VALUE(JsonData, '$.name') IS NULL;
 
-   
 -- Consulta 4.2 — leitura somente das linhas aprovadas:
 -- ISJSON = 1 elimina o texto malformado, e o teste de name elimina documentos sem
 -- a propriedade obrigatória. Os caminhos strict tornam o contrato explícito: se uma
@@ -457,7 +456,7 @@ SELECT o.SalesOrderID, item.Sku, item.Qty
 FROM lab.JsonFunctionsOrders AS o
 CROSS APPLY OPENJSON(o.OrderDocument, '$.items')
 WITH (
-        Sku nvarchar(25) '$.sku', 
+        Sku nvarchar(25) '$.sku',
         Qty int '$.qty') AS item
 WHERE o.OrderDate >= '20070101'
   AND CONVERT(nvarchar(50), JSON_VALUE(o.OrderDocument, '$.territory.name')) = N'Northwest';

@@ -349,7 +349,7 @@ BEGIN
     SELECT ContactID, FullName FROM lab.RawContacts
     WHERE CONTAINS(FullName, '"Alice Smith"');
 
-    -- Buscas booleanas: os dois termos 
+    -- Buscas booleanas: os dois termos
     SELECT ContactID, FullName FROM lab.RawContacts
     WHERE CONTAINS(FullName, '"Alice" AND "Smith"');
 
