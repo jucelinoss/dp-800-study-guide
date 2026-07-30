@@ -324,8 +324,12 @@ GO
 -- KEY CONCEPTS AND DEFINITIONS:
 --   - SET XACT_ABORT ON: For many execution errors, terminates and rolls back the entire transaction.
 --     Still, check XACT_STATE() in the CATCH block; the observed state depends on the error and context.
---   - XACT_STATE() = -1: Indicates a "Doomed Transaction". SQL Server forbids COMMIT
---     and requires the developer to execute a `ROLLBACK`.
+--   - XACT_STATE() = 1: a transaction is active and committable. COMMIT, full ROLLBACK,
+--     and ROLLBACK to a valid savepoint are allowed.
+--   - XACT_STATE() = 0: no transaction is active. Do not issue COMMIT or ROLLBACK.
+--   - XACT_STATE() = -1: a transaction is active but uncommittable (doomed). SQL Server
+--     forbids COMMIT and rollback to a savepoint; only a full ROLLBACK is allowed.
+--   - Practical CATCH rule: capture XACT_STATE() and choose the recovery action from its value.
 
 -- -- [DP-800 EXAM TIP]
 BEGIN TRY
@@ -340,13 +344,22 @@ BEGIN TRY
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
-    PRINT 'ENTROU NO CATCH. Estado da Transação (XACT_STATE): ' + CAST(XACT_STATE() AS VARCHAR(10));
+    DECLARE @XactState int = XACT_STATE();
+    PRINT 'Entered CATCH. XACT_STATE=' + CAST(@XactState AS varchar(10))
+        + ', @@TRANCOUNT=' + CAST(@@TRANCOUNT AS varchar(10));
     
-    IF XACT_STATE() <> 0
+    IF @XactState = -1
     BEGIN
-        PRINT 'Existe uma transação ativa; executando ROLLBACK...';
+        PRINT 'Doomed transaction: only a full ROLLBACK is allowed.';
         ROLLBACK TRANSACTION;
     END
+    ELSE IF @XactState = 1
+    BEGIN
+        PRINT 'Committable transaction: rolling back the full transaction in this example.';
+        ROLLBACK TRANSACTION;
+    END
+    ELSE
+        PRINT 'XACT_STATE=0: no transaction needs to be rolled back.';
 END CATCH;
 GO
 
@@ -381,39 +394,115 @@ GO
 -- PART 5: PRACTICAL PROJECT SCENARIOS
 -- =================================================================================
 
---- SCENARIO 1: Batch Processing with Savepoint Handling in a Stored Procedure
--- Allows processing individual items by saving valid ones and reverting individual failed items via Savepoint.
-
-CREATE PROCEDURE lab.usp_ProcessBatchWithSavepoints
+-- SCENARIO 1: batch processing with one savepoint per account.
+-- XACT_ABORT is OFF so an item error can be caught while the transaction remains
+-- committable (XACT_STATE=1). Only the failed item is rolled back; later items continue.
+CREATE OR ALTER PROCEDURE lab.usp_ProcessBatchWithSavepoints
+    @FailOnAccountID int = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @TranCount INT = @@TRANCOUNT;
+    SET XACT_ABORT OFF;
+
+    DECLARE @TranCount int = @@TRANCOUNT;
+    DECLARE @StartedTransaction bit = 0;
+    DECLARE @AccountID int;
 
     IF @TranCount = 0
+    BEGIN
         BEGIN TRANSACTION;
+        SET @StartedTransaction = 1;
+    END
     ELSE
         SAVE TRANSACTION SP_BatchProc;
 
     BEGIN TRY
-        -- Batch operations...
-        UPDATE lab.Accounts SET Status = 'Active' WHERE Status = 'Inactive';
-        
-        IF @TranCount = 0
+        DECLARE account_cursor CURSOR LOCAL FAST_FORWARD FOR
+            SELECT AccountID
+            FROM lab.Accounts
+            WHERE Status = N'Inactive'
+            ORDER BY AccountID;
+
+        OPEN account_cursor;
+        FETCH NEXT FROM account_cursor INTO @AccountID;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SAVE TRANSACTION SP_Item;
+
+            BEGIN TRY
+                IF @AccountID = @FailOnAccountID
+                    THROW 51010, N'Simulated failure while processing the batch account.', 1;
+
+                UPDATE lab.Accounts
+                SET Status = N'Active'
+                WHERE AccountID = @AccountID;
+
+                PRINT 'Processed account: ' + CAST(@AccountID AS varchar(10));
+            END TRY
+            BEGIN CATCH
+                DECLARE @ItemState int = XACT_STATE();
+                PRINT 'Account ' + CAST(@AccountID AS varchar(10))
+                    + ' failed. XACT_STATE=' + CAST(@ItemState AS varchar(10));
+
+                IF @ItemState = 1
+                BEGIN
+                    -- The transaction is still committable, so partial rollback is allowed.
+                    ROLLBACK TRANSACTION SP_Item;
+                    PRINT 'Only the failed item was rolled back; the batch continues.';
+                END
+                ELSE
+                    THROW;
+            END CATCH;
+
+            FETCH NEXT FROM account_cursor INTO @AccountID;
+        END;
+
+        CLOSE account_cursor;
+        DEALLOCATE account_cursor;
+
+        IF @StartedTransaction = 1
             COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
-        -- A doomed transaction cannot roll back to a savepoint; it requires a full rollback.
-        IF XACT_STATE() = -1
+        IF CURSOR_STATUS('local', 'account_cursor') >= 0
+            CLOSE account_cursor;
+        IF CURSOR_STATUS('local', 'account_cursor') >= -1
+            DEALLOCATE account_cursor;
+
+        DECLARE @BatchState int = XACT_STATE();
+        PRINT 'Unrecoverable batch failure. XACT_STATE=' + CAST(@BatchState AS varchar(10));
+
+        IF @BatchState = -1
+        BEGIN
+            -- At -1, ROLLBACK SP_Item/SP_BatchProc would also fail; use a full rollback.
             ROLLBACK TRANSACTION;
-        ELSE IF @TranCount = 0 AND XACT_STATE() <> 0
+        END
+        ELSE IF @StartedTransaction = 1 AND @BatchState = 1
             ROLLBACK TRANSACTION;
-        ELSE IF @TranCount > 0 AND XACT_STATE() = 1
+        ELSE IF @TranCount > 0 AND @BatchState = 1
             ROLLBACK TRANSACTION SP_BatchProc;
 
         THROW;
     END CATCH;
 END;
+GO
+
+-- Prepare two items for the demonstration: the first fails and the second succeeds.
+IF NOT EXISTS (SELECT 1 FROM lab.Accounts WHERE AccountID = 110)
+    INSERT INTO lab.Accounts (AccountID, AccountHolder, Status)
+    VALUES (110, N'Simulated failure account', N'Inactive');
+IF NOT EXISTS (SELECT 1 FROM lab.Accounts WHERE AccountID = 111)
+    INSERT INTO lab.Accounts (AccountID, AccountHolder, Status)
+    VALUES (111, N'Processed account', N'Inactive');
+GO
+
+-- Expected result: 110 remains Inactive; 111 becomes Active.
+EXEC lab.usp_ProcessBatchWithSavepoints @FailOnAccountID = 110;
+SELECT AccountID, AccountHolder, Status
+FROM lab.Accounts
+WHERE AccountID IN (110, 111)
+ORDER BY AccountID;
 GO
 
 -- =================================================================================================
