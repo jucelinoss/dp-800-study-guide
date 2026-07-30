@@ -43,13 +43,9 @@ IF EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'ParquetFileForm
 IF EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'NycTaxiParquet') DROP EXTERNAL FILE FORMAT NycTaxiParquet;
 IF EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'CSVFileFormat') DROP EXTERNAL FILE FORMAT CSVFileFormat;
 IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = 'MyStorageCredential') DROP DATABASE SCOPED CREDENTIAL [MyStorageCredential];
-DROP PROCEDURE IF EXISTS lab.sp_generate_mermaid_graph;
-DROP TABLE IF EXISTS lab.OwnsCard;
-DROP TABLE IF EXISTS lab.UsedIP;
-DROP TABLE IF EXISTS lab.Knows;
-DROP TABLE IF EXISTS lab.CreditCard;
-DROP TABLE IF EXISTS lab.IPAddress;
-DROP TABLE IF EXISTS lab.Person;
+DROP TABLE IF EXISTS lab.SpecializedGraphUses;
+DROP TABLE IF EXISTS lab.SpecializedGraphAsset;
+DROP TABLE IF EXISTS lab.SpecializedGraphPerson;
 DROP TABLE IF EXISTS lab.SessionCacheMemData;
 DROP TABLE IF EXISTS lab.SessionCacheMemOnly;
 DROP TYPE IF EXISTS lab.MyMemoryTableType;
@@ -398,7 +394,14 @@ GO
 
 
 -- =================================================================================
--- PARTE 4: GRAPH TABLES (MODELAGEM E ANÁLISE DE REDES E DETECÇÃO DE FRAUDES)
+/*
+-- CONTEÚDO MIGRADO: os cenários avançados de Graph, incluindo fraude,
+-- SHORTEST_PATH e o renderizador Mermaid, agora pertencem ao lab avançado:
+-- ../../../practice/labs/03-advanced-tsql/04-graph-queries-lab.sql
+--
+-- Esta implementação anterior permanece apenas como referência histórica e não
+-- é executada, evitando colisões com os objetos do lab avançado.
+-- PARTE 4 LEGADA: GRAPH TABLES (MODELAGEM E ANÁLISE DE REDES E DETECÇÃO DE FRAUDES)
 -- =================================================================================
 -- CONCEITOS E DEFINIÇÕES CHAVE DO EXAME DP-800:
 --   - BANCO DE DADOS EM GRAFO: Permite modelar relacionamentos N:M complexos de forma nativa e altamente performática.
@@ -858,6 +861,64 @@ GO
 EXEC lab.sp_generate_mermaid_graph;
 GO
 
+
+-- =================================================================================
+*/
+
+-- =================================================================================
+-- PARTE 4: GRAPH TABLES (INTRODUÇÃO A NODE, EDGE E MATCH)
+-- =================================================================================
+-- Este lab apresenta apenas a modelagem básica. Os cenários de fraude,
+-- SHORTEST_PATH e o renderizador Mermaid ficam no lab avançado de Graph.
+-- Os nomes SpecializedGraph* evitam conflito com outros labs.
+
+-- Edges devem ser removidas antes dos nodes quando o script for reexecutado.
+DROP TABLE IF EXISTS lab.SpecializedGraphUses;
+DROP TABLE IF EXISTS lab.SpecializedGraphAsset;
+DROP TABLE IF EXISTS lab.SpecializedGraphPerson;
+GO
+
+-- Dois nodes e uma edge com CONNECTION mostram o contrato básico do Graph.
+CREATE TABLE lab.SpecializedGraphPerson (
+    PersonID int NOT NULL PRIMARY KEY,
+    Name nvarchar(100) NOT NULL
+) AS NODE;
+
+CREATE TABLE lab.SpecializedGraphAsset (
+    AssetID int NOT NULL PRIMARY KEY,
+    AssetName nvarchar(100) NOT NULL
+) AS NODE;
+
+CREATE TABLE lab.SpecializedGraphUses (
+    CONSTRAINT EC_SpecializedGraphUses
+        CONNECTION (lab.SpecializedGraphPerson TO lab.SpecializedGraphAsset)
+) AS EDGE;
+GO
+
+-- `$node_id` é a chave interna usada pelas arestas; PersonID e AssetID continuam
+-- sendo as chaves de negócio exibidas para o usuário.
+INSERT INTO lab.SpecializedGraphPerson (PersonID, Name)
+VALUES (1, N'Alice'), (2, N'Bob');
+
+INSERT INTO lab.SpecializedGraphAsset (AssetID, AssetName)
+VALUES (10, N'Laptop corporativo'), (20, N'Token de acesso');
+
+INSERT INTO lab.SpecializedGraphUses ($from_id, $to_id)
+VALUES
+((SELECT $node_id FROM lab.SpecializedGraphPerson WHERE PersonID = 1),
+ (SELECT $node_id FROM lab.SpecializedGraphAsset WHERE AssetID = 10)),
+((SELECT $node_id FROM lab.SpecializedGraphPerson WHERE PersonID = 2),
+ (SELECT $node_id FROM lab.SpecializedGraphAsset WHERE AssetID = 20));
+GO
+
+-- MATCH substitui os joins manuais entre `$node_id`, `$from_id` e `$to_id`.
+SELECT p.Name AS Pessoa,
+       a.AssetName AS AtivoUtilizado
+FROM lab.SpecializedGraphPerson AS p,
+     lab.SpecializedGraphUses AS u,
+     lab.SpecializedGraphAsset AS a
+WHERE MATCH(p-(u)->a);
+GO
 
 -- =================================================================================
 -- PARTE 5: EXTERNAL TABLES & VIRTUALIZAÇÃO DE DADOS (POLYBASE / DATA LAKE)

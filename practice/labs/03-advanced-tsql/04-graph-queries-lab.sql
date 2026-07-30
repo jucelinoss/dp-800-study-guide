@@ -22,14 +22,10 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'likes' AND is_node = 0)
-    DROP TABLE lab.likes;
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'friendOf' AND is_node = 0)
-    DROP TABLE lab.friendOf;
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Restaurant' AND is_node = 1)
-    DROP TABLE lab.Restaurant;
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Person' AND is_node = 1)
-    DROP TABLE lab.Person;
+DROP TABLE IF EXISTS lab.GraphLikes;
+DROP TABLE IF EXISTS lab.GraphFriendOf;
+DROP TABLE IF EXISTS lab.GraphRestaurant;
+DROP TABLE IF EXISTS lab.GraphPerson;
 GO
 
 
@@ -44,13 +40,13 @@ GO
 --   - EDGE CONSTRAINTS (CONNECTION): DDL restriction that enforces which Node types can connect through the edge.
 
 -- 1. Create Node Tables
-CREATE TABLE lab.Person (
+CREATE TABLE lab.GraphPerson (
     PersonID INT PRIMARY KEY,
     Name NVARCHAR(100) NOT NULL,
     City NVARCHAR(100) NULL
 ) AS NODE;
 
-CREATE TABLE lab.Restaurant (
+CREATE TABLE lab.GraphRestaurant (
     RestaurantID INT PRIMARY KEY,
     Name NVARCHAR(100) NOT NULL,
     Cuisine NVARCHAR(50) NOT NULL
@@ -59,13 +55,13 @@ GO
 
 -- -- [DP-800 EXAM TIP]
 -- 2. Create Edge Tables with Connection Constraints (CONNECTION)
-CREATE TABLE lab.friendOf (
-    CONSTRAINT EC_friendOf CONNECTION (lab.Person TO lab.Person) ON DELETE CASCADE
+CREATE TABLE lab.GraphFriendOf (
+    CONSTRAINT EC_GraphFriendOf CONNECTION (lab.GraphPerson TO lab.GraphPerson) ON DELETE CASCADE
 ) AS EDGE;
 
-CREATE TABLE lab.likes (
+CREATE TABLE lab.GraphLikes (
     Rating INT NULL,
-    CONSTRAINT EC_likes CONNECTION (lab.Person TO lab.Restaurant) ON DELETE CASCADE
+    CONSTRAINT EC_GraphLikes CONNECTION (lab.GraphPerson TO lab.GraphRestaurant) ON DELETE CASCADE
 ) AS EDGE;
 GO
 
@@ -78,27 +74,27 @@ GO
 --     the internal `$node_id` primary key captured via subquery of the corresponding Node.
 
 -- 1. Insert Nodes
-INSERT INTO lab.Person (PersonID, Name, City) VALUES 
+INSERT INTO lab.GraphPerson (PersonID, Name, City) VALUES
 (1, 'Alice', 'São Paulo'),
 (2, 'Bob', 'Rio de Janeiro'),
 (3, 'Charlie', 'Belo Horizonte'),
 (4, 'Daniela', 'Curitiba');
 
-INSERT INTO lab.Restaurant (RestaurantID, Name, Cuisine) VALUES 
+INSERT INTO lab.GraphRestaurant (RestaurantID, Name, Cuisine) VALUES
 (101, 'Sushi Master', 'Japonesa'),
 (102, 'Pizzeria Bella', 'Italiana');
 GO
 
 -- -- [DP-800 EXAM TIP]
 -- 2. Insert Edges mapping $from_id and $to_id via $node_id subquery
-INSERT INTO lab.friendOf ($from_id, $to_id) VALUES 
-((SELECT $node_id FROM lab.Person WHERE PersonID = 1), (SELECT $node_id FROM lab.Person WHERE PersonID = 2)),
-((SELECT $node_id FROM lab.Person WHERE PersonID = 2), (SELECT $node_id FROM lab.Person WHERE PersonID = 3)),
-((SELECT $node_id FROM lab.Person WHERE PersonID = 3), (SELECT $node_id FROM lab.Person WHERE PersonID = 4));
+INSERT INTO lab.GraphFriendOf ($from_id, $to_id) VALUES
+((SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 1), (SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 2)),
+((SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 2), (SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 3)),
+((SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 3), (SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 4));
 
-INSERT INTO lab.likes ($from_id, $to_id, Rating) VALUES 
-((SELECT $node_id FROM lab.Person WHERE PersonID = 1), (SELECT $node_id FROM lab.Restaurant WHERE RestaurantID = 101), 5),
-((SELECT $node_id FROM lab.Person WHERE PersonID = 2), (SELECT $node_id FROM lab.Restaurant WHERE RestaurantID = 102), 4);
+INSERT INTO lab.GraphLikes ($from_id, $to_id, Rating) VALUES
+((SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 1), (SELECT $node_id FROM lab.GraphRestaurant WHERE RestaurantID = 101), 5),
+((SELECT $node_id FROM lab.GraphPerson WHERE PersonID = 2), (SELECT $node_id FROM lab.GraphRestaurant WHERE RestaurantID = 102), 4);
 GO
 
 
@@ -115,7 +111,7 @@ SELECT
     P2.Name AS Amigo,
     R.Name AS RestauranteRecomendado,
     R.Cuisine AS Culinaria
-FROM lab.Person P1, lab.friendOf F, lab.Person P2, lab.likes L, lab.Restaurant R
+FROM lab.GraphPerson P1, lab.GraphFriendOf F, lab.GraphPerson P2, lab.GraphLikes L, lab.GraphRestaurant R
 WHERE MATCH(P1-(F)->P2-(L)->R)
   AND P1.Name = 'Alice';
 GO
@@ -137,9 +133,9 @@ SELECT
     LAST_VALUE(P2.Name) WITHIN GROUP (GRAPH PATH) AS DestinoFinal,
     STRING_AGG(P2.Name, ' -> ') WITHIN GROUP (GRAPH PATH) AS RotaPercorrida
 FROM 
-    lab.Person AS P1,
-    lab.friendOf FOR PATH AS F,
-    lab.Person FOR PATH AS P2
+    lab.GraphPerson AS P1,
+    lab.GraphFriendOf FOR PATH AS F,
+    lab.GraphPerson FOR PATH AS P2
 WHERE MATCH(SHORTEST_PATH(P1(-(F)->P2)+))
   AND P1.Name = 'Alice';
 GO
@@ -156,7 +152,7 @@ SELECT
     P1.Name AS Usuario,
     P2.Name AS AmigoEmComum,
     R.Name AS SugestaoRestaurante
-FROM lab.Person P1, lab.friendOf F, lab.Person P2, lab.likes L, lab.Restaurant R
+FROM lab.GraphPerson P1, lab.GraphFriendOf F, lab.GraphPerson P2, lab.GraphLikes L, lab.GraphRestaurant R
 WHERE MATCH(P1-(F)->P2-(L)->R)
   AND R.Cuisine = 'Italiana';
 GO
