@@ -309,7 +309,16 @@ AS
 - **Batch mode adaptive joins**: switch between hash and nested loops based on actual row counts
 - **Memory grant feedback**: adjusts memory grants after first execution based on actual usage
 
-These are automatic in compatibility level 140+ and require no code changes.
+#### Adaptive Joins
+
+An adaptive join defers the choice between a **Hash Join** and a **Nested Loops Join** until after the first input has been scanned. The operator stores a row-count threshold in the execution plan:
+
+- If the build input is below the threshold, the plan switches to **Nested Loops**, which is usually more efficient for a small number of rows.
+- If the input exceeds the threshold, the plan continues with **Hash Join**, which is usually more efficient for larger inputs.
+
+This runtime decision allows the same cached plan to adapt to workloads that alternate between small and large result sets, without recompilation or code changes. Adaptive joins can request more memory than an equivalent indexed Nested Loops plan because the plan must also be prepared for the Hash Join path.
+
+Adaptive joins are available in batch mode starting with SQL Server 2017 and compatibility level 140. They can be identified as the `Adaptive Join` operator in an actual execution plan.
 
 ---
 
@@ -441,6 +450,7 @@ D. Force a specific plan using sp_query_store_force_plan
 - [Query Performance Insight (Azure SQL)](https://learn.microsoft.com/en-us/azure/azure-sql/database/query-performance-insight-use)
 - [Plan Guides (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/performance/plan-guides)
 - [Parameter Sniffing (SQL Server)](https://learn.microsoft.com/en-us/sql/relational-databases/query-processing-architecture-guide#parameter-sensitivity)
+- [Joins — Adaptive Joins (Microsoft Learn)](https://learn.microsoft.com/en-us/sql/relational-databases/performance/joins?view=sql-server-ver17#adaptive-joins)
 
 ---
 

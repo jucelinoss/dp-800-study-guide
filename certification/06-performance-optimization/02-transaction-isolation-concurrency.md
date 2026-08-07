@@ -70,22 +70,22 @@ Both use row versioning (tempdb version store) but differ in scope:
 
 ```mermaid
 flowchart TD
-    subgraph PESSIMISTIC ["1. Traditional Pattern (Pessimistic Locking)"]
+    subgraph PESSIMISTIC ["1. Traditional Pattern (Pessimistic)<br/>&nbsp;"]
         direction TB
         W1["Writer executes UPDATE<br/>(Acquires Exclusive Lock - X)"]
         R1["Reader executes SELECT<br/>(Requires Shared Lock - S)"]
-        R1 -. "BLOCKED! Waits for Exclusive Lock X release" .-> W1
+        W1 -->|"BLOCKED!<br/>Reader waits for Exclusive Lock X release"| R1
     end
 
-    subgraph RCSI ["2. RCSI (Optimistic Tempdb Row Versioning)"]
+    subgraph RCSI ["2. RCSI (Optimistic Versioning)<br/>&nbsp;"]
         direction TB
         W2["Writer executes UPDATE<br/>(Copies old row version to Tempdb Version Store)"]
         R2["Reader executes SELECT<br/>(Reads consistent row version from Tempdb lock-free)"]
-        W2 ===|Zero Blocking! Readers do not block Writers| R2
+        W2 ==>|"Zero Blocking!<br/>Reader reads version from Tempdb lock-free"| R2
     end
-```
 
-![Read Committed Snapshot Isolation Architecture](../../../dist/images/rcsi_snapshot_isolation_architecture.png)
+    PESSIMISTIC ~~~ RCSI
+```
 
 | Aspect | RCSI | Snapshot Isolation |
 | :--- | :--- | :--- |

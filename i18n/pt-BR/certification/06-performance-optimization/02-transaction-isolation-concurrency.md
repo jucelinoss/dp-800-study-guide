@@ -15,9 +15,11 @@ tags:
 > 
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Tabela Comparativa de Níveis de Isolamento](#tabela-comparativa-de-níveis-de-isolamento)
+>   - 🔹 [Explicação Intuitiva e Casos Práticos por Nível](#explicação-intuitiva-e-casos-práticos-por-nível)
+>   - 🔹 [Macete Mnemônico: Como Comparar e Memorizar os Níveis (3 Pares)](#macete-mnemônico-como-comparar-e-memorizar-os-níveis-3-pares)
 > - 📍 [3. Concorrência Pessimista vs Otimista](#concorrência-pessimista-vs-otimista)
 > - 📍 [4. RCSI vs Snapshot Isolation](#rcsi-vs-snapshot-isolation)
-> - 📍 [5. Compatibilidade de Trava (Lock Compatibility)](#compatibilidade-de-trava-lock-compatibility)
+> - 📍 [5. Modos e Compatibilidade de Travas (Lock Modes & Compatibility)](#modos-e-compatibilidade-de-travas-lock-modes--compatibility)
 > - 📍 [6. Analisando Bloqueios Ativos (Blocking)](#analisando-bloqueios-ativos-blocking)
 > - 📍 [7. Escalamento de Locks (Lock Escalation)](#escalamento-de-locks-lock-escalation)
 > - 📍 [8. Concorrência Otimista baseada em ROWVERSION](#concorrência-otimista-baseada-em-rowversion)
@@ -65,7 +67,7 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED; -- Padrão clássico
 | `READ COMMITTED` | Não | Sim | Sim | Sim (Pessimista) |
 | `REPEATABLE READ` | Não | Não | Sim | Sim (Pessimista) |
 | `SERIALIZABLE` | Não | Não | Não | Sim (Pessimista) |
-| `SNAPSHOT` | Não | Não | Não | `**Não (Otimista)**` |
+| `SNAPSHOT` | Não | Não | Não | **Não (Otimista)** |
 | `READ COMMITTED SNAPSHOT` (RCSI) | Não | Sim | Sim | **Não (Otimista)** |
 
 **Fenômenos de Leitura (Read Anomalies):**
@@ -73,6 +75,105 @@ SET TRANSACTION ISOLATION LEVEL READ COMMITTED; -- Padrão clássico
 - **Leitura suja (Dirty read)**: Uma transação lê dados modificados por outra transação que ainda não efetuou o `COMMIT`. Se a outra transação sofrer `ROLLBACK`, o dado lido torna-se inválido.
 - **Leitura não repetível (Non-repeatable read)**: Um registro lido no início da transação retorna um valor diferente se consultado novamente, porque outra transação efetuou `COMMIT` de um `UPDATE` no mesmo registro nesse meio tempo.
 - **Leitura fantasma (Phantom read)**: Uma consulta de intervalo (`WHERE Id BETWEEN 1 AND 10`) executada novamente retorna registros extras ("fantasmas") porque outra transação inseriu (`INSERT`) novas linhas no mesmo intervalo e executou o `COMMIT`.
+
+### Explicação Intuitiva e Casos Práticos por Nível
+
+#### 1. READ UNCOMMITTED (Leitura Não Comprometida)
+> **Metáfora:** *"Olhar por cima do ombro de alguém enquanto a pessoa digita, antes mesmo de ela salvar a folha."*
+
+* **Como funciona:** É a forma mais permissiva. As consultas de leitura (`SELECT`) não pedem nenhum tipo de trava e ignoram as travas de escrita dos outros usuários.
+* **Exemplo Prático:**
+  1. O Usuário A inicia uma transferência PIX de R$ 1.000 para a sua conta e o banco executa um `UPDATE` aumentando seu saldo, mas a transação **ainda não foi confirmada (`COMMIT`)**.
+  2. Você roda um relatório financeiro em `READ UNCOMMITTED` que lê esse novo saldo alterado.
+  3. O PIX do Usuário A falha por falta de limite e sofre um **`ROLLBACK`** (o saldo volta ao valor antigo).
+  4. Seu relatório exibiu um saldo que **nunca existiu oficialmente** (**Leitura Suja / Dirty Read**).
+* **Uso Recomendado:** Relatórios estatísticos ou dashboards onde a precisão ao centavo não é crítica, mas a ausência total de bloqueios é essencial.
+
+#### 2. READ COMMITTED (Pessimista — Padrão Tradicional)
+> **Metáfora:** *"Aguardar a pessoa fechar a gaveta e trancar a pasta antes de abrir para ler o documento."*
+
+* **Como funciona:** Garante que você só leia dados oficialmente gravados (`COMMIT`). Ao tentar ler uma linha que está sendo alterada por um `UPDATE` pendente, sua consulta **aguarda (fica bloqueada)** até que a escrita seja concluída.
+* **Exemplo Prático (Estoque de E-commerce):**
+  1. Um produto tem **10 unidades** em estoque.
+  2. O Cliente A inicia uma compra e o sistema executa um `UPDATE` reservando 1 unidade (diminuindo para 9), mantendo a transação aberta.
+  3. O Cliente B tenta visualizar o produto. A consulta do Cliente B **espera travada** até o Cliente A finalizar o pagamento.
+  4. Assim que o Cliente A confirma, a consulta do Cliente B é liberada e lê 9 unidades.
+  5. **Porém**, se o Cliente B fizer um segundo `SELECT` dentro da mesma transação, ele lerá 9 unidades em vez das 10 iniciais (**Leitura Não Repetível / Non-repeatable Read**).
+* **Uso Recomendado:** Padrão para a maioria dos sistemas transacionais tradicionais onde leituras sujas não podem ser toleradas.
+
+#### 3. READ COMMITTED SNAPSHOT ISOLATION — RCSI (Otimista por Instrução)
+> **Metáfora:** *"Ler uma fotocópia da última versão oficial do documento enquanto a folha original está sendo editada por outra pessoa."*
+
+* **Como funciona:** Em vez de fazer leitores esperarem por escritoras, o banco salva uma cópia da versão antiga da linha em um repositório temporário de versões (*Version Store* no `tempdb`). O leitor acessa essa versão anterior instantaneamente sem solicitar travas e **sem travar nem ser travado** pelas alterações em andamento.
+* **Exemplo Prático (Reserva de Passagens):**
+  1. Uma passagem custa R$ 500. A companhia aérea inicia um `UPDATE` alterando o preço para R$ 800 (sem `COMMIT` ainda).
+  2. Você busca a passagem no site. Com RCSI ativado, você não fica travado aguardando: lê imediatamente o valor de **R$ 500** (última foto confirmada).
+  3. Se a companhia der `COMMIT` no valor de R$ 800 e você fizer um novo `SELECT` em seguida, o RCSI atualizará a foto para a nova instrução e mostrará R$ 800.
+* **Uso Recomendado:** Padrão ativo em bancos de dados de alta concorrência OLTP (como no Azure SQL Database) para eliminar bloqueios entre leituras e escritas de forma transparente para a aplicação.
+
+#### 4. REPEATABLE READ (Leitura Repetível)
+> **Metáfora:** *"Colocar um cadeado de leitura nos arquivos pesquisados. Ninguém altera o que você leu até você sair da sala."*
+
+* **Como funciona:** Além de impedir leituras sujas, ele garante que se você ler um conjunto de linhas no início da transação e relê-las mais tarde na mesma transação, os valores serão **exatamente os mesmos**. Ele alcança isso mantendo travas de leitura retidas até o término da transação.
+* **Exemplo Prático (Cálculo de Folha de Pagamento):**
+  1. O sistema de RH abre uma transação e lê os dados do Funcionário ID 42 (Salário = R$ 5.000).
+  2. Enquanto a folha de pagamento processa outros cálculos, um gerente tenta fazer um `UPDATE` no salário do Funcionário 42 para R$ 6.000.
+  3. O gerente **fica bloqueado** porque o `REPEATABLE READ` reteve a trava de leitura no Funcionário 42.
+  4. Se o RH consultar o Funcionário 42 novamente no fim do processo, o valor continuará sendo R$ 5.000.
+  5. **Porém**, se outro usuário fizer um `INSERT` de um **novo funcionário** no mesmo departamento, ele será incluído se o RH fizer uma nova consulta por intervalo (**Leitura Fantasma / Phantom Read**).
+* **Uso Recomendado:** Cálculos financeiros ou auditorias onde valores já lidos não podem mudar no meio do processamento.
+
+#### 5. SNAPSHOT (Isolamento Otimista por Transação)
+> **Metáfora:** *"Tirar uma fotografia completa do banco de dados no exato segundo em que sua transação começou e trabalhar apenas sobre essa foto."*
+
+* **Como funciona:** Diferente do RCSI (que atualiza a foto a cada instrução SQL), o `SNAPSHOT` fixa a foto no **início de toda a transação**. Tudo o que você consultar durante a transação refletirá o estado exato dos dados naquele milissegundo inicial, ignorando quaisquer `COMMIT` feitos por terceiros enquanto sua transação estiver aberta.
+* **Exemplo Prático (Relatório Consolidado de Fim de Mês):**
+  1. Você inicia uma transação `SNAPSHOT` às 08:00:00 para gerar o balanço financeiro mensal.
+  2. Às 08:05:00, o sistema de vendas insere 500 novos pedidos e altera o saldo de várias contas.
+  3. Às 08:10:00, seu relatório continua rodando consultas complexas. Ele **continua enxergando o banco como ele estava exatamente às 08:00:00**, garantindo consistência total entre todas as tabelas consultadas.
+  4. **Detecção de Conflito de Escrita:** Se sua transação tentar fazer um `UPDATE` em uma linha que foi alterada por outro usuário após as 08:00:00, o banco cancelará sua operação com um erro de conflito (`Error 3960`), protegendo a integridade.
+* **Uso Recomendado:** Relatórios analíticos extensos e processos de reconciliação que exigem uma visão consistente ponto-no-tempo sem bloquear a operação da empresa.
+
+#### 6. SERIALIZABLE (Serializável — Concorrência Pessimista Máxima)
+> **Metáfora:** *"Trancar a sala de arquivos inteira com chave dupla. Ninguém altera, exclui nem insere nada no setor pesquisado."*
+
+* **Como funciona:** É o nível de isolamento mais rígido. Ele aplica travas de intervalo de chaves (*Key-Range Locks*). Impede que outros usuários façam `UPDATE`, `DELETE` ou insiram novos registros (`INSERT`) na faixa de dados pesquisada, evitando até mesmo leituras fantasmas.
+* **Exemplo Prático (Reserva de Assentos de Cinema):**
+  1. O sistema executa: `SELECT * FROM Assentos WHERE SalaID = 10 AND Reservado = 0;` em nível `SERIALIZABLE`.
+  2. O banco trava o intervalo inteiro da Sala 10.
+  3. Se outro usuário tentar reservar a Cadeira 12 ou o administrador tentar cadastrar uma nova Cadeira 50 na Sala 10, a operação **ficará totalmente bloqueada** até a transação inicial terminar.
+  4. O resultado final é equivalente a executar as transações uma por vez (em série).
+* **Uso Recomendado:** Operações críticas de extrema sensibilidade (ex: reservas de assentos de alta demanda, leilões, controle estrito de estoque único) onde qualquer inconsistência gera prejuízo.
+
+### Macete Mnemônico: Como Comparar e Memorizar os Níveis (3 Pares)
+
+Para facilitar a memorização rápida no exame e na prática, divida os 6 níveis de isolamento em **3 Pares de Comparação**:
+
+#### 1️⃣ PAR 1: Os Otimistas sem Bloqueio (RCSI vs SNAPSHOT)
+* **Em comum:** Ambos usam o *Version Store* no `tempdb`. Leitores **não bloqueiam** escritores e leitores não esperam por escritas.
+* **O Macete de Diferenciação:**
+  - **RCSI = Foto renovada a cada `SELECT` (Nível de Instrução):** Se outro usuário der `COMMIT` no meio da sua transação, o próximo `SELECT` verá o dado atualizado. É transparente (não exige alterar código T-SQL da aplicação).
+  - **SNAPSHOT = Foto congelada no `BEGIN TRANSACTION` (Nível de Transação):** Todas as consultas da transação enxergam estritamente a mesma foto do momento inicial. Se tentar atualizar (`UPDATE`) uma linha alterada por outro após o início, **estoura o Erro 3960** (Conflito de Escrita).
+
+#### 2️⃣ PAR 2: Os Bloqueadores de Leitura Simples (READ COMMITTED vs READ UNCOMMITTED)
+* **Em comum:** Operam no nível básico de instrução e não congelam a transação inteira.
+* **O Macete de Diferenciação:**
+  - **READ UNCOMMITTED = Sem Trava / Lê Rascunho:** Lê dados modificados que ainda não sofreram `COMMIT` (gera **Leitura Suja / Dirty Read** se houver `ROLLBACK`).
+  - **READ COMMITTED = Com Trava / Só Lê Oficial:** Pede trava compartilhada (`S lock`) linha por linha e **espera** se houver um `UPDATE` em andamento. Liberou a linha, solta a trava.
+
+#### 3️⃣ PAR 3: Os Protetores de Transação Inteira (REPEATABLE READ vs SERIALIZABLE)
+* **Em comum:** Ambos retêm travas de leitura **durante toda a transação** (do `BEGIN` até o `COMMIT`).
+* **O Macete de Diferenciação:**
+  - **REPEATABLE READ = Protege as Linhas Existentes:** Trava as linhas lidas para ninguém fazer `UPDATE` ou `DELETE`. **Porém**, não impede que outros insiram novas linhas no intervalo (**Permite Leituras Fantasma / Phantom Reads**).
+  - **SERIALIZABLE = Protege o Intervalo Inteiro (Locks de Key-Range):** Aplica travas de intervalo de chave. Ninguém faz `UPDATE`, `DELETE` nem consegue inserir (`INSERT`) novas linhas no intervalo até que sua transação termine.
+
+#### 💡 Tabela de Comparação Rápida para o Exame
+
+| Dupla Comparada | Fator Principal de Diferenciação | Armadilha de Prova |
+| :--- | :--- | :--- |
+| **RCSI vs SNAPSHOT** | **Renovação da Foto:** RCSI renova no `SELECT`; SNAPSHOT fixa no `BEGIN`. | SNAPSHOT estoura Erro 3960 em conflito de escrita; RCSI não (última escrita vence/espera). |
+| **READ COMMITTED vs UNCOMMITTED** | **Presença de Trava `S`:** COMMITTED espera o `COMMIT`; UNCOMMITTED lê rascunho. | UNCOMMITTED aceita Leitura Suja (Dirty Read). |
+| **REPEATABLE READ vs SERIALIZABLE** | **Bloqueio de `INSERT`:** REPEATABLE READ bloqueia `UPDATE/DELETE`; SERIALIZABLE bloqueia também `INSERT`. | REPEATABLE READ aceita linhas fantasma; SERIALIZABLE impede fantasmas com *Key-Range locks*. |
 
 ---
 
@@ -92,22 +193,22 @@ Ambos utilizam o repositório de versões no `tempdb` (version store) para prove
 
 ```mermaid
 flowchart TD
-    subgraph PESSIMISTIC ["1. Padrão Tradicional (Bloqueio Pessimista)"]
+    subgraph PESSIMISTIC ["1 - Padrão (Pessimista)<br/>&nbsp;"]
         direction TB
         W1["Escritor executa UPDATE<br/>(Adquire Exclusive Lock - X)"]
         R1["Leitor executa SELECT<br/>(Exige Shared Lock - S)"]
-        R1 -. "BLOQUEADO! Aguarda a trava X ser liberada" .-> W1
+        W1 -->|"BLOQUEADO!<br/>Leitor aguarda trava X ser liberada"| R1
     end
 
-    subgraph RCSI ["2. RCSI (Versionamento Otimista no Tempdb)"]
+    subgraph RCSI ["2 - RCSI (Otimista)<br/>&nbsp;"]
         direction TB
         W2["Escritor executa UPDATE<br/>(Copia versão antiga para o Tempdb Version Store)"]
         R2["Leitor executa SELECT<br/>(Lê versão consistente do Tempdb sem travas)"]
-        W2 ===|Zero Bloqueio! Leitores não travam Escritores| R2
+        W2 ==>|"Zero Bloqueio!<br/>Leitor lê versão do Tempdb sem travar"| R2
     end
-```
 
-![Read Committed Snapshot Isolation Architecture](../../../../dist/images/rcsi_snapshot_isolation_architecture.png)
+    PESSIMISTIC ~~~ RCSI
+```
 
 | Característica | RCSI | Snapshot |
 | :--- | :--- | :--- |
@@ -122,7 +223,7 @@ flowchart TD
 > - **Snapshot Isolation**: **Detecta** conflitos de gravação ativamente. Se a Sessão A e a Sessão B iniciarem transações Snapshot, lerem a mesma linha e ambas tentarem atualizá-la, a transação que tentar submeter a alteração por último falhará imediatamente com um erro de conflito de atualização (erro 3960), forçando o rollback.
 
 ```sql
--- Ativar RCSI no banco de dados
+-- Ativar RCSI no banco de dados (padrão ON no Azure SQL Database, OFF no On-Premises/SQL MI)
 ALTER DATABASE MyDB SET READ_COMMITTED_SNAPSHOT ON;
 
 -- Ativar suporte ao Snapshot Isolation no banco
@@ -136,23 +237,77 @@ SELECT Balance FROM dbo.Accounts WHERE AccountId = 1; -- snapshot fixo do iníci
 COMMIT;
 ```
 
-> [!warning] Erro Comum
-> Embora o Snapshot Isolation e o RCSI utilizem o versionamento de linhas, o RCSI atua de forma transparente substituindo o nível default `READ COMMITTED` do banco. A aplicação não precisa de alterações de código para se beneficiar da ausência de bloqueios em leituras com o RCSI.
+> [!warning] Erro Comum & Padrões do Azure SQL
+> - **Ativo por Padrão no Azure SQL Database**: No **Azure SQL Database** (Single DB e Elastic Pools), o `READ_COMMITTED_SNAPSHOT` vem **habilitado por padrão (`ON`)**, ao contrário do SQL Server On-Premises e SQL Managed Instance onde o valor padrão é `OFF`.
+> - **Benefício do RCSI no Azure SQL**: O RCSI altera o nível default `READ COMMITTED` para utilizar o Version Store no `tempdb`. A aplicação se beneficia de leituras sem bloqueio de forma completamente transparente, sem alterações no código T-SQL ou hints. Leitores não travam escritores e escritores não travam leitores.
 
 > [!note] Modelo Mental — Versionamento de Linhas
+
 > Pense no versionamento de linhas como **fotos instantâneas no tempdb**: sempre que um registro sofre alteração, o SQL Server tira uma foto do dado antigo e a salva no tempdb. As consultas de leitura não esperam as escritas terminarem; elas leem a foto correspondente. O **RCSI** atualiza as fotos a cada nova instrução enviada. O **SNAPSHOT** mantém a mesma foto tirada no início de toda a transação. O **custo**: o banco de dados `tempdb` cresce para armazenar as fotos antigas, exigindo monitoramento.
 
 ---
 
-## Compatibilidade de Trava (Lock Compatibility)
+## Modos e Compatibilidade de Travas (Lock Modes & Compatibility)
 
-| Trava (Lock) | Sigla | Compatível com |
-| :--- | :--- | :--- |
-| Compartilhada (Shared) | S | Outras travas S (Leituras concorrentes). |
-| Atualização (Update) | U | Travas S (Evita deadlocks em buscas). |
-| Exclusiva (Exclusive) | X | `**Nenhuma outra trava**` (Bloqueia tudo). |
-| Intenção Compartilhada | IS | IS, S, IX, SIX, U. |
-| Intenção Exclusiva | IX | IS, IX. |
+O mecanismo de concorrência pessimista do SQL Server utiliza diferentes **modos de trava (locks)** dependendo do comando executado (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `ALTER`) e da intenção da operação.
+
+### 🔑 Detalhamento dos Modos de Trava (Lock Modes)
+
+#### 1. Compartilhada (Shared — `S`)
+> **Metáfora:** *"Aviso de Leitura Pública no Quadro de Avisos"*. Vários leitores podem ler a mesma página simultaneamente, mas ninguém pode rabiscar ou alterar enquanto houver alguém lendo.
+
+* **Objetivo:** Utilizada por operações de leitura (`SELECT`).
+* **Comportamento:** Várias transações podem obter travas `S` no mesmo recurso (linha, página ou tabela) ao mesmo tempo. Bloqueia qualquer tentativa de trava Exclusiva (`X`).
+* **Duração:** Liberada assim que a leitura do registro termina (no nível `READ COMMITTED` padrão) ou mantida até o final da transação (em `REPEATABLE READ` e `SERIALIZABLE`).
+
+#### 2. Exclusiva (Exclusive — `X`)
+> **Metáfora:** *"Tranca Total de Porta / Reforma Fechada"*. Apenas uma pessoa entra para alterar o cômodo; ninguém mais pode entrar para ler ou mexer em nada.
+
+* **Objetivo:** Utilizada por operações de escrita e modificação de dados (`INSERT`, `UPDATE`, `DELETE`).
+* **Comportamento:** Impede que qualquer outra transação adquire travas de leitura (`S`) ou escrita (`X`, `U`) no recurso afetado.
+* **Duração:** Mantida **obrigatoriamente até o término da transação** (`COMMIT` ou `ROLLBACK`) para garantir a integridade ACID.
+
+#### 3. Atualização (Update — `U`)
+> **Metáfora:** *"Sinal Amarelo de Intenção de Escrita"*. Permite leitores, mas impede que dois escritores tentem alterar a mesma linha ao mesmo tempo.
+
+* **Objetivo:** Utilizada na fase inicial de busca de um comando `UPDATE` (antes de encontrar a linha exata que será modificada).
+* **Por que existe (Prevenção de Deadlocks):** Em um `UPDATE`, o SQL Server primeiro lê a linha e depois grava. Se dois usuários usassem travas `S` na leitura e depois tentassem promover simultaneamente para `X`, ocorreria um **deadlock inevitável**. A trava `U` resolve isso:
+  - Permite que leitores (`S`) continuem lendo a linha.
+  - **Apenas UMA transação por vez** pode ter trava `U` no mesmo recurso.
+  - Quando a linha a ser alterada é localizada, a trava `U` é promovida para `X`.
+
+#### 4. Travas de Intenção (Intent Locks — `IS`, `IX`, `SIX`)
+> **Metáfora:** *"Placa de 'Pavimento Ocupado' na Entrada do Edifício"*. Sinaliza no topo do prédio que há pessoas trabalhando nos andares ou salas individuais.
+
+* **Objetivo:** Aplicadas nos níveis superiores da hierarquia (Tabela ou Página) para sinalizar que existem travas mais finas (Linhas) mantidas lá dentro.
+  - **`IS` (Intent Shared):** Indica que a transação possui travas `S` em algumas linhas/páginas dessa tabela.
+  - **`IX` (Intent Exclusive):** Indica que a transação possui travas `X` em algumas linhas/páginas dessa tabela.
+  - **`SIX` (Shared Intent Exclusive):** A transação lê a tabela inteira (trava `S` na tabela) e pretende modificar linhas específicas (trava `IX` nas linhas).
+* **Vantagem de Performance:** Evita que o motor precise varrer milhões de linhas para saber se pode aplicar um lock exclusivo de tabela (`TABLOCKX`). Basta checar se a tabela possui trava `IX` ou `IS` no topo.
+
+#### 5. Travas de Esquema (Schema Locks — `Sch-S`, `Sch-M`)
+* **`Sch-S` (Schema Stability):** Aplicada durante a compilação de uma query para garantir que a estrutura da tabela (colunas/tipos) não seja alterada enquanto a consulta é compilada. É compatível com quase todas as travas de dados.
+* **`Sch-M` (Schema Modification):** Aplicada durante comandos DDL (`ALTER TABLE`, `DROP TABLE`, `TRUNCATE`). **Bloqueia tudo**, incluindo leituras, escritas e compilações de queries.
+
+---
+
+### 📊 Matriz Completa de Compatibilidade de Travas (Lock Compatibility Matrix)
+
+A matriz abaixo define se uma nova trava solicitada por uma Sessão B pode ser concedida imediatamente sobre um recurso que já possui uma trava mantida pela Sessão A:
+
+| Trava Solicitada \ Trava Existente | `IS` | `S` | `U` | `IX` | `SIX` | `X` |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`IS` (Intent Shared)** | ✅ **Sim** | ✅ **Sim** | ✅ **Sim** | ✅ **Sim** | ✅ **Sim** | ❌ **Não** |
+| **`S` (Shared)** | ✅ **Sim** | ✅ **Sim** | ✅ **Sim** | ❌ **Não** | ❌ **Não** | ❌ **Não** |
+| **`U` (Update)** | ✅ **Sim** | ✅ **Sim** | ❌ **Não** | ❌ **Não** | ❌ **Não** | ❌ **Não** |
+| **`IX` (Intent Exclusive)** | ✅ **Sim** | ❌ **Não** | ❌ **Não** | ✅ **Sim** | ❌ **Não** | ❌ **Não** |
+| **`SIX` (Shared Intent Exclusive)** | ✅ **Sim** | ❌ **Não** | ❌ **Não** | ❌ **Não** | ❌ **Não** | ❌ **Não** |
+| **`X` (Exclusive)** | ❌ **Não** | ❌ **Não** | ❌ **Não** | ❌ **Não** | ❌ **Não** | ❌ **Não** |
+
+> [!tip] Regras Rápidas de Memorização
+> 1. **Trava Exclusiva (`X`) é incompatível com TUDO** (inclusive com outra trava `X`).
+> 2. **Trava Compartilhada (`S`) é compatível com `S`, `U` e `IS`**.
+> 3. **Trava de Atualização (`U`) NÃO é compatível com outra `U`** (apenas 1 sessão pode estar em modo de busca para atualização no mesmo registro).
 
 ---
 
@@ -330,17 +485,45 @@ C. Adicionar uma coluna do tipo `ROWVERSION` e validar o valor correspondente no
 
 D. Habilitar o RCSI e tratar erros de deadlock 1205 com retry logic.
 
-> [!success]- Resposta
-> **C — Adicionar uma coluna do tipo `ROWVERSION` e validar o valor correspondente no `WHERE` do comando `UPDATE`**
+> [!success]- Resposta e Análise Detalhada
+> **Resposta Correta: C — Adicionar uma coluna do tipo `ROWVERSION` e validar o valor correspondente no `WHERE` do comando `UPDATE`**
 >
-> A coluna `ROWVERSION` permite implementar concorrência otimista desligada. A aplicação lê o saldo e a versão do registro sem reter nenhuma trava ativa no banco de dados. Ao submeter a atualização contendo `WHERE Id = @Id AND RowVer = @OriginalRowVer`, o SQL Server valida se a linha foi alterada (caso tenha sido alterada, o rowversion muda, fazendo com que o `UPDATE` altere 0 linhas, permitindo à aplicação cancelar a transação com segurança). O uso de `UPDLOCK` (B) e `Serializable` (A) manteria travas ativas bloqueando o banco por 10 segundos.
+> ### 📌 Por que esta é a solução ideal? (Passo a Passo)
+>
+> Este cenário exige a implementação do padrão de **Concorrência Otimista Desconectada** (Disconnected Optimistic Concurrency), resolvendo o problema com o menor impacto possível no banco de dados:
+>
+> 1. **Leitura Inicial (Livre de Bloqueios):** A aplicação web consulta o saldo e a versão atual da linha:
+>    ```sql
+>    SELECT AccountId, Balance, RowVer FROM Accounts WHERE AccountId = 1;
+>    -- Retorna: Saldo = R$ 1.000 | RowVer = 0x000000000005F12A
+>    ```
+>    *O banco libera o `SELECT` imediatamente, mantendo ZERO travas ativas.*
+>
+> 2. **Processamento Externo (10 segundos):** Durante os 10 segundos de validação da web, o banco de dados fica totalmente livre. Se outro usuário alterar o registro nesse intervalo (ex: um caixa eletrônico sacar R$ 500), o SQL Server altera **automaticamente** o valor da coluna `ROWVERSION` dessa linha (ex: de `0x...F12A` para `0x...F12B`).
+>
+> 3. **Gravação Segura (Validação por Versão):** Ao término dos 10 segundos, a aplicação submete o `UPDATE` passando a versão original lida:
+>    ```sql
+>    UPDATE Accounts
+>    SET Balance = 800
+>    WHERE AccountId = 1 AND RowVer = 0x000000000005F12A; -- Versão capturada na leitura inicial
+>    ```
+>    - Se o registro **não foi alterado por ninguém**, o `UPDATE` afeta 1 linha e confirma a alteração.
+>    - Se o registro **foi alterado** (versão mudou para `0x...F12B`), o `WHERE` não encontra correspondência, o `UPDATE` afeta `0` linhas (`@@ROWCOUNT = 0`), e a aplicação cancela a transação informando o conflito com total segurança.
+>
+> ---
+>
+> ### ❌ Por que as outras alternativas estão incorretas?
+>
+> - **A. Isolation `Serializable` (Incorreta):** Mantém travas de leitura exclusivas de intervalo ativas durante todos os 10 segundos, bloqueando outros usuários que tentarem acessar a tabela e violando a exigência de "menor impacto de bloqueio".
+> - **B. Query Hint `UPDLOCK` (Incorreta):** Retém uma trava de atualização (`U lock`) no banco durante os 10 segundos de validação no servidor de aplicação, impedindo que outras transações alterem o saldo nesse período.
+> - **D. `RCSI + Retry Logic` (Incorreta):** Embora o RCSI não trave a leitura, **o RCSI NÃO detecta conflitos de gravação**. Se duas gravações ocorrerem, a última gravação sobrescreverá a primeira sem gerar erro (perda de atualização / *Lost Update*). O erro 1205 de deadlock só ocorre sob travas pessimistas, não no RCSI.
 
 ---
 
 ## Tópicos Relacionados
 
 - [01-Recomendações de Configuração do Banco de Dados](./01-database-configurations.md)
-- [03-Solução de Problemas de Desempenho de Queries](./03-query-performance-troubleshooting.md) *(Inglês apenas)*
+- [03-Solução de Problemas de Desempenho de Queries](./03-query-performance-troubleshooting.md)
 
 ---
 
