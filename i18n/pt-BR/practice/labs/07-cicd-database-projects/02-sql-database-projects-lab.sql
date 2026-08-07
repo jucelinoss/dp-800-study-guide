@@ -1,128 +1,300 @@
 -- =================================================================================
--- DP-800 - LAB PRÁTICO: PROJETOS DE BANCO DE DADOS SQL (.SQLPROJ E ARTEFATOS DACPAC)
--- Banco de Dados: AdventureWorks2025 (ou similar)
+-- DP-800 - LABORATÓRIO PRÁTICO: PROJETOS DE BANCO DE DADOS SQL, DACPAC E SQLCMD
 -- =================================================================================
--- NOTA DE CONFIGURAÇÃO: Para rodar este e outros scripts de laboratório, você precisa
--- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
+-- Banco: AdventureWorks2025 (ou qualquer banco descartável do SQL Server)
+--
+-- Este laboratório pode ser repetido: todos os objetos usam o schema lab e o script
+-- remove somente os objetos criados por este exercício.
+-- Ao executar pelo sqlcmd no Windows, preserve os acentos com: -f 65001
+--
+-- TEORIA:
+-- ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
+--
+-- MICROSOFT LEARN:
+-- Scripts de pré/pós-implantação:
+-- https://learn.microsoft.com/pt-br/sql/tools/sql-database-projects/concepts/pre-post-deployment-scripts?view=sql-server-ver17
+-- Comandos sqlcmd (:r):
+-- https://learn.microsoft.com/pt-br/sql/tools/sqlcmd/sqlcmd-commands?view=sql-server-ver17#r-filename
+-- Instalação do AdventureWorks (opcional):
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
--- Este script demonstra a estrutura e comportamento de implantação declarativa de um .sqlproj:
---   1. Diferença entre Artefato de Esquema (.dacpac) vs Esquema + Dados (.bacpac)
---   2. Padrão de Scripts Pre-Deployment (Preservação/Migração de dados antes do alter do DACPAC)
---   3. Padrão de Scripts Post-Deployment (Carga de dados estáticos e permissões após o DACPAC)
---   4. Rastreamento de Refatoração de Nomes via Tabela de Log (`__RefactorLog`)
---   5. Cenários Práticos de Projeto (Simulação de Ações de Proteção contra Perda de Dados em CI/CD)
--- =================================================================================
--- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
---    Abra o guia teorico junto com este laboratorio para contexto conceitual.
 
 USE AdventureWorks2025;
 GO
 
--- Limpeza preventiva
-DROP TABLE IF EXISTS lab.__RefactorLog;
-DROP TABLE IF EXISTS lab.LegacyCustomers;
-DROP TABLE IF EXISTS lab.MigratedCustomers;
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
 GO
 
--- Estrutura para simular a tabela de Refatoração do SQL Database Projects
-CREATE TABLE lab.__RefactorLog (
-    OperationKey UNIQUEIDENTIFIER NOT NULL PRIMARY KEY
-);
+IF SCHEMA_ID(N'lab') IS NULL
+    EXEC(N'CREATE SCHEMA lab');
+GO
 
--- Estrutura de Tabela Antiga para Teste de Migração Pre-Deployment
-CREATE TABLE lab.LegacyCustomers (
-    CustomerID INT IDENTITY(1,1) PRIMARY KEY,
+-- ---------------------------------------------------------------------------------
+-- PARTE 0: RESET APENAS DOS OBJETOS DO LABORATÓRIO
+-- ---------------------------------------------------------------------------------
+DROP TABLE IF EXISTS lab.ReferenceCountries;
+DROP TABLE IF EXISTS lab.ReferenceOrderStatus;
+DROP TABLE IF EXISTS lab.__RefactorLog;
+DROP TABLE IF EXISTS lab.MigratedCustomers;
+DROP TABLE IF EXISTS lab.LegacyCustomers;
+GO
+
+-- ---------------------------------------------------------------------------------
+-- PARTE 1: SIMULAR UMA MIGRAÇÃO DE DADOS DE PRÉ-IMPLANTAÇÃO
+-- ---------------------------------------------------------------------------------
+-- Um script de pré-implantação roda antes da aplicação do plano de implantação. O
+-- plano é calculado antes da execução do pré-deploy; por isso, este é o lugar para
+-- copiar valores que seriam perdidos por um rename/drop de coluna.
+
+CREATE TABLE lab.LegacyCustomers
+(
+    CustomerID INT NOT NULL CONSTRAINT PK_LegacyCustomers PRIMARY KEY,
     FullContactName NVARCHAR(100) NOT NULL,
     LegacyCode VARCHAR(20) NULL
 );
 
-CREATE TABLE lab.MigratedCustomers (
-    CustomerID INT PRIMARY KEY,
+CREATE TABLE lab.MigratedCustomers
+(
+    CustomerID INT NOT NULL CONSTRAINT PK_MigratedCustomers PRIMARY KEY,
     FirstName NVARCHAR(50) NOT NULL,
     LastName NVARCHAR(50) NOT NULL,
     Notes NVARCHAR(200) NULL
 );
 GO
 
-INSERT INTO lab.LegacyCustomers (FullContactName, LegacyCode) VALUES 
-('Alice Silva', 'LEG-1001'),
-('Bob Santos', 'LEG-1002');
+INSERT INTO lab.LegacyCustomers (CustomerID, FullContactName, LegacyCode)
+VALUES
+    (1001, N'Alice Silva', 'LEG-1001'),
+    (1002, N'Bob Santos', 'LEG-1002');
 GO
 
+-- Padrão idempotente de pré-deploy: executar este bloco duas vezes não duplica as
+-- linhas migradas. Uma migração real também deve tratar nomes sem espaço e ser testada
+-- com a distribuição real dos dados.
+DECLARE @MigrationRows INT;
 
--- =================================================================================
--- PARTE 1: PADRÃO DE SCRIPT PRE-DEPLOYMENT (PRESERVAÇÃO ANTES DA ALTERAÇÃO)
--- =================================================================================
--- CONCEITOS E DEFINIÇÕES CHAVE:
---   - PRE-DEPLOYMENT SCRIPT: Executado pelo SqlPackage ANTES da comparação e aplicação do DACPAC.
---   - USO TÍPICO: Migrar dados de colunas que serão excluídas/renomeadas para evitar erro `BlockOnPossibleDataLoss=true`.
+INSERT INTO lab.MigratedCustomers (CustomerID, FirstName, LastName, Notes)
+SELECT
+    l.CustomerID,
+    LEFT(l.FullContactName, CHARINDEX(N' ', l.FullContactName + N' ') - 1),
+    LTRIM(SUBSTRING(l.FullContactName, CHARINDEX(N' ', l.FullContactName + N' '), 100)),
+    CONCAT(N'Migrado do código legado: ', l.LegacyCode)
+FROM lab.LegacyCustomers AS l
+WHERE l.LegacyCode IS NOT NULL
+  AND NOT EXISTS
+  (
+      SELECT 1
+      FROM lab.MigratedCustomers AS m
+      WHERE m.CustomerID = l.CustomerID
+  );
 
--- -- [PONTO DE ATENÇÃO DP-800]
--- Simulação de Script Pre-Deployment: Copiar dados da tabela legada antes de a coluna ser dropada pelo DACPAC
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('lab.LegacyCustomers') AND name = 'LegacyCode')
+SET @MigrationRows = @@ROWCOUNT;
+PRINT CONCAT(N'PRE-DEPLOYMENT: linhas migradas nesta execução = ', @MigrationRows);
+
+-- Repita o mesmo bloco para provar que a segunda execução insere zero linhas.
+INSERT INTO lab.MigratedCustomers (CustomerID, FirstName, LastName, Notes)
+SELECT
+    l.CustomerID,
+    LEFT(l.FullContactName, CHARINDEX(N' ', l.FullContactName + N' ') - 1),
+    LTRIM(SUBSTRING(l.FullContactName, CHARINDEX(N' ', l.FullContactName + N' '), 100)),
+    CONCAT(N'Migrado do código legado: ', l.LegacyCode)
+FROM lab.LegacyCustomers AS l
+WHERE l.LegacyCode IS NOT NULL
+  AND NOT EXISTS
+  (
+      SELECT 1
+      FROM lab.MigratedCustomers AS m
+      WHERE m.CustomerID = l.CustomerID
+  );
+
+PRINT CONCAT(N'PRE-DEPLOYMENT: linhas migradas na repetição = ', @@ROWCOUNT);
+GO
+
+SELECT CustomerID, FirstName, LastName, Notes
+FROM lab.MigratedCustomers
+ORDER BY CustomerID;
+GO
+
+-- ---------------------------------------------------------------------------------
+-- PARTE 2: REFACTOR LOG E CHAVES DETERMINÍSTICAS DE OPERAÇÃO
+-- ---------------------------------------------------------------------------------
+-- O SQL Database Projects usa um refactor log para preservar renames feitos pelas
+-- ferramentas do projeto. Esta tabela é apenas uma simulação didática; não crie nem
+-- edite manualmente o refactor log real gerenciado pelo projeto.
+
+CREATE TABLE lab.__RefactorLog
+(
+    OperationKey UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_lab_RefactorLog PRIMARY KEY,
+    OperationDescription NVARCHAR(200) NOT NULL,
+    AppliedAt DATETIME2(0) NOT NULL CONSTRAINT DF_lab_RefactorLog_AppliedAt DEFAULT SYSUTCDATETIME()
+);
+GO
+
+DECLARE @OperationKey UNIQUEIDENTIFIER = '11111111-1111-1111-1111-111111111111';
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM lab.__RefactorLog
+    WHERE OperationKey = @OperationKey
+)
 BEGIN
-    PRINT 'PRE-DEPLOYMENT: Migrando dados da coluna LegacyCode antes do DACPAC aplicar o DROP...';
+    INSERT INTO lab.__RefactorLog (OperationKey, OperationDescription)
+    VALUES (@OperationKey, N'Renomear o mapeamento LegacyCustomers.FullContactName');
 
-    INSERT INTO lab.MigratedCustomers (CustomerID, FirstName, LastName, Notes)
-    SELECT 
-        CustomerID,
-        SUBSTRING(FullContactName, 1, CHARINDEX(' ', FullContactName) - 1),
-        SUBSTRING(FullContactName, CHARINDEX(' ', FullContactName) + 1, LEN(FullContactName)),
-        CONCAT('Migrado do codigo antigo: ', LegacyCode)
-    FROM lab.LegacyCustomers;
+    PRINT N'REFACTOR LOG: operação registrada.';
 END
+ELSE
+    PRINT N'REFACTOR LOG: operação já registrada; nada a repetir.';
 GO
 
--- Validar dados preservados no Pre-Deployment
-SELECT * FROM lab.MigratedCustomers;
+-- ---------------------------------------------------------------------------------
+-- PARTE 3: DADOS REFERENCIAIS DE PÓS-IMPLANTAÇÃO COM UPSERT IDEMPOTENTE
+-- ---------------------------------------------------------------------------------
+-- Um script de pós-implantação roda depois da conclusão do plano de implantação. Os
+-- dados referenciais devem ser versionados com o projeto e carregados de modo seguro
+-- para repetição.
+
+CREATE TABLE lab.ReferenceOrderStatus
+(
+    StatusCode VARCHAR(20) NOT NULL CONSTRAINT PK_ReferenceOrderStatus PRIMARY KEY,
+    StatusName NVARCHAR(100) NOT NULL,
+    IsActive BIT NOT NULL
+);
+
+CREATE TABLE lab.ReferenceCountries
+(
+    CountryCode CHAR(2) NOT NULL CONSTRAINT PK_ReferenceCountries PRIMARY KEY,
+    CountryName NVARCHAR(100) NOT NULL
+);
 GO
 
+-- Este é o T-SQL que um arquivo de dados referenciado poderia conter.
+UPDATE target
+SET target.StatusName = source.StatusName,
+    target.IsActive = source.IsActive
+FROM lab.ReferenceOrderStatus AS target
+JOIN
+(
+    VALUES
+        ('NEW', N'Novo', CONVERT(BIT, 1)),
+        ('CLOSED', N'Fechado', CONVERT(BIT, 1)),
+        ('CANCELLED', N'Cancelado', CONVERT(BIT, 0))
+) AS source(StatusCode, StatusName, IsActive)
+    ON target.StatusCode = source.StatusCode;
 
--- =================================================================================
--- PARTE 2: REFACTORLOG E EVITANDO RE-EXECUÇÕES REPETIDAS
--- =================================================================================
--- CONCEITOS E DEFINIÇÕES CHAVE:
---   - __RefactorLog: Tabela do sistema mantida pelo DACPAC para registrar renomeações de objetos via IDE.
---     Evita que o SqlPackage interprete uma renomeação como um DROP TABLE seguido de CREATE TABLE.
+INSERT INTO lab.ReferenceOrderStatus (StatusCode, StatusName, IsActive)
+SELECT source.StatusCode, source.StatusName, source.IsActive
+FROM
+(
+    VALUES
+        ('NEW', N'Novo', CONVERT(BIT, 1)),
+        ('CLOSED', N'Fechado', CONVERT(BIT, 1)),
+        ('CANCELLED', N'Cancelado', CONVERT(BIT, 0))
+) AS source(StatusCode, StatusName, IsActive)
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM lab.ReferenceOrderStatus AS target
+    WHERE target.StatusCode = source.StatusCode
+);
 
--- -- [PONTO DE ATENÇÃO DP-800]
-DECLARE @RefactorGuid UNIQUEIDENTIFIER = NEWID();
+INSERT INTO lab.ReferenceCountries (CountryCode, CountryName)
+SELECT source.CountryCode, source.CountryName
+FROM
+(
+    VALUES
+        ('BR', N'Brasil'),
+        ('US', N'Estados Unidos'),
+        ('CA', N'Canadá')
+) AS source(CountryCode, CountryName)
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM lab.ReferenceCountries AS target
+    WHERE target.CountryCode = source.CountryCode
+);
 
-IF NOT EXISTS (SELECT 1 FROM lab.__RefactorLog WHERE OperationKey = @RefactorGuid)
-BEGIN
-    INSERT INTO lab.__RefactorLog (OperationKey) VALUES (@RefactorGuid);
-    PRINT 'REFACTORLOG: Operacao de renomeacao gravada com sucesso.';
-END
+PRINT N'POST-DEPLOYMENT: dados referenciais carregados sem chaves duplicadas.';
 GO
 
+SELECT StatusCode, StatusName, IsActive
+FROM lab.ReferenceOrderStatus
+ORDER BY StatusCode;
 
--- =================================================================================
--- PARTE 3: CENÁRIOS PRÁTICOS DE PROJETO
--- =================================================================================
-
---- CENÁRIO 1: Matriz de Parâmetros da CLI SqlPackage para Pipelines de CI/CD
--- Utilizado por engenheiros de dados para configurar a publicação segura de DACPACs em staging e produção.
-
-SELECT 
-    'SqlPackage /Action:Publish' AS ComandoCLI,
-    'Deploys da diferença entre DACPAC e banco alvo' AS DescricaoAcao,
-    'BlockOnPossibleDataLoss=true' AS ParametroSegurancaCritical,
-    'Aborta o deploy se houver DROP de colunas com dados' AS EfeitoParametro
-UNION ALL
-SELECT 
-    'SqlPackage /Action:DeployReport',
-    'Gera um relatório XML de alterações sem alterar o banco',
-    'TargetFile: drift-report.xml',
-    'Usado para aprovação de PRs e validação de Drift'
-UNION ALL
-SELECT 
-    'SqlPackage /Action:Script',
-    'Gera o script T-SQL resultante do DACPAC',
-    'OutputPath: ./deploy.sql',
-    'Recomendado para revisão por DBAs em ambientes estritos';
+SELECT CountryCode, CountryName
+FROM lab.ReferenceCountries
+ORDER BY CountryCode;
 GO
 
--- =================================================================================================
--- PROXIMO PASSO: Revise a teoria em ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
--- =================================================================================================
+-- ---------------------------------------------------------------------------------
+-- PARTE 4: COMO :r COMPÕE UM SCRIPT DE PÓS-IMPLANTAÇÃO
+-- ---------------------------------------------------------------------------------
+-- As linhas abaixo são comentários de propósito, para este laboratório rodar no modo
+-- normal do SSMS. Para executá-las, crie os arquivos indicados e habilite Consulta >
+-- Modo SQLCMD no SSMS (ou execute o script pai com sqlcmd).
+--
+-- Scripts/PostDeployment/PostDeployment.sql:
+-- PRINT 'Post-deployment: carregando dados referenciais...';
+-- :r .\..\..\Data\ReferenceData\dbo.OrderStatus.data.sql
+-- :r .\..\..\Data\ReferenceData\dbo.Countries.data.sql
+-- PRINT 'Post-deployment concluído.';
+--
+-- O :r é processado pelo sqlcmd antes que o SQL Server receba o lote. Os arquivos
+-- referenciados são lidos em relação ao diretório de inicialização do sqlcmd e seus
+-- conteúdos são inseridos na ordem. No .sqlproj, esses arquivos devem ser removidos
+-- da compilação do modelo com Build Remove e podem permanecer visíveis como None.
+
+-- ---------------------------------------------------------------------------------
+-- PARTE 5: DACPAC, BACPAC E BAK — IDENTIFIQUE O ARTEFATO
+-- ---------------------------------------------------------------------------------
+SELECT Artefato, ContémSchema, ContémDadosDeUsuário, ImplantaçãoOuRestauração
+FROM
+(
+    VALUES
+        (N'DACPAC', N'Sim', N'Não', N'Implantação declarativa de schema / diff'),
+        (N'BACPAC', N'Sim', N'Sim', N'Pacote de importação/exportação'),
+        (N'BAK', N'Páginas e log conforme aplicável', N'Sim', N'Restauração física')
+) AS artefatos(Artefato, ContémSchema, ContémDadosDeUsuário, ImplantaçãoOuRestauração);
+GO
+
+-- ---------------------------------------------------------------------------------
+-- PARTE 6: AÇÕES DA CLI E GATES DE RELEASE
+-- ---------------------------------------------------------------------------------
+SELECT NomeDaAção, Objetivo, AlteraODestino
+FROM
+(
+    VALUES
+        (N'/Action:Build', N'Compilar e validar o projeto SQL', N'Não'),
+        (N'/Action:Script', N'Gerar o T-SQL de implantação para revisão', N'Não'),
+        (N'/Action:DeployReport', N'Gerar o relatório XML de implantação', N'Não'),
+        (N'/Action:Publish', N'Aplicar a implantação da DACPAC', N'Sim')
+) AS acoes(NomeDaAção, Objetivo, AlteraODestino);
+GO
+
+-- ---------------------------------------------------------------------------------
+-- PARTE 7: ASSERTIONS AUTOMÁTICAS DO LABORATÓRIO
+-- ---------------------------------------------------------------------------------
+IF (SELECT COUNT(*) FROM lab.MigratedCustomers) <> 2
+    THROW 51000, 'Eram esperados exatamente dois clientes migrados.', 1;
+
+IF (SELECT COUNT(*) FROM lab.__RefactorLog) <> 1
+    THROW 51001, 'Era esperada exatamente uma operação determinística de refactor.', 1;
+
+IF (SELECT COUNT(*) FROM lab.ReferenceOrderStatus) <> 3
+    THROW 51002, 'Eram esperados exatamente três status de pedido.', 1;
+
+IF (SELECT COUNT(*) FROM lab.ReferenceCountries) <> 3
+    THROW 51003, 'Eram esperados exatamente três países.', 1;
+
+PRINT N'LABORATÓRIO APROVADO: migração, refactor log, dados referenciais e artefatos verificados.';
+GO
+
+-- A limpeza foi deixada como comando separado para você inspecionar as linhas.
+-- Execute somente quando terminar:
+-- DROP TABLE IF EXISTS lab.ReferenceCountries;
+-- DROP TABLE IF EXISTS lab.ReferenceOrderStatus;
+-- DROP TABLE IF EXISTS lab.__RefactorLog;
+-- DROP TABLE IF EXISTS lab.MigratedCustomers;
+-- DROP TABLE IF EXISTS lab.LegacyCustomers;
