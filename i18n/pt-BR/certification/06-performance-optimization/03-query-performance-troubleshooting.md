@@ -17,7 +17,6 @@ tags:
 >   - 🔹 [Operadores de Plano de Execução Comuns (Quadro Resumo)](#operadores-de-plano-de-execução-comuns-quadro-resumo)
 >   - 🔹 [Guia Intuitivo e Detalhado dos Operadores Físicos](#guia-intuitivo-e-detalhado-dos-operadores-físicos)
 >     - 🔸 [1. Operadores Físicos Mais Comuns (Fundamentais)](#1-operadores-físicos-mais-comuns-fundamentais)
->     - 🔸 [Arquitetura de Heaps (Tabelas Sem Índice Clusterizado)](#arquitetura-de-heaps-por-que-tabelas-sem-índice-clusterizado-são-chamadas-de-heap)
 >     - 🔸 [2. Operadores Físicos Intermediários e Avançados](#2-operadores-físicos-intermediários-e-avançados)
 >   - 🔹 [Entendendo o Conceito de Data Spill (Spill para TempDB)](#entendendo-o-conceito-de-data-spill-spill-para-tempdb)
 >   - 🔹 [Analisando Percentuais de Custo no Plano](#analisando-percentuais-de-custo-no-plano)
@@ -41,18 +40,12 @@ tags:
 >   - 🔹 [Quando Manter no Automático (Default e Modo Assíncrono)](#quando-manter-no-automático-default-e-modo-assíncrono)
 >   - 🔹 [Quando Executar Manutenção Manual (UPDATE STATISTICS)](#quando-executar-manutenção-manual-update-statistics)
 >   - 🔹 [Quando Desligar a Atualização Automática (Exceções Cirúrgicas)](#quando-desligar-a-atualização-automática-exceções-cirúrgicas)
-> - 📍 [9. Fragmentação de Índices e Estratégias de Manutenção](#fragmentação-de-índices-e-estratégias-de-manutenção)
->   - 🔹 [Conceito: Fragmentação Lógica vs Densidade de Página](#conceito-fragmentação-lógica-vs-densidade-de-página)
->   - 🔹 [Causas: Page Splits e Inserções Aleatórias](#causas-page-splits-e-inserções-aleatórias)
->   - 🔹 [Diagnóstico com sys.dm_db_index_physical_stats](#diagnóstico-com-sysdm_db_index_physical_stats)
->   - 🔹 [Decisão de Manutenção: REORGANIZE vs REBUILD](#decisão-de-manutenção-reorganize-vs-rebuild)
->   - 🔹 [Prevenção: Escolha de Chaves e FILLFACTOR](#prevenção-escolha-de-chaves-e-fillfactor)
-> - 📍 [10. Problemas Comuns e Soluções (Common Issues)](#problemas-comuns-e-soluções-common-issues)
-> - 📍 [11. Dicas para o Exame (Exam Tips)](#dicas-para-o-exame-exam-tips)
-> - 📍 [12. Resumo dos Conceitos (Key Takeaways)](#resumo-dos-conceitos-key-takeaways)
-> - 📍 [13. Questões de Prática (Practice Questions)](#questões-de-prática-practice-questions)
-> - 📍 [14. Tópicos Relacionados](#tópicos-relacionados)
-> - 📍 [15. Documentação Oficial](#documentação-oficial)
+> - 📍 [9. Problemas Comuns e Soluções (Common Issues)](#problemas-comuns-e-soluções-common-issues)
+> - 📍 [10. Dicas para o Exame (Exam Tips)](#dicas-para-o-exame-exam-tips)
+> - 📍 [11. Resumo dos Conceitos (Key Takeaways)](#resumo-dos-conceitos-key-takeaways)
+> - 📍 [12. Questões de Prática (Practice Questions)](#questões-de-prática-practice-questions)
+> - 📍 [13. Tópicos Relacionados](#tópicos-relacionados)
+> - 📍 [14. Documentação Oficial](#documentação-oficial)
 
 ---
 
@@ -137,9 +130,9 @@ Os **operadores físicos de execução** são os algoritmos reais executados pel
    - **Desempenho:** Eficiente para tabelas pequenas ou relatórios que exigem ler 100% dos dados. **Péssimo** para buscas pontuais em tabelas com milhões de linhas (indica ausência de índice seletivo).
 
 3. **Key Lookup / RID Lookup (Busca de Marcador no Índice)**
-   - **Metáfora:** Encontrar uma referência no índice secundário, mas precisar ir até a página original do livro para ler o parágrafo inteiro porque o índice secundário só continha o título.
-   - **Como funciona:** Ocorre quando um *Index Seek* é feito em um índice não-clusterizado que não possui todas as colunas requisitadas pela consulta (`SELECT`). Para cada linha encontrada, o motor precisa fazer uma busca adicional no índice clusterizado (*Key Lookup*) ou na Heap (*RID Lookup*) para resgatar os atributos faltantes.
-   - **Solução de Performance:** Adicionar as colunas solicitadas na cláusula `INCLUDE` do índice não-clusterizado (**Covering Index / Índice Cobertor**), eliminando os Lookups.
+   - **Metáfora:** É como encontrar a referência no índice remissivo, mas precisar voltar à página original do livro porque o índice secundário só continha o título.
+   - **Como funciona:** O índice usado encontrou as linhas, mas não contém todas as colunas solicitadas. O SQL Server precisa buscar os dados restantes no clustered index (`Key Lookup`) ou na Heap (`RID Lookup`).
+   - **Solução:** Adicione as colunas necessárias à cláusula `INCLUDE` para criar um índice de cobertura. Veja os detalhes em [Tabelas e Índices](../01-database-objects/01-tables-indexes.md).
 
 > [!tip] 💡 Diferenciais do Grupo: Acesso a Dados (Como Escolher / Identificar)
 > - **`Index Seek` vs `Index Scan`:** O *Seek* é pontual (busca rápida via Árvore-B por chave); o *Scan* percorre 100% das páginas de dados sequencialmente. Se o otimizador usar *Scan* para buscar 1 linha em uma tabela de 10 milhões, significa que **falta um índice seletivo** no predicado do `WHERE`.
@@ -147,29 +140,8 @@ Os **operadores físicos de execução** são os algoritmos reais executados pel
 > - **`Key Lookup` vs `RID Lookup`:** O *Key Lookup* busca dados no índice clusterizado (B-Tree); o *RID Lookup* busca dados em uma Heap (sem B-Tree) usando o identificador de linha `RowID`.
 > - **`Key Lookup`:** Mostra que o índice secundário foi útil para encontrar a linha, mas **incompleto** para retornar todas as colunas da query. Se o custo do Lookup for alto, o otimizador pode desistir do Seek e forçar um *Table/Index Scan* direto na tabela inteira.
 
-##### 📦 Arquitetura de Heaps: Por que Tabelas sem Índice Clusterizado são Chamadas de Heap?
-
-Entender o comportamento interno de uma **Heap** é fundamental para diagnosticar travamentos de I/O e estrutura no SQL Server:
-
-1. **A Origem do Nome ("Amontoado" / "Pilha Desordenada"):**
-   - Em inglês, a palavra **Heap** significa literalmente *"um amontoado"* ou *"uma pilha sem ordem"* (como uma pilha desordenada de papéis no chão).
-   - **Tabela com Clustered Index:** Os dados são mantidos fisicamente organizados em uma estrutura de **Árvore-B (*B-Tree*)**, ordenados estritamente pela chave do índice (ex: `1, 2, 3, 4, 5...`).
-   - **Tabela sem Clustered Index (Heap):** **Não existe Árvore-B**. As linhas não possuem nenhuma ordem física ou lógica. O SQL Server grava novas linhas na **primeira página de dados que tiver espaço vago disponível** — ou seja, os registros ficam amontoados.
-
-2. **Como o SQL Server Localiza uma Linha na Heap (O RID):**
-   - Como uma Heap não possui uma chave clusterizada para navegar pela árvore, cada linha é identificada por um **RID (Row Identifier)** de 8 bytes no formato:
-     $$\text{RID} = \text{ID\_Arquivo} : \text{ID\_Página} : \text{Slot\_Linha}$$
-     *(Exemplo: `FileID 1, PageID 350, Slot 4`).*
-   - As páginas de dados de uma Heap são vinculadas apenas por mapas de alocação de espaço conhecidos como **IAM (Index Allocation Map)**.
-   - Quando um índice secundário (não-clusterizado) é criado em uma Heap, o ponteiro mantido nas folhas desse índice secundário é o próprio **RID**.
-
-3. **Riscos e Gargalos de Performance em Heaps:**
-   - **Ponteiros de Encaminhamento (*Forwarding Pointers*):** Se um comando `UPDATE` aumentar o tamanho de um campo variável (`VARCHAR`) e a linha não couber mais na página original, o SQL Server move a linha para outra página e deixa um *"ponteiro de encaminhamento"* na página antiga. Ao consultar essa linha, o motor precisa fazer **2 leituras físicas de disco** em vez de 1.
-   - **Desperdício de Espaço em Disco:** Deletar linhas de uma Heap nem sempre desaloca as páginas de dados para o sistema operacional sem um comando com `TABLOCK` ou recriação da tabela (`ALTER TABLE ... REBUILD`).
-   - **Varredura Lenta (`Table Scan`):** Para encontrar registros sem índice, o motor precisa ler a Heap inteira da primeira à última página via mapas IAM.
-
-4. **Quando o Uso de Heap é Aceitável?**
-   - Em **tabelas temporárias de *staging*** (ex: carga rápida via `BULK INSERT`, `bcp` ou Azure Data Factory), onde os dados são gravados em lote sem validações, lidos sequencialmente de uma só vez e descartados/truncados (`TRUNCATE TABLE`) logo em seguida.
+> [!note] Heaps, `Key Lookup` e `RID Lookup`
+> O plano pode exibir `Table Scan` quando a tabela é uma Heap e não há caminho seletivo. A explicação estrutural de Heaps, RIDs, forwarding pointers e o uso adequado de tabelas sem clustered index está em [Tabelas e Índices](../01-database-objects/01-tables-indexes.md).
 
 ##### 🔵 Junções Físicas (Join Operators)
 
@@ -755,96 +727,6 @@ Desabilitar a atualização automática no banco de dados inteiro é **altamente
 
 ---
 
-## Fragmentação de Índices e Estratégias de Manutenção
-
-A **fragmentação de índices** ocorre à medida que operações de modificação de dados (`INSERT`, `UPDATE`, `DELETE`) alteram as páginas físicas do banco de dados, gerando espaço desperdiçado e desalinhamento na sequência de leitura.
-
----
-
-### Conceito: Fragmentação Lógica vs Densidade de Página
-
-Existem dois tipos fundamentais de fragmentação física em estruturas de Árvore-B (*B-Tree*):
-
-1. **Fragmentação Lógica / Externa (`avg_fragmentation_in_percent`):**
-   - Ocorre quando a ordem lógica das chaves no índice não corresponde à ordem física das páginas gravadas no disco.
-   - **Impacto:** O cabeçote de leitura do disco (ou o subsistema de I/O) precisa realizar leituras aleatórias desordenadas em vez de uma leitura sequencial contínua. Prejudica terrivelmente a performance de **`Index Scan`** e **`Table Scan`**.
-2. **Fragmentação de Densidade / Interna (`avg_page_space_used_in_percent`):**
-   - Ocorre quando as páginas de 8 KB do índice possuem muito espaço vago (ex: páginas preenchidas com apenas 40% de capacidade).
-   - **Impacto:** Força o SQL Server a carregar mais páginas para a memória RAM (Buffer Pool) do que o necessário para retornar o mesmo volume de dados, desperdiçando cache de RAM e gerando I/O excessivo.
-
----
-
-### Causas: Page Splits e Inserções Aleatórias
-
-A causa primária da fragmentação é o **Page Split (Divisão de Página)**:
-
-1. Uma página folha do índice de 8 KB está **100% cheia**.
-2. Uma nova linha precisa ser inserida **no meio** dessa página (ex: chave primária com `UUID/NEWID()` aleatório ou chave intermediária).
-3. O SQL Server é obrigado a alocar uma nova página em outro local do disco, mover **50% dos dados** da página antiga para a nova página e atualizar os ponteiros da Árvore-B.
-4. **Resultado:** As duas páginas ficam desalinhadas fisicamente no disco e meio vazias.
-
----
-
-### Diagnóstico com sys.dm_db_index_physical_stats
-
-Para consultar o percentual de fragmentação física e densidade das páginas, utiliza-se a DMV **`sys.dm_db_index_physical_stats`**:
-
-```sql
-SELECT
-    OBJECT_NAME(ips.object_id) AS TableName,
-    i.name AS IndexName,
-    ips.index_type_desc,
-    ips.avg_fragmentation_in_percent,
-    ips.page_count,
-    ips.avg_page_space_used_in_percent
-FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ips
-INNER JOIN sys.indexes i
-    ON ips.object_id = i.object_id AND ips.index_id = i.index_id
-WHERE ips.page_count > 1000 -- Filtra tabelas pequenas (menos de 1.000 páginas / ~8 MB)
-ORDER BY ips.avg_fragmentation_in_percent DESC;
-```
-
-> [!important] Dica Prática de Desempenho
-> **Ignore a fragmentação em tabelas pequenas** (com menos de 1.000 páginas de 8 KB). Tabelas pequenas fragmentadas cabem inteiras em poucas páginas na memória RAM e não trazem nenhum impacto perceptível de performance.
-
----
-
-### Decisão de Manutenção: REORGANIZE vs REBUILD
-
-A estratégia padrão de manutenção baseia-se no nível de fragmentação encontrado (`avg_fragmentation_in_percent`):
-
-| Porcentagem de Fragmentação | Ação Recomendada | Comando T-SQL | Comportamento e Características |
-| :--- | :--- | :--- | :--- |
-| **< 5%** | **Nenhuma Ação** | N/A | A fragmentação é irrelevante. Executar manutenção seria um desperdício inútil de CPU e I/O. |
-| **5% a 30%** | **REORGANIZE** | `ALTER INDEX IX_Orders_CustomerId ON dbo.Orders REORGANIZE;` | - **Operação Leve e Sempre Online** (não bloqueia consultas ou alterações).<br>- Reordena e compacta as páginas no nível folha.<br>- **NÃO atualiza estatísticas** (requer `UPDATE STATISTICS` manual em seguida). |
-| **> 30%** | **REBUILD** | `ALTER INDEX IX_Orders_CustomerId ON dbo.Orders REBUILD;` *(ou com `ONLINE = ON`)* | - **Recria a Árvore-B inteira do zero**, descartando páginas velhas fragmentadas.<br>- **ATUALIZA ESTATÍSTICAS COM FULLSCAN AUTOMATICAMENTE**.<br>- Pode ser executado com `ONLINE = ON` nas edições Enterprise ou Azure SQL. |
-
-#### Tabela Comparativa Estrita para o Exame
-
-| Característica / Recurso | `ALTER INDEX REORGANIZE` | `ALTER INDEX REBUILD` |
-| :--- | :--- | :--- |
-| **Bloqueio de Tabela (Locking)** | **Sempre Online** (Mínimo impacto) | Offline por padrão (`ONLINE = ON` requer Enterprise/PaaS) |
-| **Atualização de Estatísticas** | ❌ **NÃO atualiza** estatísticas | ✅ **SIM (FULLSCAN)** atualiza estatísticas automaticamente |
-| **Uso de Memória / TempDB** | Baixo consumo de recursos | Alto consumo de espaço temporário em log e `tempdb` |
-| **Cancelamento de Operação** | Pode ser cancelado a qualquer momento sem perder o trabalho já feito | Se interrompido, sofre *rollback* completo da transação |
-
-> [!important] Pegadinha de Prova: O `REBUILD` atualiza TODAS as estatísticas da tabela?
-> **Não!** O `ALTER INDEX IX_Nome ON dbo.Tabela REBUILD` atualiza **exclusivamente a estatística pertencente àquele índice específico** (com `FULLSCAN`). Ele **NÃO** atualiza estatísticas de outros índices e **NÃO** atualiza estatísticas automáticas de colunas individuais (`_WA_Sys_...`). Para atualizar todas as estatísticas da tabela inteira, execute `UPDATE STATISTICS dbo.Tabela WITH FULLSCAN;`.
-
----
-
-### Prevenção: Escolha de Chaves e FILLFACTOR
-
-1. **Escolha Adequada da Chave do Clustered Index:**
-   - **Prefira:** Colunas sequenciais crescentes (`IDENTITY`, `BIGINT`, `DATE`). As inserções ocorrem sempre na última página folha (sem *page splits* no meio do índice).
-   - **Evite como chave clusterizada:** Chaves aleatórias não-sequenciais (`GUID / NEWID()`). Se for obrigatório usar GUID como chave clusterizada, utilize **`NEWSEQUENTIALID()`**.
-2. **Ajuste do `FILLFACTOR` (Fator de Preenchimento):**
-   - O `FILLFACTOR` define qual a porcentagem de espaço a ser preenchida em cada página folha durante a criação ou rebuild do índice.
-   - **Padrão (`FILLFACTOR = 0` ou `100`):** Preenche 100% da página. Ótimo para tabelas somente leitura (*Read-Only*).
-   - **Tabelas com Inserções/Atualizações Intermediárias Constantes:** Definir `FILLFACTOR = 80` ou `90` deixa de 10% a 20% de espaço livre em cada página folha para acomodar novos dados sem causar *Page Splits* imediatos.
-
----
-
 ## Problemas Comuns e Soluções (Common Issues)
 
 | Sintoma | Causa provável | Mitigação recomendada |
@@ -902,6 +784,7 @@ D. Forçar um plano de execução de forma manual usando comandos do Query Store
 - [01-Recomendações de Configuração do Banco de Dados](./01-database-configurations.md)
 - [02-Níveis de Isolamento de Transações & Concorrência](./02-transaction-isolation-concurrency.md)
 - [01-Tabelas & Índices](../01-database-objects/01-tables-indexes.md)
+- [Manutenção de Índices e Fragmentação](../01-database-objects/01-tables-indexes.md#fragmentação-de-índices-e-estratégias-de-manutenção)
 
 ---
 

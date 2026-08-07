@@ -26,6 +26,7 @@ tags:
 >   - 🔹 [Included Columns](#included-columns)
 >   - 🔹 [Index Compression](#index-compression)
 >   - 🔹 [Considerações de Design de Index](#consideracoes-de-design-de-index-index-design)
+>   - 🔹 [Fragmentação de Índices e Estratégias de Manutenção](#fragmentação-de-índices-e-estratégias-de-manutenção)
 > - 📍 [5. Aplicação Prática & Síntese](#casos-de-uso-use-cases)
 >   - 🔹 [Casos de Uso](#casos-de-uso-use-cases)
 >   - 🔹 [Problemas Comuns e Soluções](#problemas-comuns-e-solucoes-common-issues)
@@ -270,6 +271,17 @@ ON dbo.Orders (OrderDate, CustomerId, TotalAmount);
 | **Ponteiros de encaminhamento (Forwarding pointers)** | Sim (ocorrem após atualizações/UPDATEs) | Não |
 | **Ideal para** | Tabelas de staging/carga em massa temporária | A maioria das tabelas OLTP |
 
+### Detalhes de Armazenamento de Heaps
+
+Uma Heap não possui uma árvore B para organizar as linhas. O SQL Server usa páginas de dados e mapas de alocação, e cada linha é identificada por um **RID (Row Identifier)** de 8 bytes no formato `FileID:PageID:SlotID` — por exemplo, `FileID 1, PageID 350, Slot 4`.
+
+- Um índice não clusterizado sobre uma Heap mantém RIDs como ponteiros para as linhas.
+- As páginas de dados de uma Heap são vinculadas por mapas de alocação, como o **IAM (Index Allocation Map)**.
+- Se um `UPDATE` aumentar uma linha e ela não couber mais na página original, o SQL Server pode mover a linha e deixar um **forwarding pointer** na página antiga. Ao consultar essa linha, o motor pode precisar de duas leituras físicas em vez de uma.
+- A exclusão de linhas de uma Heap nem sempre devolve as páginas ao sistema operacional; a liberação pode exigir operações específicas, como `TABLOCK` ou a recriação da tabela (`ALTER TABLE ... REBUILD`).
+- Sem um índice seletivo, a busca pode resultar em um `Table Scan`, percorrendo a Heap inteira por meio dos mapas IAM.
+- Heaps podem ser adequadas para tabelas temporárias de staging carregadas em massa, lidas sequencialmente e descartadas ou truncadas em seguida. Para a maioria das tabelas OLTP, um clustered index bem escolhido tende a ser mais apropriado.
+
 ---
 
 ## Filtered Indexes
@@ -378,6 +390,79 @@ A escolha de quais colunas indexar — e como — tem um impacto significativo n
 - **Fill factor (Fator de Preenchimento)** — percentual de cada página folha deixado livre durante a criação ou reconstrução do Index (o padrão `0` ou `100` significa 100% cheia); usar um fill factor menor (ex: 80) deixa espaço livre para inserções, reduzindo as divisões de página (page splits) em tabelas com muita escrita.
 - **Statistics (Estatísticas)** — o SQL Server cria estatísticas automaticamente para colunas indexadas; as estatísticas alimentam as estimativas de cardinalidade do otimizador de consultas.
 - **A ordem das colunas da chave importa** — para indexes compostos, coloque as colunas de igualdade mais seletivas (maior cardinalidade) primeiro, seguidas pelas colunas de intervalo (range).
+
+---
+
+## Fragmentação de Índices e Estratégias de Manutenção
+
+A **fragmentação de índices** surge quando `INSERT`, `UPDATE` e `DELETE` alteram a organização das páginas físicas da árvore B. O impacto é maior em índices grandes usados por leituras sequenciais; fragmentação em objetos pequenos normalmente não justifica manutenção.
+
+### Conceito: Fragmentação Lógica vs Densidade de Página
+
+1. **Fragmentação lógica/externa (`avg_fragmentation_in_percent`)**: a ordem lógica das chaves deixa de acompanhar a ordem física das páginas, prejudicando leituras sequenciais.
+2. **Densidade de página (`avg_page_space_used_in_percent`)**: as páginas ficam parcialmente vazias, exigindo mais páginas no Buffer Pool e mais I/O para ler o mesmo volume de dados.
+
+### Causas: Page Splits e Inserções Aleatórias
+
+Quando uma página folha de 8 KB está cheia e uma nova chave precisa ser inserida no meio da árvore — cenário comum com `GUID`/`NEWID()` aleatório — o SQL Server divide a página, move aproximadamente 50% das linhas para uma nova página e atualiza os ponteiros da árvore. Isso pode deixar as páginas fisicamente desalinhadas e parcialmente vazias.
+
+- A fragmentação lógica faz com que leituras que poderiam ser sequenciais se tornem mais aleatórias; o cabeçote de leitura ou subsistema de I/O precisa fazer mais acessos dispersos, prejudicando especialmente `Index Scan` e `Table Scan`.
+- A baixa densidade de página força o SQL Server a carregar mais páginas no Buffer Pool para retornar o mesmo volume de dados, aumentando I/O e consumo de cache.
+
+### Diagnóstico com `sys.dm_db_index_physical_stats`
+
+```sql
+SELECT
+    OBJECT_NAME(ips.object_id) AS TableName,
+    i.name AS IndexName,
+    ips.index_type_desc,
+    ips.avg_fragmentation_in_percent,
+    ips.page_count,
+    ips.avg_page_space_used_in_percent
+FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ips
+INNER JOIN sys.indexes i
+    ON ips.object_id = i.object_id AND ips.index_id = i.index_id
+WHERE ips.page_count > 1000 -- Menos de 1.000 páginas (~8 MB) raramente justificam manutenção
+ORDER BY ips.avg_fragmentation_in_percent DESC;
+```
+
+> **Dica prática:** Ignore a fragmentação de tabelas pequenas. Se o objeto cabe confortavelmente no Buffer Pool, o custo de reorganizar ou reconstruir o índice tende a ser maior que o benefício.
+
+### Decisão de Manutenção: `REORGANIZE` vs `REBUILD`
+
+| Fragmentação | Ação | Características |
+| :--- | :--- | :--- |
+| **< 5%** | Nenhuma | Evita gastar CPU e I/O sem benefício relevante. |
+| **5% a 30%** | `REORGANIZE` | Operação incremental e online; reorganiza as páginas, mas não atualiza estatísticas automaticamente. |
+| **> 30%** | `REBUILD` | Recria a árvore, pode consumir mais log/`tempdb` e atualiza a estatística do índice com `FULLSCAN`. |
+
+```sql
+ALTER INDEX IX_Orders_CustomerId
+ON dbo.Orders REORGANIZE;
+
+ALTER INDEX IX_Orders_CustomerId
+ON dbo.Orders REBUILD;
+
+-- Disponível apenas quando a edição/serviço oferecer suporte a operações online
+ALTER INDEX IX_Orders_CustomerId
+ON dbo.Orders REBUILD WITH (ONLINE = ON);
+```
+
+| Característica | `REORGANIZE` | `REBUILD` |
+| :--- | :--- | :--- |
+| Bloqueio | Operação online, com menor impacto | Offline por padrão; `ONLINE = ON` depende da edição/serviço (por exemplo, Enterprise ou Azure SQL) |
+| Estatísticas | Não atualiza automaticamente | Atualiza a estatística do índice com `FULLSCAN` |
+| Recursos | Menor consumo | Maior uso de CPU, log e `tempdb` |
+| Cancelamento | Pode preservar o trabalho já realizado | Pode exigir rollback da operação |
+
+> **Pegadinha de prova:** `ALTER INDEX ... REBUILD` atualiza a estatística daquele índice, não todas as estatísticas da tabela nem as estatísticas automáticas de colunas. Para atualizar todas, use `UPDATE STATISTICS dbo.Tabela WITH FULLSCAN`.
+
+### Prevenção: Escolha de Chaves e `FILLFACTOR`
+
+- Prefira chaves clusterizadas crescentes, como `IDENTITY`, `BIGINT` ou `DATE`, quando o padrão de inserção for sequencial.
+- Evite `GUID`/`NEWID()` aleatório como chave clusterizada; quando necessário, avalie `NEWSEQUENTIALID()`.
+- `FILLFACTOR` reserva espaço nas páginas folha durante a criação ou reconstrução do índice. Valores menores podem reduzir page splits em tabelas com atualizações e inserções no meio, ao custo de mais páginas e I/O.
+- O valor adequado depende do padrão de escrita; não aplique `FILLFACTOR = 80` ou `90` indiscriminadamente.
 
 ---
 
