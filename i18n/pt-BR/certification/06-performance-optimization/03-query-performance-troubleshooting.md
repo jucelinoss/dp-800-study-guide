@@ -10,7 +10,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Planos de Execução (Execution Plans)](#planos-de-execução-execution-plans)
 >   - 🔹 [Habilitando Planos de Execução via T-SQL](#habilitando-planos-de-execução-via-t-sql)
@@ -27,7 +27,7 @@ tags:
 > - 📍 [4. Query Store (Repositório de Consultas)](#query-store-repositório-de-consultas)
 > - 📍 [5. Query Performance Insight (Azure SQL Database)](#query-performance-insight-azure-sql-database)
 > - 📍 [6. Forçando Planos e Guias de Planos (Plan Guides)](#forçando-planos-e-guias-de-planos-plan-guides)
->   - 🔹 [sp_query_store_force_plan](#sp-query-store-force-plan)
+>   - 🔹 [sp_query_store_force_plan](#sp_query_store_force_plan)
 >   - 🔹 [Guias de Planos (Plan Guides)](#guias-de-planos-plan-guides)
 > - 📍 [7. Mitigação de Parameter Sniffing (Snifagem de Parâmetros)](#mitigação-de-parameter-sniffing-snifagem-de-parâmetros)
 >   - 🔹 [OPTION(RECOMPILE)](#optionrecompile)
@@ -135,7 +135,7 @@ Os **operadores físicos de execução** são os algoritmos reais executados pel
    - **Solução:** Adicione as colunas necessárias à cláusula `INCLUDE` para criar um índice de cobertura. Veja os detalhes em [Tabelas e Índices](../01-database-objects/01-tables-indexes.md).
 
 > [!tip] 💡 Diferenciais do Grupo: Acesso a Dados (Como Escolher / Identificar)
-> - **`Index Seek` vs `Index Scan`:** O *Seek* é pontual (busca rápida via Árvore-B por chave); o *Scan* percorre 100% das páginas de dados sequencialmente. Se o otimizador usar *Scan* para buscar 1 linha em uma tabela de 10 milhões, significa que **falta um índice seletivo** no predicado do `WHERE`.
+> - **`Index Seek` vs `Index Scan`:** O *Seek* é pontual (busca rápida via Árvore-B por chave); o *Scan* percorre as páginas do índice ou da tabela. Se o otimizador usar *Scan* para buscar 1 linha em uma tabela de 10 milhões, investigue seletividade, colunas retornadas, estimativas e índices; isso pode indicar um índice ausente, mas não é prova isolada.
 > - **`Index Scan` vs `Table Scan`:** O *Index Scan* varre um índice (agrupado ou não); o *Table Scan* varre uma Heap (tabela sem chave primária/índice clusterizado).
 > - **`Key Lookup` vs `RID Lookup`:** O *Key Lookup* busca dados no índice clusterizado (B-Tree); o *RID Lookup* busca dados em uma Heap (sem B-Tree) usando o identificador de linha `RowID`.
 > - **`Key Lookup`:** Mostra que o índice secundário foi útil para encontrar a linha, mas **incompleto** para retornar todas as colunas da query. Se o custo do Lookup for alto, o otimizador pode desistir do Seek e forçar um *Table/Index Scan* direto na tabela inteira.
@@ -255,7 +255,7 @@ O **Data Spill (ou TempDB Spill)** é um dos eventos de degradação mais severo
    - O otimizador lê estatísticas antigas e estima que a query retornará apenas **100 linhas**, alocando 1 MB de RAM.
    - Na prática, a consulta retorna **5.000.000 de linhas** (exigindo 500 MB). O excesso de 499 MB é descarregado no disco do `tempdb`.
 2. **Uso de Variáveis de Tabela (`@TableVariable`):**
-   - O SQL Server estima fixo apenas **1 linha** para variáveis de tabela, reservando a menor concessão de RAM possível.
+   - Variáveis de tabela não mantêm estatísticas tradicionais; em versões anteriores ou sem compilação adiada, isso podia produzir estimativas muito baixas e uma concessão de RAM pequena.
 3. **Parameter Sniffing:**
    - O plano foi compilado originalmente para um parâmetro que trazia 10 linhas (RAM pequena) e reutilizado para uma chamada com parâmetro de 10 milhões de linhas.
 
@@ -280,7 +280,7 @@ O **Data Spill (ou TempDB Spill)** é um dos eventos de degradação mais severo
 Os percentuais de custo exibidos sobre os nós nos planos gráficos (SSMS, Azure Data Studio e Query Store) indicam o consumo relativo estimado de recursos (CPU e I/O) para cada etapa da consulta:
 
 1. **`Table Scan` / `Index Scan` com Custo Elevado (ex: 80%+ do plano):** Indica que o otimizador está varrendo a tabela inteira por ausência de um índice seletivo.
-2. **`Key Lookup` com Custo Elevado (ex: 50%+ do plano):** Indica que o índice secundário foi utilizado para localizar as linhas, mas a consulta exige colunas adicionais da tabela base. **Solução:** Adicionar as colunas solicitadas na cláusula `INCLUDE` do índice não-clusterizado (*Covering Index*).
+2. **`Key Lookup` com Custo Elevado (ex.: parcela relevante do plano):** Indica que o índice secundário foi utilizado para localizar as linhas, mas a consulta exige colunas adicionais da tabela base. **Possível solução:** avaliar as colunas solicitadas na cláusula `INCLUDE` de um índice não clusterizado (*Covering Index*), comparando o custo de manutenção e o plano resultante.
 3. **Operadores de `Sort` Pesados:** Indicam que o motor precisa reordenar dados em memória porque nenhum índice existente satisfaz a ordem do `ORDER BY` ou `GROUP BY`. **Solução:** Criar um índice com as chaves ordenadas na mesma sequência da consulta.
 4. **`Hash Match` com Alertas de Spill (⚠️):** Indicam estimativas de cardinalidade incorretas decorrentes de estatísticas desatualizadas ou ausentes, forçando o vazamento de memória RAM para o `tempdb`. **Solução:** Atualizar estatísticas com `FULLSCAN`.
 
@@ -540,7 +540,7 @@ O SQL Server cria **novas estatísticas** (histogramas e matrizes de densidade) 
 
 2. **Criação Automática por Consultas (`AUTO_CREATE_STATISTICS` - Coluna Única):**
    - Com `AUTO_CREATE_STATISTICS ON` (ativado por padrão no banco), quando uma consulta executa um predicado (`WHERE`, `JOIN`, `GROUP BY`, `HAVING`) usando uma coluna que **ainda não possui estatísticas**, o otimizador gera **automaticamente** uma estatística de coluna única na compilação.
-   - O nome dessas estatísticas automáticas geradas pelo motor sempre inicia com o prefixo **`_WA_Sys_`** (ex: `_WA_Sys_00000002_178D7908`).
+   - O nome das estatísticas automáticas de coluna normalmente usa o prefixo **`_WA_Sys_`** (ex: `_WA_Sys_00000002_178D7908`).
 
 3. **Criação Manual Explícita (`CREATE STATISTICS` - Multicolunas e Filtradas):**
    - DBAs e desenvolvedores criam estatísticas manualmente para cobrir cenários onde o automático de coluna única é insuficiente:
@@ -554,7 +554,7 @@ O SQL Server cria **novas estatísticas** (histogramas e matrizes de densidade) 
        ```
 
 > [!important] Cuidado no Exame: Objetos que NÃO Geram Estatísticas
-> - **Variáveis de Tabela (`@TableVariable`):** O SQL Server **NÃO cria estatísticas** para variáveis de tabela. O otimizador assume sempre que a variável de tabela contém **1 única linha**, gerando planos ruins para volumes grandes (mitigado usando `#TempTable`, `OPTION(RECOMPILE)` ou `OPTIMIZE FOR UNKNOWN`).
+> - **Variáveis de Tabela (`@TableVariable`):** O SQL Server **não mantém estatísticas tradicionais** para variáveis de tabela. Em versões e níveis de compatibilidade anteriores, isso podia levar a estimativas fixas muito baixas; no nível de compatibilidade 150, a compilação adiada pode usar a cardinalidade observada na primeira compilação. Para volumes maiores, avalie `#TempTable` ou `OPTION(RECOMPILE)` conforme o caso.
 > - **Tabelas Temporárias (`#TempTable`):** Tabelas temporárias reais com `#` **geram** estatísticas automáticas normalmente no `tempdb`.
 
 ---
@@ -599,11 +599,11 @@ Ao executar a manutenção manual de estatísticas via `UPDATE STATISTICS`, voc�
 
 #### 1. Como o SQL Server Calcula a Amostragem Padrão (Default Sampling)?
 
-Quando o `AUTO_UPDATE_STATISTICS` executa ou quando você roda `UPDATE STATISTICS` sem especificar o tamanho da amostra:
-- **Tabelas Pequenas (< 8 MB / ~1.000 páginas de 8 KB):** O motor realiza **`FULLSCAN` (100%) automaticamente**, pois a varredura completa da tabela é rápida e barata.
-- **Tabelas Médias e Grandes:** O SQL Server utiliza um algoritmo de amostragem proporcional inversa não-linear:
+Quando o `AUTO_UPDATE_STATISTICS` executa ou quando você roda `UPDATE STATISTICS` sem especificar o tamanho da amostra, o SQL Server calcula a amostra dinamicamente. Como regra prática, tabelas pequenas podem acabar sendo lidas integralmente quando isso for barato, mas o tamanho exato não deve ser tratado como um limiar contratual:
+- **Tabelas Pequenas:** O motor pode realizar **`FULLSCAN` (100%)** quando a varredura completa for barata.
+- **Tabelas Médias e Grandes:** O SQL Server normalmente utiliza uma amostra calculada pelo otimizador:
   - Quanto **maior** o número de linhas da tabela, **menor é a porcentagem** de linhas lidas na amostragem padrão.
-  - Em tabelas com dezenas ou centenas de milhões de linhas, o *Default Sampling* pode amostrar **menos de 1%** dos registros.
+  - Em tabelas muito grandes, a porcentagem efetiva pode ser pequena; não existe uma taxa padrão fixa aplicável a todos os bancos.
   - **Pró:** Leitura ultra-rápida sem impacto de CPU/disco.
   - **Contra:** Em tabelas com distribuição desigual de dados (*Data Skew*), amostrar apenas 1% pode ignorar valores raros ou concentrados, gerando histogramas imprecisos e planos de execução ruins.
 
@@ -611,23 +611,23 @@ Quando o `AUTO_UPDATE_STATISTICS` executa ou quando você roda `UPDATE STATISTIC
 
 | Tipo de Tabela / Cenário | Recomendação de Amostragem | Comando T-SQL Recomendado | Racional Técnico |
 | :--- | :--- | :--- | :--- |
-| **Tabelas de Dimensão / Médias** (< 20M linhas) | **`FULLSCAN` (100%)** | `UPDATE STATISTICS dbo.Orders WITH FULLSCAN;` | Leitura rápida que garante 100% de precisão nos histogramas sem adivinhação. |
-| **Tabelas Grandes com *Data Skew*** | **`FULLSCAN` (100%)** | `UPDATE STATISTICS dbo.Sales WITH FULLSCAN;` | Se os dados tiverem picos ou concentrações desiguais, amostras parciais distorcem a estimativa de cardinalidade. |
-| **Após `ALTER INDEX REBUILD`** | **`FULLSCAN` (100%)** | Executado automaticamente pelo `REBUILD` | O rebuild de índice recria a estrutura física e atualiza estatísticas com `FULLSCAN` por padrão. |
-| **Tabelas Gigantes de Fatos** (> 100M linhas) | **`SAMPLE 15 TO 30 PERCENT`** | `UPDATE STATISTICS dbo.FactSales WITH SAMPLE 25 PERCENT;` | `FULLSCAN` levaria horas e consumiria I/O massivo. Aumentar de 1% (padrão) para 25% melhora dramaticamente a precisão com tempo aceitável. |
+| **Tabelas de Dimensão / Médias** | **Considere `FULLSCAN` (100%) quando houver benefício comprovado** | `UPDATE STATISTICS dbo.Orders WITH FULLSCAN;` | Pode melhorar a informação do histograma, ao custo de mais leitura e compilação. |
+| **Tabelas Grandes com *Data Skew*** | **Considere aumentar a amostra ou usar `FULLSCAN` após medir o problema** | `UPDATE STATISTICS dbo.Sales WITH FULLSCAN;` | Distribuições muito desiguais podem se beneficiar de uma amostra maior, mas a decisão depende do plano e da carga. |
+| **Após `ALTER INDEX REBUILD`** | **Verifique o tipo de índice e a partição** | Executado como efeito do `REBUILD` | Em índices rowstore não particionados, a estatística do índice é atualizada com varredura completa; cenários particionados podem usar a amostragem padrão. |
+| **Tabelas Gigantes de Fatos** | **Escolha uma amostra maior apenas após medir o custo e a qualidade das estimativas** | `UPDATE STATISTICS dbo.FactSales WITH SAMPLE 25 PERCENT;` | `FULLSCAN` pode ser caro; o percentual deve ser ajustado ao volume, à distribuição e ao plano observado. |
 
 #### 3. Como Calcular a Porcentagem Ideal para Tabelas Gigantes?
 
-Para tabelas gigantes onde o `FULLSCAN` é inviável pelo tempo de execução, utilize a seguinte regra prática:
+Para tabelas gigantes onde o `FULLSCAN` é inviável pelo tempo de execução, use os números abaixo apenas como ponto de partida para um teste controlado:
 
-1. **Amostragem Padrão Inexistente/Ruim:** Verifique `sp.rows_sampled` na DMV `sys.dm_db_stats_properties`. Se `rows_sampled` for inferior a 2-5% das linhas totais e a query estiver sofrendo com estimativas ruins, o *Default Sampling* falhou.
-2. **Cálculo da Amostra Alvo:**
-   - Para tabelas de **20M a 100M linhas**: Defina `SAMPLE 20 PERCENT` a `30 PERCENT`.
-   - Para tabelas de **100M a 500M linhas**: Defina `SAMPLE 10 PERCENT` a `20 PERCENT` ou especifique quantidade fixa por linhas (ex: `SAMPLE 10000000 ROWS`).
+1. **Diagnóstico:** Verifique `sp.rows_sampled` na DMV `sys.dm_db_stats_properties` e compare a estimativa com a execução real. Uma amostra menor não significa, por si só, que a amostragem falhou.
+2. **Teste da Amostra Alvo:**
+   - Os percentuais de **20–30%** e **10–20%** podem ser usados como exemplos de teste para tabelas de tamanhos diferentes, mas não são limiares prescritos pelo SQL Server.
+   - Compare também `SAMPLE N ROWS`, custo da atualização e qualidade do plano antes de adotar uma configuração.
 
 #### 4. Fixando a Amostragem com `PERSIST_SAMPLE_PERCENT = ON` (SQL Server 2016 SP1+)
 
-Historicamente, se um DBA definisse manualmente um `UPDATE STATISTICS ... WITH SAMPLE 30 PERCENT`, o **`AUTO_UPDATE_STATISTICS` automático** futuro sobrescreveria essa estatística horas depois com a amostragem padrão de 1%, destruindo o histograma customizado!
+Se um DBA definir manualmente um `UPDATE STATISTICS ... WITH SAMPLE 30 PERCENT`, uma atualização automática futura poderá usar outra taxa de amostragem, caso a porcentagem não seja persistida.
 
 Para evitar isso, utilize a cláusula **`PERSIST_SAMPLE_PERCENT = ON`**:
 
@@ -638,7 +638,8 @@ UPDATE STATISTICS dbo.FactSales
 WITH SAMPLE 30 PERCENT, PERSIST_SAMPLE_PERCENT = ON;
 
 -- Para reverter e voltar ao padrão automático dinâmico:
-ALTER TABLE dbo.FactSales SET (PERSIST_SAMPLE_PERCENT = OFF);
+UPDATE STATISTICS dbo.FactSales
+WITH PERSIST_SAMPLE_PERCENT = OFF;
 ```
 
 #### 5. Entendendo o Impacto do Data Skew (Distribuição Desigual de Dados)
@@ -651,12 +652,12 @@ Em uma tabela de 50 milhões de pedidos (`Orders`), a coluna `StatusID` possui o
 - **`StatusID = 2` ("Em Trânsito"):** 450.000 linhas ($0.9\%$).
 - **`StatusID = 3` ("Suspeita de Fraude"):** 50.000 linhas ($0.1\%$).
 
-##### 💥 O Desastre da Amostragem Automática (1%):
-Se o `AUTO_UPDATE_STATISTICS` atualiza essa tabela usando a amostragem automática padrão de 1% (lê apenas 500.000 linhas aleatórias da tabela inteira):
+##### 💥 Exemplo hipotético de amostragem insuficiente:
+Suponha, apenas para ilustrar o risco, que uma atualização automática use uma amostra de 1% (500.000 linhas) nessa tabela:
 1. Por azar amostral, a varredura aleatória pode capturar apenas 2 linhas de `StatusID = 3` ("Fraude").
-2. O histograma resultante indicará ao otimizador que `StatusID = 3` quase não existe no banco, estimando que a busca retornará apenas 1 linha.
-3. Ao executar a consulta `SELECT * FROM dbo.Orders WHERE StatusID = 3`, o otimizador lê a estatística imprecisa, acha que virá apenas 1 linha e escolhe um plano com **`Nested Loops`** e **`Key Lookup`**.
-4. **Impacto Catastrófico de Performance:** Em vez de 1 linha, a query encontra 50.000 linhas reais! Executar 50.000 *Key Lookups* individuais e laços de *Nested Loops* destrói o subsistema de I/O de disco e a CPU, fazendo a query demorar minutos em vez de milissegundos.
+2. O histograma poderá representar mal a frequência de `StatusID = 3`, levando a uma estimativa inferior à quantidade real.
+3. Nesse cenário, o otimizador poderá escolher um plano com **`Nested Loops`** e **`Key Lookup`** que não seja adequado para as 50.000 linhas reais.
+4. **Impacto possível:** muitos *Key Lookups* podem aumentar bastante o I/O e a CPU. A duração final depende do plano, dos índices, do cache e do hardware.
 
 ##### 🛡️ As 2 Soluções Recomendadas para Data Skew:
 
@@ -664,7 +665,7 @@ Se o `AUTO_UPDATE_STATISTICS` atualiza essa tabela usando a amostragem automáti
    ```sql
    UPDATE STATISTICS dbo.Orders(IX_Orders_StatusID) WITH FULLSCAN, PERSIST_SAMPLE_PERCENT = ON;
    ```
-   *Racional:* Ao ler 100% das páginas de dados, o histograma registra a contagem exata dos valores raros (`StatusID = 3`). Sabendo que virão 50.000 linhas, o otimizador escolhe um **`Index Scan`** ou **`Hash Join`**, executando a query em milissegundos.
+   *Racional:* Ao ler 100% das linhas, o histograma recebe a informação mais completa possível sobre os valores raros (`StatusID = 3`). O plano escolhido ainda depende de índices, predicados, cardinalidade e custos estimados.
 
 2. **Criar Estatísticas Filtradas (*Filtered Statistics*):**
    Se rodar `FULLSCAN` na tabela inteira for pesado demais pelo tamanho do banco, crie uma estatística dedicada cobrindo apenas o valor raro/desproporcional:
@@ -673,7 +674,7 @@ Se o `AUTO_UPDATE_STATISTICS` atualiza essa tabela usando a amostragem automáti
    ON dbo.Orders(StatusID)
    WHERE StatusID = 3;
    ```
-   *Racional:* Garante 100% de precisão para a distribuição dos valores críticos sem precisar ler as 49.500.000 linhas do valor comum (`StatusID = 1`).
+   *Racional:* Concentra as estatísticas no subconjunto relevante e pode melhorar a estimativa sem exigir a mesma leitura da tabela inteira; não constitui garantia de 100% de precisão em todos os planos.
 
 ---
 
@@ -699,7 +700,7 @@ A atualização automática utiliza uma **amostragem dinâmica (sample rate)** q
 3. **Tabelas Gigantes com Distribuição Desigual (Data Skew):**
    - Quando a amostragem pequena do `AUTO_UPDATE` (ex: 1% das linhas) não reflete a realidade de colunas com valores altamente concentrados. Execute rotinas manuais com `WITH FULLSCAN` ou `WITH SAMPLE X PERCENT`.
 4. **Variáveis de Tabela (`@TableVariable`):**
-   - Variáveis de tabela não criam nem atualizam estatísticas automaticamente (o SQL Server sempre estima 1 linha). Se precisar de estatísticas reais em tabelas temporárias, utilize `#TempTables` ou adicione `OPTION (RECOMPILE)`.
+   - Variáveis de tabela não mantêm estatísticas tradicionais. Em compatibilidade 150, a compilação adiada pode melhorar a estimativa; para cenários que exigem estatísticas completas, avalie `#TempTables` ou `OPTION (RECOMPILE)`.
 
 ---
 
@@ -709,9 +710,9 @@ Desabilitar a atualização automática no banco de dados inteiro é **altamente
 
 1. **Tabelas Gigantes de Carga Contínua (Evitar Locks / Timeouts em Pico):**
    - Em tabelas de fatos com centenas de milhões de linhas, o disparo síncrono do `AUTO_UPDATE_STATISTICS` no horário de pico pode fazer com que a query que o disparou sofra *timeout* enquanto tenta compilar a estatística de milhões de registros.
-   - **Mitigação:** Desabilitar o auto-update apenas nessa tabela específica:
+   - **Mitigação:** Desabilitar o auto-update apenas nas estatísticas dessa tabela específica:
      ```sql
-     ALTER TABLE dbo.SalesFact SET (AUTO_UPDATE_STATISTICS = OFF);
+     EXEC sys.sp_autostats N'dbo.SalesFact', 'OFF';
      ```
      *(E manter obrigatoriamente um Job noturno agendado de `UPDATE STATISTICS WITH FULLSCAN` fora do horário de pico).*
 2. **"Congelar" uma Estatística Específica para Preservar um Plano Estável (Freeze Stats):**

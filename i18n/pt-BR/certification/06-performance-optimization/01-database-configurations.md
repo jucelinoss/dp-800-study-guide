@@ -10,7 +10,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Camadas de Serviço do Azure SQL (Azure SQL Service Tiers)](#camadas-de-serviço-do-azure-sql-azure-sql-service-tiers)
 >   - 🔹 [Baseado em DTU (Modelo de precificação legado simplificado)](#baseado-em-dtu-modelo-de-precificação-legado-simplificado)
@@ -48,9 +48,10 @@ As escolhas de configuração de um banco de dados — camadas de serviço (serv
 > [!tip] O que o Exame Testa
 >
 > `MAXDOP`
->   - `MAXDOP = 0` -> utilizar todas as CPUs disponíveis;
->   - `MAXDOP = 1` -> desabilitar execução paralela;
->   - `(MAXDOP n)`-> utilizar n cores .
+>
+> - `MAXDOP = 0` -> permitir o uso de todos os processadores disponíveis, sujeito aos limites do ambiente e do plano;
+> - `MAXDOP = 1` -> desabilitar execução paralela;
+> - `(MAXDOP n)` -> limitar o grau máximo de paralelismo a `n` processadores;
 > - `ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = n` altera o comportamento padrão do banco de dados correspondente (sem afetar as configurações globais do servidor SQL).
 > - **Nível de compatibilidade (compatibility level)** rege o comportamento do otimizador de consultas e a ativação de recursos lógicos — opera de forma independente da versão física instalada do engine.
 
@@ -143,11 +144,11 @@ RECONFIGURE;
 > [!important] RCSI no Azure SQL vs. SQL Server On-Premises
 >
 > - **Ativo Por Padrão no Azure SQL Database**: No **Azure SQL Database** (Single Databases e Elastic Pools), a opção `READ_COMMITTED_SNAPSHOT` já vem **habilitada por padrão (`ON`)** na criação do banco de dados. No **SQL Server On-Premises** e no **Azure SQL Managed Instance**, o padrão histórico é **`OFF`**.
-> - **Recomendações Oficiais**: É recomendado manter/habilitar o **RCSI** para cargas OLTP no Azure SQL porque:
->   1. **Zero Bloqueio entre Leitura e Escrita**: Transações de leitura (`SELECT`) acessam a versão da linha confirmada anteriormente gravada no Version Store (`tempdb`) sem solicitar travas compartilhadas (`Shared / S locks`). Leitores não bloqueiam escritores e escritores não bloqueiam leitores.
+> - **Efeito do RCSI**: Em cargas que se beneficiam de versionamento de linhas, o **RCSI** pode reduzir a contenção entre leitura e escrita:
+>   1. **Menos bloqueio entre leitura e escrita**: Transações de leitura (`SELECT`) acessam a versão confirmada anteriormente no Version Store (`tempdb`) sem solicitar travas compartilhadas (`Shared / S locks`) para os dados versionados. Isso não elimina travas de esquema nem bloqueios entre escritores.
 >   2. **Transparente para a Aplicação**: Aplicações executando no nível de isolamento padrão (`READ COMMITTED`) se beneficiam imediatamente de leituras sem bloqueio sem requerer qualquer alteração no código T-SQL ou hints adicionais.
->   3. **Redução Drástica de Contenção e Deadlocks**: Diminui cadeias de bloqueio e ocorrência de deadlocks sob alta concorrência.
->   4. **Considerações de Recursos**: O versionamento de linhas utiliza o **Version Store no `tempdb`** e adiciona 14 bytes por linha nas páginas de dados para ponteiros de versão. Monitorar a utilização e espaço do `tempdb` é essencial em workloads de escrita extremamente pesada.
+>   3. **Possível redução de contenção**: Pode diminuir cadeias de bloqueio entre leitores e escritores, mas não garante a eliminação de deadlocks.
+>   4. **Considerações de Recursos**: O versionamento de linhas utiliza o **Version Store no `tempdb`** e pode adicionar sobrecarga de versionamento às linhas. Monitorar a utilização e o espaço do `tempdb` é essencial em workloads de escrita extremamente pesada.
 
 ---
 
@@ -171,10 +172,11 @@ Nem todas as configurações de nível de servidor se aplicam ou podem ser alter
 | Configuração | SQL Server On-Premises / Azure VM (IaaS) | Azure SQL Managed Instance (MI) | Azure SQL Database (PaaS - Single/Elastic) | Prática Recomendada |
 | :--- | :--- | :--- | :--- | :--- |
 | `max server memory` | **Configurável** (`sp_configure`) | **Gerenciado pelo Azure** (Automático) | **Gerenciado pelo Azure** (Não aplicável) | Reserve de 10% a 15% da RAM física para o OS no On-Premises/IaaS. |
-| `MAXDOP` | **Configurável** (Servidor, DB, Query) | **Configurável** (Servidor, DB, Query) | **Configurável** (`DATABASE SCOPED` ou Query Hint) | Definir limite adequado ao tamanho da CPU (ex: 2 a 8) para evitar overhead em OLTP. |
-| `cost threshold for parallelism` | **Configurável** (`sp_configure`) | **Configurável** (`sp_configure`) | **Não Configurável** (Sem suporte no PaaS) | Aumentar do padrão histórico (5) para valores entre 25 e 50 em OLTP. |
+| `MAXDOP` | **Configurável** (Servidor, DB, Query) | **Configurável** (Servidor, DB, Query) | **Configurável** (`DATABASE SCOPED` ou Query Hint) | Avaliar um limite adequado ao workload; valores como 2 a 8 são apenas exemplos. |
+| `cost threshold for parallelism` | **Configurável** (`sp_configure`) | **Configurável** (`sp_configure`) | **Não Configurável** (Sem suporte no PaaS) | O valor deve ser ajustado com base em planos e carga; 25 a 50 é apenas uma faixa de teste possível. |
 
 > [!important] Regra de Ouro para o Exame DP-800
+>
 > - **No Azure SQL Database (PaaS)**, a instrução `sp_configure` a nível de servidor **não está disponível**. Portanto, o tuning de paralelismo é feito exclusivamente via `ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = n` ou `OPTION (MAXDOP n)`.
 > - **No Azure SQL Managed Instance (MI)**, você tem acesso à maioria dos parâmetros de nível de servidor via `sp_configure` (como `cost threshold for parallelism`), exceto pelo gerenciamento físico da memória que é governado pelo Azure.
 

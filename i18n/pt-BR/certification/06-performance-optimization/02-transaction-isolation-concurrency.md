@@ -171,7 +171,7 @@ Para facilitar a memorização rápida no exame e na prática, divida os 6 níve
 
 | Dupla Comparada | Fator Principal de Diferenciação | Armadilha de Prova |
 | :--- | :--- | :--- |
-| **RCSI vs SNAPSHOT** | **Renovação da Foto:** RCSI renova no `SELECT`; SNAPSHOT fixa no `BEGIN`. | SNAPSHOT estoura Erro 3960 em conflito de escrita; RCSI não (última escrita vence/espera). |
+| **RCSI vs SNAPSHOT** | **Renovação da Foto:** RCSI renova no `SELECT`; SNAPSHOT fixa no `BEGIN`. | SNAPSHOT pode estourar Erro 3960 em conflito de escrita; RCSI não oferece essa mesma detecção de conflito, embora os escritores ainda possam aguardar travas. |
 | **READ COMMITTED vs UNCOMMITTED** | **Presença de Trava `S`:** COMMITTED espera o `COMMIT`; UNCOMMITTED lê rascunho. | UNCOMMITTED aceita Leitura Suja (Dirty Read). |
 | **REPEATABLE READ vs SERIALIZABLE** | **Bloqueio de `INSERT`:** REPEATABLE READ bloqueia `UPDATE/DELETE`; SERIALIZABLE bloqueia também `INSERT`. | REPEATABLE READ aceita linhas fantasma; SERIALIZABLE impede fantasmas com *Key-Range locks*. |
 
@@ -204,7 +204,7 @@ flowchart TD
         direction TB
         W2["Escritor executa UPDATE<br/>(Copia versão antiga para o Tempdb Version Store)"]
         R2["Leitor executa SELECT<br/>(Lê versão consistente do Tempdb sem travas)"]
-        W2 ==>|"Zero Bloqueio!<br/>Leitor lê versão do Tempdb sem travar"| R2
+        W2 ==>|"Menos bloqueio de dados<br/>Leitor lê versão do Tempdb"| R2
     end
 
     PESSIMISTIC ~~~ RCSI
@@ -219,7 +219,7 @@ flowchart TD
 
 > [!important] Cuidado na Prova: Diferença de Conflito de Escrita
 >
-> - **RCSI (Read Committed Snapshot)**: Não detecta conflitos de gravação. Se duas sessões atualizarem a mesma linha ao mesmo tempo, a última alteração simplesmente sobrescreve a primeira (last write wins), ou a segunda bloqueia até a primeira terminar.
+> - **RCSI (Read Committed Snapshot)**: Não oferece a detecção de conflitos de gravação do nível `SNAPSHOT`. Em uma disputa, os escritores ainda usam as regras de bloqueio e podem aguardar; dependendo do fluxo da aplicação, também pode haver perda de atualização se não existir controle otimista adicional.
 > - **Snapshot Isolation**: **Detecta** conflitos de gravação ativamente. Se a Sessão A e a Sessão B iniciarem transações Snapshot, lerem a mesma linha e ambas tentarem atualizá-la, a transação que tentar submeter a alteração por último falhará imediatamente com um erro de conflito de atualização (erro 3960), forçando o rollback.
 
 ```sql
@@ -516,7 +516,7 @@ D. Habilitar o RCSI e tratar erros de deadlock 1205 com retry logic.
 >
 > - **A. Isolation `Serializable` (Incorreta):** Mantém travas de leitura exclusivas de intervalo ativas durante todos os 10 segundos, bloqueando outros usuários que tentarem acessar a tabela e violando a exigência de "menor impacto de bloqueio".
 > - **B. Query Hint `UPDLOCK` (Incorreta):** Retém uma trava de atualização (`U lock`) no banco durante os 10 segundos de validação no servidor de aplicação, impedindo que outras transações alterem o saldo nesse período.
-> - **D. `RCSI + Retry Logic` (Incorreta):** Embora o RCSI não trave a leitura, **o RCSI NÃO detecta conflitos de gravação**. Se duas gravações ocorrerem, a última gravação sobrescreverá a primeira sem gerar erro (perda de atualização / *Lost Update*). O erro 1205 de deadlock só ocorre sob travas pessimistas, não no RCSI.
+> - **D. `RCSI + Retry Logic` (Incorreta neste cenário):** Embora o RCSI reduza bloqueios entre leitura e escrita, **ele não substitui o controle de concorrência da aplicação** e não oferece a detecção de conflitos do `SNAPSHOT`. O erro 1205 pode ocorrer em outros padrões de bloqueio mesmo com RCSI; não se deve assumir que o RCSI elimina deadlocks.
 
 ---
 

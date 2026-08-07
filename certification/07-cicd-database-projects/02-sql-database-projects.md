@@ -161,6 +161,14 @@ PRINT 'Post-deployment: loading reference data...';
 PRINT 'Post-deployment complete.';
 ```
 
+### How `:r` works
+
+`:r` is a **sqlcmd command**, not Transact-SQL. The sqlcmd preprocessor reads the referenced file and inserts its contents at that position before the combined script is sent to SQL Server. In this example, the two data files are therefore executed as part of `PostDeployment.sql`.
+
+The command is available when the script is executed by the `sqlcmd` utility, by SQL Database Projects tooling, or in SSMS with **Query > SQLCMD Mode** enabled. If you run the script in the default SSMS query mode, SQL Server receives `:r` as invalid T-SQL because SSMS did not process the sqlcmd command first.
+
+The path is resolved from the sqlcmd startup/current directory, so relative paths must match the directory from which the deployment tool starts. Each included file must contain valid T-SQL (and may contain other sqlcmd commands). If the included statements need a separate batch, place `GO` after the `:r` line.
+
 To mark a script as pre/post-deployment, set the Build Action in the project:
 
 ```xml
@@ -249,8 +257,27 @@ sqlpackage /Action:Export \
     /SourceConnectionString:"..."
 ```
 
-> [!warning] Common Mistake
-> dacpac and bacpac are not interchangeable. Use dacpac for CI/CD deployments (schema changes). Use bacpac for migrating data between environments (schema + data export). Publishing a dacpac does NOT import data.
+> [!warning] Common Mistake: DACPAC vs BACPAC vs BAK
+>
+> dacpac, bacpac, and bak are not interchangeable:
+>
+> - **DACPAC**: Schema-only state artifact. Used for CI/CD deployments (declarative diff).
+> - **BACPAC**: Schema + user data exported in a portable package using BCP-formatted data. Used for cross-platform migrations and Dev/Test copies; the usual import flow creates and populates a target database.
+> - **BAK**: Native SQL Server backup file. Supports physical restore and, when combined with the required full, differential, and transaction-log backups under a suitable recovery model, point-in-time restore (PITR). **Cannot be restored directly into Azure SQL Database (Single DB)**.
+>
+
+### Strict Comparison: DACPAC vs BACPAC vs BAK
+
+| Feature / Resource | **DACPAC (`.dacpac`)** | **BACPAC (`.bacpac`)** | **BAK (`.bak`)** |
+| :--- | :--- | :--- | :--- |
+| **Stored Content** | **Schema Model (DDL/Metadata)** (Tables, Views, Procedures, Roles) | **Schema Model + User Data** (Exported in BCP format) | **Backup data according to the backup type, including database pages and log records where applicable** |
+| **Deployment Mechanism** | **Declarative (Desired State)**: Generates an incremental T-SQL diff script. | **Import**: Usually creates and populates a target database from the package; some workflows can target an existing empty database. | **Physical Restore**: Restores the data represented by the backup set and applies subsequent log backups when required. |
+| **Transactional Consistency** | N/A (contains no data) | ❌ **Not inherently point-in-time consistent** during active writes; export from a transactionally consistent copy or without concurrent writes. | ✅ A valid backup/restore sequence produces a consistent recovery point; **PITR requires the appropriate full/differential/log backup chain**. |
+| **Primary Use Case** | **CI/CD Pipelines (DevOps)** and Source Control (SQL Projects `.sqlproj`). | **Cross-Platform Migration** (On-Prem <-> Azure SQL) and Dev/Test Copy. | **Disaster Recovery (DR)**, Operational Backup, and Migration to SQL Managed Instance. |
+| **Azure SQL Database (Single DB)** | ✅ **YES** (via SqlPackage / Pipeline) | ✅ **YES** (via Import / Export) | ❌ **NO** (Does not accept `RESTORE DATABASE` command). |
+| **Azure SQL Managed Instance** | ✅ **YES** | ✅ **YES** | ✅ **YES** (via Restore from Azure Blob Storage `URL`). |
+| **SQL Server (On-Prem / VM)** | ✅ **YES** | ✅ **YES** | ✅ **YES** |
+| **Version Downgrade** | ⚠️ **Conditional** (Target platform and T-SQL features must be supported) | ⚠️ **Conditional** (Target platform and data types must be supported) | ❌ **NO** (Cannot restore newer `.bak` onto an older SQL Server version). |
 
 ---
 
@@ -322,6 +349,7 @@ SDK-style projects support referencing shared objects as NuGet packages:
 - [SQL Database Projects Overview](https://learn.microsoft.com/en-us/sql/tools/sql-database-projects/sql-database-projects)
 - [sqlpackage CLI Reference](https://learn.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage)
 - [SDK-style SQL Projects](https://learn.microsoft.com/en-us/sql/tools/sql-database-projects/sql-database-projects#original-projects-vs-sdk-style-projects)
+- [sqlcmd Commands — `:r`](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-commands?view=sql-server-ver17#r-filename)
 
 ---
 

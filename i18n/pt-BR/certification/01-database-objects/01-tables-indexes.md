@@ -430,11 +430,13 @@ ORDER BY ips.avg_fragmentation_in_percent DESC;
 
 ### Decisão de Manutenção: `REORGANIZE` vs `REBUILD`
 
+Os percentuais abaixo são uma **heurística operacional comum**, não uma regra obrigatória do SQL Server. A decisão também deve considerar tamanho do índice, densidade de páginas, padrão de leitura e evidência de degradação no workload.
+
 | Fragmentação | Ação | Características |
 | :--- | :--- | :--- |
-| **< 5%** | Nenhuma | Evita gastar CPU e I/O sem benefício relevante. |
-| **5% a 30%** | `REORGANIZE` | Operação incremental e online; reorganiza as páginas, mas não atualiza estatísticas automaticamente. |
-| **> 30%** | `REBUILD` | Recria a árvore, pode consumir mais log/`tempdb` e atualiza a estatística do índice com `FULLSCAN`. |
+| **< 5%** | Geralmente nenhuma | Evita gastar CPU e I/O quando não houver benefício observável. |
+| **5% a 30%** | Considere `REORGANIZE` | Operação incremental e online; reorganiza as páginas, mas não atualiza estatísticas automaticamente. |
+| **> 30%** | Considere `REBUILD` | Recria a árvore, pode consumir mais log/`tempdb` e, para índices rowstore, normalmente atualiza a estatística do índice com varredura completa. |
 
 ```sql
 ALTER INDEX IX_Orders_CustomerId
@@ -451,7 +453,7 @@ ON dbo.Orders REBUILD WITH (ONLINE = ON);
 | Característica | `REORGANIZE` | `REBUILD` |
 | :--- | :--- | :--- |
 | Bloqueio | Operação online, com menor impacto | Offline por padrão; `ONLINE = ON` depende da edição/serviço (por exemplo, Enterprise ou Azure SQL) |
-| Estatísticas | Não atualiza automaticamente | Atualiza a estatística do índice com `FULLSCAN` |
+| Estatísticas | Não atualiza automaticamente | Em índices rowstore, atualiza a estatística do índice como efeito do rebuild; a amostragem e o comportamento podem variar em cenários particionados ou resumíveis |
 | Recursos | Menor consumo | Maior uso de CPU, log e `tempdb` |
 | Cancelamento | Pode preservar o trabalho já realizado | Pode exigir rollback da operação |
 

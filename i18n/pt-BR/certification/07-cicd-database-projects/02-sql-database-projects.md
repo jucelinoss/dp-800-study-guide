@@ -9,7 +9,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Formato SDK-Style de Projeto](#formato-sdk-style-de-projeto)
 > - 📍 [3. Estrutura de Diretórios Recomendada](#estrutura-de-diretórios-recomendada)
@@ -25,6 +25,7 @@ tags:
 > - 📍 [12. Questões de Prática (Practice Questions)](#questões-de-prática-practice-questions)
 > - 📍 [13. Tópicos Relacionados](#tópicos-relacionados)
 > - 📍 [14. Documentação Oficial](#documentação-oficial)
+>
 ---
 
 # Projetos de Banco de Dados SQL (SDK-Style) (SQL Database Projects - SDK-Style)
@@ -44,7 +45,7 @@ O arquivo dacpac registra o estado desejado final do banco — o deploy computa 
 > [!tip] O que o Exame Testa
 >
 > - O build compila um arquivo **`.dacpac`** (apenas o schema); o utilitário **`SqlPackage /Action:Publish`** calcula a diferença e atualiza o banco de destino de forma idempotente.
-> - **dacpac** = apenas estrutura (schema); **bacpac** = estrutura + dados físicos (usado para migração e cópias físicas de bases, não para CI/CD).
+> - **dacpac** = apenas estrutura (schema); **bacpac** = estrutura + dados exportados (usado para migração e cópias de bases, não para CI/CD).
 > - Scripts pré/pós-implantação rodam fora do cálculo do dacpac — usados para migrar dados legados ou preencher lookups estáticos.
 
 ---
@@ -185,6 +186,14 @@ PRINT 'Post-deployment: Carregando dados estáticos...';
 PRINT 'Post-deployment concluído.';
 ```
 
+### Como funciona o `:r`
+
+`:r` é um **comando do sqlcmd**, não uma instrução Transact-SQL. O pré-processador do sqlcmd lê o arquivo referenciado e insere o conteúdo naquela posição antes que o script combinado seja enviado ao SQL Server. Neste exemplo, os dois arquivos de dados são executados como parte do `PostDeployment.sql`.
+
+O comando funciona quando o script é executado pelo utilitário `sqlcmd`, pelas ferramentas de Projetos de Banco de Dados SQL ou no SSMS com **Consulta > Modo SQLCMD** habilitado. Se você executar o script no modo de consulta padrão do SSMS, o SQL Server receberá `:r` como T-SQL inválido, porque o SSMS não processou o comando sqlcmd antes.
+
+O caminho é resolvido a partir do diretório de inicialização/atual do sqlcmd; por isso, os caminhos relativos precisam corresponder ao diretório a partir do qual a ferramenta de implantação é iniciada. Cada arquivo incluído deve conter T-SQL válido (e também pode conter outros comandos sqlcmd). Se as instruções incluídas precisarem ficar em um lote separado, coloque `GO` depois da linha com `:r`.
+
 Para registrar a ação correspondente dos scripts, especifique as referências explícitas no arquivo do projeto `.sqlproj`:
 
 ```xml
@@ -250,10 +259,24 @@ sqlpackage /Action:DeployReport \
     /OutputPath:./drift-report.xml
 ```
 
-> [!tip] Dica para a Prova: DACPAC vs BACPAC
+> [!tip] Dica para a Prova: DACPAC vs BACPAC vs BAK
 >
-> - **DACPAC (Data-tier Application Package)**: Contém exclusivamente a definição lógica do **schema** do banco de dados (tabelas, views, procedures). Es o artefato padrão para deploys de CI/CD baseados em comparação de estado desejado.
-> - **BACPAC (Schema + Data Package)**: Contém o schema e também os **dados físicos** compactados das tabelas. Utilizado para exportação/importação de bancos completos de produção para ambientes locais, não sendo adequado para pipelines automáticos de CI/CD.
+> - **DACPAC (Data-tier Application Package)**: Contém exclusivamente a definição lógica do **schema** do banco de dados (tabelas, views, procedures). É o artefato padrão para deploys de CI/CD baseados em comparação de estado desejado (diff).
+> - **BACPAC (Schema + Data Package)**: Contém o schema e os **dados de usuário exportados em um pacote portátil**, com dados formatados em BCP. É utilizado para exportação/importação e migração cross-platform entre ambientes (On-Premises <-> Azure SQL Database), não sendo adequado para pipelines automáticos de CI/CD.
+> - **BAK (Native Backup File)**: Arquivo de backup nativo do SQL Server. Permite restauração física e, quando combinado com os backups completo, diferencial e de log necessários em um modelo de recuperação adequado, suporta Point-in-Time Restore (PITR). **Não pode ser restaurado diretamente no Azure SQL Database (Single DB)**.
+
+### Comparativo Técnico Estrito: DACPAC vs BACPAC vs BAK
+
+| Característica / Recurso | **DACPAC (`.dacpac`)** | **BACPAC (`.bacpac`)** | **BAK (`.bak`)** |
+| :--- | :--- | :--- | :--- |
+| **Conteúdo Armazenado** | **Modelo de Esquema (DDL/Metadados)** (Tabelas, Views, Procedures, Roles) | **Modelo de Esquema + Dados de Usuário** (Exportados em formato BCP) | **Dados de backup conforme o tipo de backup, incluindo páginas de dados e registros de log quando aplicável** |
+| **Mecanismo de Implantação** | **Declarativo (Estado Desejado)**: Gera script de alteração incremental (*diff* T-SQL). | **Importação**: Normalmente cria e preenche uma base de destino a partir do pacote; alguns fluxos podem usar uma base existente vazia. | **Restauração Física**: Restaura os dados representados pelo backup e aplica backups de log subsequentes quando necessário. |
+| **Consistência Transacional** | N/A (não contém dados) | ❌ **Não é inerentemente consistente no tempo** durante escritas ativas; exporte de uma cópia consistente ou sem escritas concorrentes. | ✅ Uma sequência válida de backup/restauração produz um ponto de recuperação consistente; **PITR exige a cadeia adequada de backups completos/diferenciais/de log**. |
+| **Caso de Uso Primário** | **Pipelines de CI/CD (DevOps)** e Controle de Versão (Source Control via `.sqlproj`). | **Migração Cross-Platform** (On-Premises <-> Azure SQL) e Cópia para Dev/HMG. | **Disaster Recovery (DR)**, Backup Operacional e Migração para SQL Managed Instance. |
+| **Azure SQL Database (Single DB)** | ✅ **SIM** (via SqlPackage / Pipeline) | ✅ **SIM** (via Import / Export) | ❌ **NÃO** (Não aceita comando `RESTORE DATABASE`). |
+| **Azure SQL Managed Instance** | ✅ **SIM** | ✅ **SIM** | ✅ **SIM** (via Restore do Azure Blob Storage com `URL`). |
+| **SQL Server (On-Prem / VM)** | ✅ **SIM** | ✅ **SIM** | ✅ **SIM** |
+| **Downgrade de Versão** | ⚠️ **Condicional** (A plataforma de destino e os recursos T-SQL precisam ser compatíveis) | ⚠️ **Condicional** (A plataforma de destino e os tipos de dados precisam ser compatíveis) | ❌ **NÃO** (Impossível restaurar `.bak` novo em versão mais antiga). |
 
 ### Parâmetros de Configuração Chave do SqlPackage
 
@@ -352,6 +375,7 @@ D. Utilizar o utilitário bacpac para exportar os dados e importá-los novamente
 - [SQL Database Projects Overview](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-projects-overview)
 - [sqlpackage CLI Reference](https://learn.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage)
 - [SDK-style SQL Projects](https://learn.microsoft.com/en-us/sql/tools/sql-database-projects/concepts/sdk-style-projects)
+- [Comandos do sqlcmd — `:r`](https://learn.microsoft.com/pt-br/sql/tools/sqlcmd/sqlcmd-commands?view=sql-server-ver17#r-filename)
 
 ---
 

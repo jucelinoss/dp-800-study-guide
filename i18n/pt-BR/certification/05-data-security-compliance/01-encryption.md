@@ -140,7 +140,7 @@ Se a aplicação tivesse que chamar o Azure Key Vault para criptografar/descript
 
 Para resolver isso, o Always Encrypted divide as responsabilidades em duas chaves:
 1. **CEK (Column Encryption Key):** É uma chave simétrica rápida (AES-256) usada para cifrar os dados reais das colunas. A CEK é armazenada dentro do banco de dados, porém em formato criptografado.
-2. **CMK (Column Master Key):** É a chave mestra que tranca a CEK. O driver da aplicação consulta a CMK no Key Vault **apenas uma vez** no início da sessão para descriptografar a CEK na memória RAM da aplicação. A partir daí, o driver usa a CEK local para cifrar/decifrar milhares de dados com altíssima performance.
+2. **CMK (Column Master Key):** É a chave mestra que protege a CEK. O driver da aplicação acessa o repositório da CMK quando precisa obter ou usar a chave, normalmente aproveitando cache da CEK para evitar uma chamada por registro. A partir daí, o driver usa a CEK local para cifrar/decifrar os dados.
 
 #### 📍 Comparativo: CMK vs CEK
 
@@ -162,7 +162,7 @@ A **"Busca da CMK"** (representada no diagrama do Always Encrypted) é o process
 
 1. **Consulta aos Metadados do Banco:** Quando a aplicação dispara um comando SQL em uma tabela criptografada, o driver cliente consulta as visões de sistema do SQL Server (`sys.column_master_keys` e `sys.column_encryption_keys`). O banco retorna apenas os **metadados** (ex.: a URL do Azure Key Vault e o valor cifrado da CEK).
 2. **Conexão Direta com o Cofre de Chaves (Busca CMK):** O driver do cliente (usando a identidade da aplicação via Azure AD / Managed Identity) autentica-se diretamente no **Azure Key Vault** (ou acessa o Windows Certificate Store local) e solicita acesso à **CMK (Column Master Key)**.
-3. **Descriptografia Local da CEK:** De posse da CMK, o driver descriptografa a **CEK (Column Encryption Key)** e mantém o valor da CEK em memória RAM segura na máquina cliente durante a sessão.
+3. **Descriptografia Local da CEK:** De posse da CMK, o driver descriptografa a **CEK (Column Encryption Key)** e mantém o valor da CEK em memória do processo cliente enquanto necessário.
 4. **Criptografia dos Parâmetros e Leitura:**
    - Ao **enviar dados**, o driver usa a CEK para criptografar os parâmetros (`WHERE SSN = '...'`) antes de trafegar pela rede.
    - Ao **receber dados**, o driver usa a CEK em memória para converter os bytes criptografados (*ciphertext*) retornados pelo SQL Server em texto plano para a aplicação.
@@ -218,7 +218,7 @@ CREATE TABLE dbo.Patients (
 > Não confunda TDE com Always Encrypted no exame. No TDE, o servidor SQL **descriptografa** os dados para rodar queries. No Always Encrypted, o servidor SQL **nunca** vê o dado descriptografado (a conversão ocorre estritamente no driver cliente). O divisor de águas nas questões é a necessidade de impedir que o administrador do banco (DBA) consiga visualizar dados sensíveis de clientes.
 
 > [!note] Modelo Mental — Always Encrypted
-> Imagine o Always Encrypted como o envio de uma **pasta trancada** para o seu DBA. Ele cuida do armazenamento da pasta (coluna criptografada), mas a chave física (CMK) está segura em seu Azure Key Vault ou repositório local. Apenas o driver cliente consegue destrancar a pasta usando a CMK; o banco armazena apenas metal trancado. A criptografia **DETERMINISTIC** é como usar a mesma tranca para pastas iguais, permitindo ordenação e agrupamento básico pelo DBA. A criptografia **RANDOMIZED** altera o segredo a cada pasta, impedindo qualquer correlação de semelhança pelo banco de dados.
+> Imagine o Always Encrypted como o envio de uma **pasta trancada** para o seu DBA. Ele cuida do armazenamento da pasta (coluna criptografada), mas a chave física (CMK) está segura em seu Azure Key Vault ou repositório local. Apenas o driver cliente consegue destrancar a pasta usando a CMK; o banco armazena apenas o material criptografado. A criptografia **DETERMINISTIC** é como usar a mesma tranca para valores iguais, permitindo algumas operações baseadas em igualdade, como `=` e `JOIN`, conforme os recursos suportados. A criptografia **RANDOMIZED** altera o resultado a cada valor criptografado, dificultando correlação por igualdade no banco de dados.
 
 ---
 

@@ -295,7 +295,7 @@ O driver `Microsoft.Data.SqlClient` suporta diversos modos de autenticação no 
 | Método | Descrição | Caso de Uso |
 | :--- | :--- | :--- |
 | `Active Directory Managed Identity` | Utiliza explicitamente a Managed Identity da VM / App Service. | Serviços hospedados no Azure PaaS/IaaS. |
-| `Active Directory Default` | Testa sequencialmente múltiplos métodos (Managed Identity -> Env -> Azure CLI -> VS Code). | Recomendado para desenvolvimento e produção contínuos. |
+| `Active Directory Default` | Testa sequencialmente múltiplos métodos disponíveis no ambiente (por exemplo, Managed Identity, variáveis de ambiente, Azure CLI e VS Code). | Conveniente para desenvolvimento e cenários com múltiplos ambientes; em produção, avalie um método explícito de identidade gerenciada. |
 | `Active Directory Integrated` | Autenticação integrada Kerberos/SSO via Active Directory alinhado ao Entra ID. | Estações de trabalho corporativas conectadas ao domínio. |
 | `Active Directory Interactive` | Abre navegador/pop-up exigindo Autenticação Multi-Fator (MFA). | Desenvolvedores acessando via SSMS ou Azure Data Studio. |
 | `Active Directory Service Principal` | Utiliza `Client ID` e `Client Secret` registrados no Entra ID. | Aplicações rodando fora do Azure (on-premises / multicloud). |
@@ -337,7 +337,7 @@ Historicamente no SQL Server, a segurança é estruturada em dois níveis distin
 
 Essa separação cria uma alta dependência do banco de dados em relação à instância em que está hospedado.
 
-Um **Contained Database** (Banco de Dados Contido) quebra essa dependência ao armazenar todas as definições de metadados, credenciais e usuários **diretamente dentro do próprio arquivo do banco de dados**, isolando-o completamente da instância do SQL Server.
+Um **Contained Database** (Banco de Dados Contido) reduz essa dependência ao manter no banco as definições e os usuários contidos. No caso de um usuário contido com senha, a autenticação também é gerenciada no banco; usuários baseados em Microsoft Entra continuam dependendo da identidade externa para autenticação.
 
 ```mermaid
 flowchart TD
@@ -379,8 +379,8 @@ No modelo de banco contido, existem três tipos principais de usuários:
 | :--- | :--- | :--- |
 | **Onde fica a Credencial/Senha?** | No banco `master` da instância (`sys.server_principals`) | **Diretamente no banco de dados do usuário** (`sys.database_principals`) |
 | **Criação de Conta** | 1. `CREATE LOGIN` no servidor<br/>2. `CREATE USER ... FOR LOGIN` no DB | `CREATE USER ... WITH PASSWORD` diretamente no DB |
-| **Backup / Restore em Outro Servidor** | Quebra a autenticação! Gera **Usuários Órfãos** (*Orphaned Users*) | **Zero impacto**. O usuário e a senha são migrados dentro do backup |
-| **Failover (Always On / Geo-Replication)** | Exige sincronização manual ou scripts de login entre instâncias | **Failover transparente**. A autenticação funciona no nó secundário sem ajustes |
+| **Backup / Restore em Outro Servidor** | Pode quebrar o mapeamento e gerar **Usuários Órfãos** (*Orphaned Users*) | Evita a dependência do login no `master`; ainda é necessário validar identidade, senha e permissões no ambiente de destino |
+| **Failover (Always On / Geo-Replication)** | Exige sincronização manual ou scripts de login entre instâncias | Reduz a dependência de logins no `master`; a conectividade e a configuração do destino ainda precisam ser validadas |
 | **Acesso à Instância/master** | Pode listar bancos, ler metadados do servidor e logar no `master` | **Totalmente bloqueado**. O usuário não tem acesso ao `master` nem ao servidor |
 | **Suporte Nativo Azure SQL DB** | Requer permissões de servidor (não aplicável em PaaS) | **Padrão recomendado pela Microsoft** para nuvem PaaS |
 
