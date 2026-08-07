@@ -18,11 +18,22 @@ tags:
 > - 📍 [4. Roles de Banco de Dados (Database Roles)](#roles-de-banco-de-dados-database-roles)
 > - 📍 [5. Comandos de Permissão em Nível de Objeto](#comandos-de-permissão-em-nível-de-objeto)
 > - 📍 [6. Acesso Sem Senha com Identidade Gerenciada (Managed Identity)](#acesso-sem-senha-com-identidade-gerenciada-managed-identity)
+>   - 🔹 [Visão Geral e Arquitetura Passwordless](#visão-geral-e-arquitetura-passwordless)
 >   - 🔹 [Tipos de Managed Identity](#tipos-de-managed-identity)
+>   - 🔹 [Fluxo de Autenticação OAuth 2.0 Passo a Passo](#fluxo-de-autenticação-oauth-20-passo-a-passo)
 >   - 🔹 [Mapeando Managed Identity no Azure SQL](#mapeando-managed-identity-no-azure-sql)
+>   - 🔹 [Strings de Conexão e Implementação em Código](#strings-de-conexão-e-implementação-em-código)
 >   - 🔹 [Métodos de Autenticação Entra ID (Azure AD)](#métodos-de-autenticação-entra-id-azure-ad)
 > - 📍 [7. Princípio do Menor Privilégio (Least Privilege)](#princípio-do-menor-privilégio-least-privilege)
-> - 📍 [8. Contained Database Users (Usuários de Banco Contidos)](#contained-database-users-usuários-de-banco-contidos)
+> - 📍 [8. Contained Databases e Contained Users (Bancos e Usuários Contidos)](#contained-databases-e-contained-users-bancos-e-usuários-contidos)
+>   - 🔹 [Visão Geral da Arquitetura](#visão-geral-da-arquitetura)
+>   - 🔹 [Tipos de Usuários Contidos](#tipos-de-usuários-contidos)
+>   - 🔹 [Diferenças entre Modelo Tradicional e Modelo Contido](#diferenças-entre-modelo-tradicional-e-modelo-contido)
+>   - 🔹 [O Problema dos Usuários Órfãos (Orphaned Users)](#o-problema-dos-usuários-órfãos-orphaned-users)
+>   - 🔹 [Requisito Obrigatório da String de Conexão](#requisito-obrigatório-da-string-de-conexão)
+>   - 🔹 [Habilitando e Configurando no SQL Server e Azure SQL](#habilitando-e-configurando-no-sql-server-e-azure-sql)
+>   - 🔹 [Identificando Entidades Não Contidas](#identificando-entidades-não-contidas)
+>   - 🔹 [Dicas para o Exame DP-800](#dicas-para-o-exame-dp-800)
 > - 📍 [9. Contexto de Execução com EXECUTE AS](#contexto-de-execução-com-execute-as)
 >   - 🔹 [Escopos do EXECUTE AS](#escopos-do-execute-as)
 > - 📍 [10. Cadeia de Propriedade (Ownership Chaining)](#cadeia-de-propriedade-ownership-chaining)
@@ -52,7 +63,11 @@ O SQL Server utiliza um modelo hierárquico e granular de permissões: logins no
 >
 > - **DENY sempre ganha (wins)** de um GRANT — se houver um `DENY` direto no usuário, o acesso será bloqueado mesmo que ele pertença a uma role com permissão `GRANT SELECT`.
 > - **REVOKE** remove uma permissão concedida ou negada anteriormente — ele apenas anula um comando prévio, não bloqueando novos acessos herdados.
-> - Roles fixas: `db_datareader` = SELECT em todas as tabelas; `db_datawriter` = INSERT/UPDATE/DELETE; `db_owner` = controle total; `db_ddladmin` = permissões para DDL.
+> - Roles fixas:
+>   - `db_datareader` = SELECT em todas as tabelas;
+>   - `db_datawriter` = INSERT/UPDATE/DELETE;
+>   - `db_owner` = controle total;
+>   - `db_ddladmin` = permissões para DDL.
 
 ---
 
@@ -134,53 +149,165 @@ SELECT * FROM fn_my_permissions('dbo.Orders', 'OBJECT');
 SELECT * FROM sys.database_permissions WHERE grantee_principal_id = USER_ID('ReportUser');
 ```
 
-> [!warning] Erro Comum
+[!warning] Erro Comum
 > REVOKE não é o mesmo que DENY. O `REVOKE` desfaz uma regra (devolvendo a decisão de acesso às regras herdadas das Roles). O `DENY` bloqueia explicitamente no nível mais alto de precedência. Para barrar acessos com segurança absoluta, use `DENY`.
 
-> [!note] Modelo Mental — GRANT / DENY / REVOKE
+[!note] Modelo Mental — GRANT / DENY / REVOKE
+
 > Pense nisso como a **portaria de um prédio**. O `GRANT` é o crachá de liberação de entrada. O `DENY` é a lista de banidos da portaria — mesmo que você tenha crachá ou esteja acompanhado por um amigo (Role), o banimento overrules e você não entra. O `REVOKE` é apenas o ato de recolher o crachá de alguém (ou apagá-lo da lista de banimento) — ele não cria novas proibições. O único comando que barra ativamente é o `DENY`. A única forma de anular um `DENY` é dar um `REVOKE` especificamente daquele DENY.
 
 ---
 
 ## Acesso Sem Senha com Identidade Gerenciada (Managed Identity)
 
-O uso de **Managed Identity** elimina o armazenamento de senhas e credenciais em arquivos locais de código, substituindo por tokens seguros do Azure Active Directory (Entra ID).
+---
+
+### Visão Geral e Arquitetura Passwordless
+
+O **Acesso Sem Senha (*Passwordless Access*)** com **Managed Identity** (Identidade Gerenciada) é o padrão-ouro de segurança para conectar serviços hospedados no Azure (como Azure App Service, Azure Functions, VMs e Azure Kubernetes Service - AKS) ao **Azure SQL Database** ou **Azure SQL Managed Instance**.
+
+Esse modelo elimina a necessidade de gerenciar, armazenar ou rotacionar credenciais (usuários e senhas) em arquivos de configuração (`appsettings.json`, `.env`), variáveis de ambiente ou cofres de segredos.
+
+```mermaid
+flowchart TD
+    subgraph TRAD["❌ Modelo Tradicional"]
+        direction TB
+        App1["Azure App Service"]
+        Conf["appsettings.json<br/><i>User=dbuser; Password=P@ssword123!</i>"]
+        DB1[("Azure SQL Database")]
+        App1 -->|"Lê senha exposta"| Conf
+        App1 -->|"Envia User + Password"| DB1
+    end
+
+    subgraph MI["✅ Modelo Passwordless"]
+        direction TB
+        App2["Azure App Service<br/>(Managed Identity Habilitada)"]
+        Entra["Microsoft Entra ID<br/>(Emite Token OAuth 2.0)"]
+        DB2[("Azure SQL Database<br/><i>CREATE USER [app-prod] FROM EXTERNAL PROVIDER</i>")]
+        App2 -->|"1. Pede Token via Endpoint de Metadados"| Entra
+        Entra -->|"2. Emite Token JWT de curta duração"| App2
+        App2 -->|"3. Conecta via Token OAuth (sem senha)"| DB2
+    end
+```
+
+---
 
 ### Tipos de Managed Identity
 
-| Tipo | Ciclo de Vida | Casos de Uso comuns |
+O Azure disponibiliza dois tipos de Identidades Gerenciadas no Microsoft Entra ID:
+
+| Característica | System-Assigned (Atribuída pelo Sistema) | User-Assigned (Atribuída pelo Usuário) |
 | :--- | :--- | :--- |
-| **System-assigned** | Vinculado exclusivamente ao recurso do Azure | Autenticação dedicada para um único serviço. |
-| **User-assigned** | Recurso Azure independente e compartilhado | `Múltiplos microsserviços dividindo a mesma identidade lógica`. |
+| **Vínculo** | Criada e vinculada a **um único recurso** do Azure (ex: 1 App Service). | Criada como um **recurso independente** no Azure. |
+| **Ciclo de Vida** | Excluída automaticamente se o recurso Azure for deletado. | Mantida independentemente da exclusão dos recursos associados. |
+| **Compartilhamento** | **Não compartilhável**. Exclusiva de uma única VM/App Service. | **Compartilhável**. Pode ser associada a múltiplos recursos/VMs. |
+| **Caso de Uso Recomendado** | Cargas de trabalho isoladas e aplicações com ciclo de vida único. | Microsserviços e conjuntos de instâncias (ex.: clusters AKS ou VM Scale Sets). |
 
 > [!tip] Identidades Gerenciadas no Azure: System-Assigned vs User-Assigned
->
-> - **System-assigned (Atribuída pelo sistema)**: Criada e vinculada diretamente a um recurso específico do Azure (ex: uma VM ou App Service). Se o recurso for excluído, a identidade é deletada automaticamente.
-> - **User-assigned (Atribuída pelo usuário)**: Criada como um recurso Azure independente. Pode ser associada a múltiplos recursos compartilhando o mesmo escopo de permissões lógicas de banco.
+> - **System-assigned**: Ideal quando a identidade precisa pertencer unicamente àquele serviço específico. Ao deletar o serviço, o Azure limpa o Service Principal no Entra ID automaticamente.
+> - **User-assigned**: Ideal quando múltiplos serviços (ex: 3 Azure Functions distintas) precisam reutilizar a mesma identidade lógica de banco de dados para simplificar a concessão de permissões SQL.
+
+---
+
+### Fluxo de Autenticação OAuth 2.0 Passo a Passo
+
+O processo de autenticação sem senha ocorre em 5 etapas transparentes:
+
+1. **Ativação da Identidade:** Habilita-se a Managed Identity no recurso do Azure (ex: App Service `app-vendas-prod`). O Azure registra o Service Principal no Microsoft Entra ID.
+2. **Provisionamento no Banco:** No Azure SQL Database, cria-se o usuário contido correspondente:
+   `CREATE USER [app-vendas-prod] FROM EXTERNAL PROVIDER;`
+3. **Requisição Local de Token:** A aplicação chama o SDK da Azure (`Azure.Identity`). O SDK se comunica com o **Endpoint de Metadados Local** (`http://169.254.169.254/metadata/identity/oauth2/token`).
+4. **Emissão do Token JWT:** O Microsoft Entra ID valida que a requisição veio de um recurso autenticado do Azure e retorna um **Token de Acesso OAuth 2.0 (JWT)** assinado com escopo para o Azure SQL (`https://database.windows.net/`).
+5. **Conexão ao SQL Database:** O driver do SQL insere o Token de Acesso no protocolo TDS da conexão. O Azure SQL valida o token com o Entra ID e autoriza as queries do usuário.
+
+---
 
 ### Mapeando Managed Identity no Azure SQL
 
 ```sql
--- Criar usuário para a identidade gerenciada do App Service
-CREATE USER [my-app-service] FROM EXTERNAL PROVIDER;
-ALTER ROLE db_datareader ADD MEMBER [my-app-service];
-GRANT EXECUTE ON SCHEMA::dbo TO [my-app-service];
+-- Executado no Azure SQL Database conectado como Admin do Entra ID:
+USE VendasDB;
+
+-- 1. Criar usuário contido para a Managed Identity (nome EXATO do recurso ou da User-Assigned Identity)
+CREATE USER [app-vendas-prod] FROM EXTERNAL PROVIDER;
+
+-- 2. Atribuir roles de banco de dados e permissões mínimas
+ALTER ROLE db_datareader ADD MEMBER [app-vendas-prod];
+ALTER ROLE db_datawriter ADD MEMBER [app-vendas-prod];
+GRANT EXECUTE ON SCHEMA::dbo TO [app-vendas-prod];
 ```
 
-```csharp
-// String de conexão de aplicação (sem necessidade de senhas ou chaves)
-var connectionString = "Server=myserver.database.windows.net;Database=mydb;Authentication=Active Directory Managed Identity;";
+---
+
+### Strings de Conexão e Implementação em Código
+
+#### String de Conexão (Sem Usuário e Sem Senha!)
+
+```text
+-- Configuração via Microsoft.Data.SqlClient usando Managed Identity:
+Server=tcp:meuservidor.database.windows.net,1433; Database=VendasDB; Authentication=Active Directory Default;
 ```
+
+#### Exemplo em Código C# (.NET):
+
+```csharp
+using Microsoft.Data.SqlClient;
+using Azure.Identity;
+
+// String de conexão limpa sem nenhuma credencial sensível
+var connectionString = "Server=tcp:meuservidor.database.windows.net; Database=VendasDB;";
+using var connection = new SqlConnection(connectionString);
+
+// O SDK DefaultAzureCredential obtém o token de acesso da Managed Identity automaticamente
+var credential = new DefaultAzureCredential();
+var tokenContext = new Azure.Core.TokenRequestContext(new[] { "https://database.windows.net/.default" });
+var accessToken = await credential.GetTokenAsync(tokenContext);
+
+connection.AccessToken = accessToken.Token;
+await connection.OpenAsync();
+```
+
+#### Exemplo em Python (`azure-identity` + `pyodbc`):
+
+```python
+import struct
+import pyodbc
+from azure.identity import DefaultAzureCredential
+
+# 1. Obter o token de acesso via SDK Azure
+credential = DefaultAzureCredential()
+token_bytes = credential.get_token("https://database.windows.net/.default").token.encode("utf-16-le")
+token_struct = struct.pack(f"<I{len(token_bytes)}s", len(token_bytes), token_bytes)
+
+# 2. Conectar via pyodbc passando o token no atributo SQL_COPT_SS_ACCESS_TOKEN (1256)
+conn_str = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:meuservidor.database.windows.net,1433;Database=VendasDB;"
+SQL_COPT_SS_ACCESS_TOKEN = 1256
+
+conn = pyodbc.connect(conn_str, attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct})
+```
+
+---
 
 ### Métodos de Autenticação Entra ID (Azure AD)
 
-| Método | Casos de Uso |
-| :--- | :--- |
-| `Active Directory Integrated` | Máquinas no domínio corporativo com SSO. |
-| `Active Directory Interactive` | Contas de usuários que exigem autenticação MFA. |
-| `Active Directory Managed Identity` | Aplicações e serviços hospedados na nuvem Azure. |
-| `Active Directory Service Principal` | Integrações com aplicativos externos (Client ID + Secrets). |
-| `Active Directory Default` | Tenta múltiplos métodos de forma sequencial automatizada. |
+O driver `Microsoft.Data.SqlClient` suporta diversos modos de autenticação no Entra ID:
+
+| Método | Descrição | Caso de Uso |
+| :--- | :--- | :--- |
+| `Active Directory Managed Identity` | Utiliza explicitamente a Managed Identity da VM / App Service. | Serviços hospedados no Azure PaaS/IaaS. |
+| `Active Directory Default` | Testa sequencialmente múltiplos métodos (Managed Identity -> Env -> Azure CLI -> VS Code). | Recomendado para desenvolvimento e produção contínuos. |
+| `Active Directory Integrated` | Autenticação integrada Kerberos/SSO via Active Directory alinhado ao Entra ID. | Estações de trabalho corporativas conectadas ao domínio. |
+| `Active Directory Interactive` | Abre navegador/pop-up exigindo Autenticação Multi-Fator (MFA). | Desenvolvedores acessando via SSMS ou Azure Data Studio. |
+| `Active Directory Service Principal` | Utiliza `Client ID` e `Client Secret` registrados no Entra ID. | Aplicações rodando fora do Azure (on-premises / multicloud). |
+| `Active Directory Password` | Autenticação via usuário e senha tradicionais do Entra ID. | Legado / Não recomendado em novas arquiteturas. |
+
+---
+
+### Dicas para o Exame DP-800
+
+> [!important] Cenários Frequentes sobre Passwordless e Managed Identity
+> 1. **Eliminação Total de Credenciais:** Se o requisito for conectar uma aplicação Azure PaaS ao Azure SQL **sem armazenar credenciais ou segredos em nenhum lugar**, a resposta correta é **Managed Identity + Contained Database User (`FROM EXTERNAL PROVIDER`)**.
+> 2. **Autenticação de Desenvolvimento vs Produção:** Usar `Authentication=Active Directory Default` ou `DefaultAzureCredential` permite que o código use Azure CLI/VS Code localmente no dev e a **Managed Identity** nativamente quando implantado no Azure sem mudar o código.
 
 ---
 
@@ -198,31 +325,167 @@ GRANT INSERT ON dbo.OrderItems TO AppUser;
 
 ---
 
-## Contained Database Users (Usuários de Banco Contidos)
+## Contained Databases e Contained Users (Bancos e Usuários Contidos)
 
-Um **contained database user** possui dados cadastrais salvos no próprio banco de dados, dispensando a presença de um login mapeado a nível do master no servidor SQL.
+---
 
-**Vantagens:**
+### Visão Geral da Arquitetura
 
-- **Portabilidade**: O usuário e suas permissões migram junto com o banco de dados em backups, restores ou failovers, evitando "logins órfãos".
-- **Azure SQL**: É o padrão recomendado pelo Azure, facilitando a portabilidade em bancos elétricos (Elastic Pools).
-- **Facilidade**: Permite provisionar acessos sem necessidade de tocar no master.
+Historicamente no SQL Server, a segurança é estruturada em dois níveis distintos:
+1. **Instância / Servidor (`master`):** Onde reside o **Login** (identidade e credencial de autenticação).
+2. **Banco de Dados:** Onde reside o **User** (mapeado para o Login para receber permissões e papéis).
+
+Essa separação cria uma alta dependência do banco de dados em relação à instância em que está hospedado.
+
+Um **Contained Database** (Banco de Dados Contido) quebra essa dependência ao armazenar todas as definições de metadados, credenciais e usuários **diretamente dentro do próprio arquivo do banco de dados**, isolando-o completamente da instância do SQL Server.
+
+```mermaid
+flowchart TD
+    subgraph TRAD["Modelo Tradicional"]
+        direction TB
+        L1["<b>SQL Server Instance (master)</b><br/>sys.server_principals (LOGIN + Hash de Senha)"]
+        U1["<b>User Database</b><br/>sys.database_principals (USER mapeado ao SID)"]
+        L1 -->|"Dependência de SID"| U1
+    end
+
+    subgraph CONT["Modelo Contido"]
+        direction TB
+        U2["<b>Contained User Database</b><br/>sys.database_principals (USER + Hash de Senha no próprio DB)"]
+        S2["<b>SQL Server Instance (master)</b><br/><i>Não armazena credenciais nem logins</i>"]
+    end
+```
+
+---
+
+### Tipos de Usuários Contidos
+
+No modelo de banco contido, existem três tipos principais de usuários:
+
+1. **Usuário Contido com Senha (*Contained User with Password*):**
+   * Criado diretamente no banco de dados com `CREATE USER ReportUser WITH PASSWORD = '...'`.
+   * A hash da senha é armazenada diretamente na tabela de sistema do banco do usuário (`sys.database_principals`), dispensando qualquer registro no banco `master`.
+2. **Usuário do Microsoft Entra ID / Azure AD (*External Provider User*):**
+   * Criado no Azure SQL Database ou Azure SQL Managed Instance via `CREATE USER [user@domain.com] FROM EXTERNAL PROVIDER`.
+   * A autenticação é delegada ao Microsoft Entra ID (nuvem) e o mapeamento de acesso ocorre diretamente dentro do banco de dados.
+3. **Usuário Contido sem Senha (*Contained User Without Login/Password*):**
+   * Criado via `CREATE USER AppInternalUser WITHOUT LOGIN`.
+   * Utilizado para personificação de segurança (`EXECUTE AS USER`) ou para conceder permissões a objetos internos sem permitir conexões diretas por clientes externos.
+
+---
+
+### Diferenças entre Modelo Tradicional e Modelo Contido
+
+| Característica | Modelo Tradicional (Login + User) | Modelo Contido (Contained User) |
+| :--- | :--- | :--- |
+| **Onde fica a Credencial/Senha?** | No banco `master` da instância (`sys.server_principals`) | **Diretamente no banco de dados do usuário** (`sys.database_principals`) |
+| **Criação de Conta** | 1. `CREATE LOGIN` no servidor<br/>2. `CREATE USER ... FOR LOGIN` no DB | `CREATE USER ... WITH PASSWORD` diretamente no DB |
+| **Backup / Restore em Outro Servidor** | Quebra a autenticação! Gera **Usuários Órfãos** (*Orphaned Users*) | **Zero impacto**. O usuário e a senha são migrados dentro do backup |
+| **Failover (Always On / Geo-Replication)** | Exige sincronização manual ou scripts de login entre instâncias | **Failover transparente**. A autenticação funciona no nó secundário sem ajustes |
+| **Acesso à Instância/master** | Pode listar bancos, ler metadados do servidor e logar no `master` | **Totalmente bloqueado**. O usuário não tem acesso ao `master` nem ao servidor |
+| **Suporte Nativo Azure SQL DB** | Requer permissões de servidor (não aplicável em PaaS) | **Padrão recomendado pela Microsoft** para nuvem PaaS |
+
+---
+
+### O Problema dos Usuários Órfãos (Orphaned Users)
+
+No modelo tradicional, o mapeamento entre o Login no `master` e o Usuário no banco de dados é feito por um **Security Identifier (SID)** único de 16 bytes:
+
+1. Quando você executa `CREATE LOGIN AppUser WITH PASSWORD = '...'`, o SQL Server gera um `SID_A` no `master`.
+2. Quando você roda `CREATE USER AppUser FOR LOGIN AppUser` no `MeuBanco`, o banco salva o `SID_A`.
+3. Se você fizer o backup do `MeuBanco` e restaurar em outro servidor SQL Server (ou se o servidor for reconstruído), o `master` do novo servidor **não possui o `SID_A`**.
+4. **Resultado:** O usuário no banco vira um **Usuário Órfão** (*Orphaned User*). A aplicação não consegue logar, sendo necessário rodar comandos corretivos como `ALTER USER AppUser WITH LOGIN = AppUser` ou `sp_change_users_login`.
+
+**Como o Contained User resolve isso:**
+O `Contained Database User` não possui mapeamento com o `master`. O SID e a hash da senha nascem e vivem exclusivamente dentro de `sys.database_principals` do banco do usuário. Ao restaurar o arquivo `.bak` em qualquer SQL Server do planeta, a autenticação continua funcionando **instantaneamente**.
+
+---
+
+### Requisito Obrigatório da String de Conexão
+
+Como o usuário contido não possui cadastro no banco `master`, o SQL Server não sabe qual banco de dados autenticar se a conexão chegar de forma genérica. Por essa razão, a string de conexão da aplicação **OBRIGATORIAMENTE** deve especificar o nome do banco de dados inicial (`Database=...` ou `Initial Catalog=...`):
+
+```text
+-- ✅ Conexão bem-sucedida (especifica o banco de dados contido):
+Server=meuservidor.database.windows.net; Database=MeuBancoDados; User Id=ReportUser; Password=Report#2025!;
+
+-- ❌ Falha de Autenticação (Erro 18456 - Tenta autenticar no 'master', onde o usuário não existe):
+Server=meuservidor.database.windows.net; User Id=ReportUser; Password=Report#2025!;
+```
+
+---
+
+### Habilitando e Configurando no SQL Server e Azure SQL
+
+#### 1. Em Ambiente SQL Server On-Premises ou VM (IaaS)
+
+Para permitir a criação de bancos de dados contidos em uma instância SQL Server tradicional, é necessário ativar a funcionalidade no servidor e definir o nível de confinamento do banco de dados:
 
 ```sql
--- Ativar autenticação contida (SQL Server local)
+-- Passo 1: Habilitar a funcionalidade no nível da Instância (exige sysadmin)
 EXEC sp_configure 'contained database authentication', 1;
 RECONFIGURE;
+GO
 
-ALTER DATABASE MyDatabase SET CONTAINMENT = PARTIAL;
+-- Passo 2: Alterar o nível de confinamento do banco de dados para PARTIAL
+ALTER DATABASE SalesDB SET CONTAINMENT = PARTIAL;
+GO
 
--- Criar usuário contido sem necessidade de LOGIN no servidor master
-USE MyDatabase;
-CREATE USER AppUser WITH PASSWORD = 'SecureP@ssword1!';
-ALTER ROLE db_datareader ADD MEMBER AppUser;
-
--- No Azure SQL Database (Entra ID usa contidos por padrão)
-CREATE USER [user@domain.com] FROM EXTERNAL PROVIDER;
+-- Passo 3: Criar o Usuário Contido com Senha direto no banco de dados do usuário
+USE SalesDB;
+CREATE USER ReportUser WITH PASSWORD = 'Report#2025!';
+ALTER ROLE db_datareader ADD MEMBER ReportUser;
+GO
 ```
+
+#### 2. No Azure SQL Database / Elastic Pools (PaaS)
+
+No Azure SQL Database, a infraestrutura PaaS é contida por padrão. Você pode criar usuários contidos locais ou integrados ao **Microsoft Entra ID**:
+
+```sql
+-- Conectado diretamente ao seu Azure SQL Database:
+USE SalesDB;
+
+-- Criar usuário contido com senha local
+CREATE USER AppUser WITH PASSWORD = 'StrongP@ssword2026!';
+ALTER ROLE db_datareader ADD MEMBER AppUser;
+ALTER ROLE db_datawriter ADD MEMBER AppUser;
+
+-- Criar usuário contido autenticado via Microsoft Entra ID (Azure AD)
+CREATE USER [analista@contoso.com] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [analista@contoso.com];
+
+-- Criar usuário contido para uma Managed Identity do Azure
+CREATE USER [app-service-prod] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [app-service-prod];
+```
+
+---
+
+### Identificando Entidades Não Contidas
+
+Em bancos de dados configurados como parcialmente contidos (`CONTAINMENT = PARTIAL`), alguns recursos T-SQL podem cruzar os limites do banco e acessar a instância (ex.: consultas entre bancos distintos `SELECT * FROM OtherDB.dbo.Table` ou uso de `sp_send_dbmail`).
+
+O SQL Server disponibiliza a visão de sistema `sys.dm_db_uncontained_entities` para identificar dependências que quebram o confinamento do banco:
+
+```sql
+-- Listar todos os objetos ou recursos que violam o confinamento estrito do banco de dados
+SELECT
+    class_desc,
+    entity_name,
+    feature_name,
+    statement_line_number
+FROM sys.dm_db_uncontained_entities;
+```
+
+---
+
+### Dicas para o Exame DP-800
+
+> [!important] Cenários Frequentes em Questões de Certificação
+>
+> 1. **Zero Manutenção de Logins após Disaster Recovery:** Se a questão pedir uma arquitetura de banco de dados onde os backups possam ser restaurados em qualquer novo servidor ou região **sem necessitar de sincronização de logins no `master` ou correção de usuários órfãos**, a resposta correta é **Contained Database Users**.
+> 2. **Azure SQL Database Security:** Se a questão perguntar qual a melhor prática para conceder acesso a uma aplicação no Azure SQL DB sem criar Logins de servidor, utilize **Contained Database Users com senha** ou **Contained Users via Microsoft Entra ID (External Provider)**.
+> 3. **Causa de Erro de Conexão:** Se a questão indicar que um `Contained Database User` recém-criado não consegue se conectar e recebe erro de autenticação, verifique se a **String de Conexão inclui o parâmetro `Database=...`**.
 
 ---
 

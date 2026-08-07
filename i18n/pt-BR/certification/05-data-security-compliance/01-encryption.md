@@ -15,15 +15,20 @@ tags:
 > - 📍 [2. Criptografia de Dados Transparente (TDE)](#criptografia-de-dados-transparente-tde)
 > - 📍 [3. Always Encrypted](#always-encrypted)
 >   - 🔹 [Hierarquia de Chaves](#hierarquia-de-chaves)
+>   - 🔹 [O que é a CMK (Column Master Key)?](#o-que-é-a-cmk-column-master-key)
+>   - 🔹 [O que é a "Busca de CMK" (CMK Retrieval)?](#o-que-é-a-busca-de-cmk-cmk-retrieval)
 >   - 🔹 [Configurando Always Encrypted via DDL](#configurando-always-encrypted-via-ddl)
 >   - 🔹 [Tipos de Criptografia no Always Encrypted](#tipos-de-criptografia-no-always-encrypted)
 >   - 🔹 [Executando Consultas em Colunas Criptografadas](#executando-consultas-em-colunas-criptografadas)
 > - 📍 [4. Always Encrypted com Secure Enclaves (Enclaves Seguros)](#always-encrypted-com-secure-enclaves-enclaves-seguros)
 >   - 🔹 [Limitações do Always Encrypted Padrão](#limitações-do-always-encrypted-padrão)
 >   - 🔹 [A Solução: Enclaves Seguros (Secure Enclaves)](#a-solução-enclaves-seguros-secure-enclaves)
+>   - 🔹 [Tecnologias de Enclave Suportadas](#tecnologias-de-enclave-suportadas)
+>   - 🔹 [Mecanismo de Atestação (Attestation)](#mecanismo-de-atestação-attestation)
 >   - 🔹 [Operações Suportadas por Enclaves Seguros](#operações-suportadas-por-enclaves-seguros)
 >   - 🔹 [Requisitos da String de Conexão com Enclave](#requisitos-da-string-de-conexão-com-enclave)
->   - 🔹 [Exemplo de Uso de Enclave](#exemplo-de-uso-de-enclave)
+>   - 🔹 [Exemplo de Configuração DDL e Consulta com Enclave](#exemplo-de-configuração-ddl-e-consulta-com-enclave)
+>   - 🔹 [Comparativo: Always Encrypted Padrão vs Secure Enclaves](#comparativo-always-encrypted-padrão-vs-secure-enclaves)
 > - 📍 [5. Processos de Rotação de Chaves (Key Rotation Procedures)](#processos-de-rotação-de-chaves-key-rotation-procedures)
 >   - 🔹 [Por que Rotacionar Chaves](#por-que-rotacionar-chaves)
 >   - 🔹 [Rotação de Column Master Key (CMK)](#rotação-de-column-master-key-cmk)
@@ -122,10 +127,48 @@ Column Master Key (CMK)
     └── Dados criptografados da coluna (Encrypted column data)
 ```
 
+### O que é a CMK (Column Master Key)?
+
+A **CMK (Column Master Key)** é uma **chave mestra de proteção** (Key-Protecting Key) mantida em um cofre externo confiável (como **Azure Key Vault** ou **Windows Certificate Store**).
+
+#### 🎯 Qual é o papel da CMK?
+- A CMK **NÃO criptografa os dados das linhas da tabela diretamente**.
+- A única função da CMK é **criptografar e proteger a CEK (Column Encryption Key)**.
+
+#### 💡 Por que o Always Encrypted usa 2 chaves (CMK + CEK)?
+Se a aplicação tivesse que chamar o Azure Key Vault para criptografar/descriptografar cada registro de uma tabela, uma consulta de 10.000 linhas causaria 10.000 requisições de rede ao Key Vault, tornando a aplicação extremamente lenta.
+
+Para resolver isso, o Always Encrypted divide as responsabilidades em duas chaves:
+1. **CEK (Column Encryption Key):** É uma chave simétrica rápida (AES-256) usada para cifrar os dados reais das colunas. A CEK é armazenada dentro do banco de dados, porém em formato criptografado.
+2. **CMK (Column Master Key):** É a chave mestra que tranca a CEK. O driver da aplicação consulta a CMK no Key Vault **apenas uma vez** no início da sessão para descriptografar a CEK na memória RAM da aplicação. A partir daí, o driver usa a CEK local para cifrar/decifrar milhares de dados com altíssima performance.
+
+#### 📍 Comparativo: CMK vs CEK
+
+| Chave | Nome | Onde Fica Armazenada? | O que Ela Criptografa? | Quem tem Acesso? |
+| :--- | :--- | :--- | :--- | :--- |
+| **CMK** | Column Master Key | External Key Store (**Azure Key Vault** / Cert Store) | Apenas a **CEK** | Apenas a Aplicação Cliente |
+| **CEK** | Column Encryption Key | **Banco de Dados** (em formato cifrado) | Os **Dados das Colunas** (`SSN`, `Salário`, etc.) | Driver decifra na RAM do cliente |
+
 > [!tip] Divisão de Responsabilidade de Chaves no Always Encrypted
 >
 > - **Column Encryption Key (CEK)**: Fica armazenada de forma criptografada no banco de dados (o banco não possui a chave para descriptografá-la).
 > - **Column Master Key (CMK)**: Fica guardada em um repositório confiável externo (como Azure Key Vault ou Windows Certificate Store). O banco de dados **nunca** tem acesso à CMK. Apenas o driver do cliente recupera a CMK para descriptografar a CEK na máquina do cliente.
+
+### O que é a "Busca de CMK" (CMK Retrieval)?
+
+A **"Busca da CMK"** (representada no diagrama do Always Encrypted) é o processo no qual o **driver SQL do cliente** se conecta ao cofre externo para obter permissão/chave para decifrar dados.
+
+**Como funciona o fluxo passo a passo:**
+
+1. **Consulta aos Metadados do Banco:** Quando a aplicação dispara um comando SQL em uma tabela criptografada, o driver cliente consulta as visões de sistema do SQL Server (`sys.column_master_keys` e `sys.column_encryption_keys`). O banco retorna apenas os **metadados** (ex.: a URL do Azure Key Vault e o valor cifrado da CEK).
+2. **Conexão Direta com o Cofre de Chaves (Busca CMK):** O driver do cliente (usando a identidade da aplicação via Azure AD / Managed Identity) autentica-se diretamente no **Azure Key Vault** (ou acessa o Windows Certificate Store local) e solicita acesso à **CMK (Column Master Key)**.
+3. **Descriptografia Local da CEK:** De posse da CMK, o driver descriptografa a **CEK (Column Encryption Key)** e mantém o valor da CEK em memória RAM segura na máquina cliente durante a sessão.
+4. **Criptografia dos Parâmetros e Leitura:**
+   - Ao **enviar dados**, o driver usa a CEK para criptografar os parâmetros (`WHERE SSN = '...'`) antes de trafegar pela rede.
+   - Ao **receber dados**, o driver usa a CEK em memória para converter os bytes criptografados (*ciphertext*) retornados pelo SQL Server em texto plano para a aplicação.
+
+> [!important] Ponto Fundamental para a Prova DP-800
+> O **SQL Server NUNCA faz a busca da CMK** e **NUNCA acessa o Azure Key Vault**. Toda a autenticação no cofre e o download/uso da CMK são executados exclusivamente pelo **driver da aplicação cliente**. O servidor SQL armazena e enxerga apenas o *ciphertext* (dado trancado).
 
 ### Configurando Always Encrypted via DDL
 
@@ -200,77 +243,133 @@ SELECT * FROM dbo.Patients WHERE SSN = '123-45-6789'; -- Funciona apenas com DET
 
 ### Limitações do Always Encrypted Padrão
 
-O Always Encrypted padrão limita bastante a flexibilidade de desenvolvimento: colunas criptografadas suportam apenas filtros de igualdade se configuradas como Determinísticas. Consultas de intervalo (`<`, `>`, `BETWEEN`), filtros textuais aproximados (`LIKE`) e re-criptografia em tempo de execução falham, pois o motor do banco de dados não consegue ler os valores reais.
+O Always Encrypted padrão (apenas no lado do cliente) limita consideravelmente a flexibilidade de desenvolvimento:
+* Colunas criptografadas suportam apenas filtros de igualdade (`=`, `IN`) se configuradas com o tipo **DETERMINISTIC**.
+* Colunas configuradas com criptografia **RANDOMIZED** não suportam nenhum tipo de filtro ou pesquisa T-SQL.
+* Consultas de intervalo (`<`, `>`, `BETWEEN`), ordenação (`ORDER BY`), pesquisas textuais parciais (`LIKE`) e alterações de esquema *in-place* falham, pois o motor do banco de dados não possui acesso aos dados em texto plano.
+
+---
 
 ### A Solução: Enclaves Seguros (Secure Enclaves)
 
-Um **secure enclave** é uma área isolada e protegida de memória (sandbox) dentro do servidor de banco de dados onde os dados criptografados podem ser descriptografados e processados de forma segura, sem expor os valores planos ao restante do sistema ou aos DBAs.
+Um **Secure Enclave** é uma região de memória isolada e criptografada (sandbox) dentro do processo do SQL Server que atua como um **TEE (Trusted Execution Environment)**. O enclave permite que o SQL Server realize computações complexas em dados sensíveis sem expor o texto plano ao restante do motor do banco de dados, ao sistema operacional, ao hipervisor ou a usuários privilegiados (como DBAs e administradores `sysadmin`).
 
 ```mermaid
 flowchart LR
-    subgraph CLIENT ["1. CLIENT APPLICATION & DRIVER"]
+    subgraph CLIENT[" "]
         direction TB
+        T1["<b>Cliente & Driver</b>"]
         APP["App / Driver SQL"]
-        AKV[("Azure Key Vault<br/>(Column Master Key - CMK)")]
-        APP -->|Busca CMK| AKV
+        AKV[("Azure Key Vault<br/>(CMK)")]
+        ATT["Serviço de Atestação<br/>(HGS / Azure Attestation)"]
+        T1 --> APP
+        APP -->|"1. Valida Enclave"| ATT
+        APP -->|"2. Busca CMK"| AKV
     end
 
-    subgraph ENGINE ["2. SQL SERVER ENGINE"]
+    subgraph ENGINE[" "]
         direction TB
+        T2["<b>SQL Server Engine</b>"]
         STORAGE[("Tabelas Criptografadas<br/>(Ciphertext em Disco)")]
+        T2 --> STORAGE
     end
 
-    subgraph ENCLAVE ["3. SECURE ENCLAVE (Sandbox VBS)"]
+    subgraph ENCLAVE[" "]
         direction TB
-        MEM["Memória Isolada do Enclave<br/>(Descriptografa CEK e processa BETWEEN / LIKE)"]
+        T3["<b>Secure Enclave (TEE)</b>"]
+        MEM["Memória Isolada<br/>(Processa LIKE/BETWEEN/ALTER)"]
+        T3 --> MEM
     end
 
-    CLIENT -->|Envia consulta autorizada| ENGINE
-    ENGINE -->|Delega dados para processamento| ENCLAVE
-    ENCLAVE -->|Retorna IDs filtrados| ENGINE
-    ENGINE -->|Retorna dados ao cliente| CLIENT
+    CLIENT -->|"3. Query + CEK Segura"| ENGINE
+    ENGINE -->|"4. Delega cálculo"| ENCLAVE
+    ENCLAVE -->|"5. Retorna IDs filtrados"| ENGINE
+    ENGINE -->|"6. Retorna resultado"| CLIENT
 ```
 
-![Always Encrypted with Secure Enclaves Architecture](../../../../dist/images/always_encrypted_secure_enclaves.png)
+---
 
-O Azure SQL Database implementa enclaves do tipo **VBS (Virtualization-based Security)**.
+### Tecnologias de Enclave Suportadas
+
+1. **VBS (Virtualization-based Security Enclaves):**
+   * **Implementação:** Isolamento de memória baseado em software e hipervisor (Hyper-V). Suportado no SQL Server 2019+ (Windows Server 2019+ / Windows 10/11) e no **Azure SQL Database**.
+   * **Vantagem:** Dispensam hardware especial na CPU. Facilidade de implantação e menor custo de infraestrutura.
+2. **Intel SGX (Software Guard Extensions):**
+   * **Implementação:** Enclave baseado em instruções dedicadas de hardware da CPU Intel.
+   * **Vantagem:** Nível máximo de isolamento garantido por hardware. Suportado no SQL Server 2019+ e configurações de hardware específicas.
+
+---
+
+### Mecanismo de Atestação (Attestation)
+
+Antes de enviar a chave de criptografia de coluna (CEK) para o enclave, o driver da aplicação cliente executa o protocolo de **Atestação (Attestation)** para verificar cryptographicamente a integridade do enclave e garantir que ele é autêntico e não foi modificado:
+
+* **Host Guardian Service (HGS):** Utilizado em ambientes *on-premises* ou VMs IaaS com SQL Server.
+* **Microsoft Azure Attestation (MAA):** Utilizado nativamente no **Azure SQL Database** e serviços PaaS da Microsoft.
+
+---
 
 ### Operações Suportadas por Enclaves Seguros
 
-- Consultas de intervalo: `<`, `>`, `<=`, `>=`, `BETWEEN`.
-- Filtros textuais aproximados: `LIKE`, `IN`.
-- Criptografia e re-criptografia "in-place" (sem necessidade de mover os dados para a rede).
+* **Consultas de Intervalo:** `<`, `>`, `<=`, `>=`, `BETWEEN`.
+* **Filtros por Padrão de Texto:** `LIKE`, `IN`.
+* **Ordenação e Agrupamentos:** `ORDER BY`, `GROUP BY` em colunas criptografadas de forma randômica (`RANDOMIZED`).
+* **Criptografia In-Place (Online):** Permite alterar tipos de criptografia ou adicionar chaves via `ALTER TABLE ... ALTER COLUMN ... ENCRYPTED WITH (...)` diretamente no servidor, sem necessidade de baixar terabytes de dados para o cliente.
+
+---
 
 ### Requisitos da String de Conexão com Enclave
 
-O driver cliente precisa especificar as rotas de atestação do enclave:
+O driver cliente (.NET, JDBC, ODBC, etc.) precisa especificar que deseja utilizar o enclave e indicar o serviço de atestação:
 
 ```text
-Column Encryption Setting=Enabled; Attestation Protocol=HGS; Enclave Attestation Url=https://...
+Column Encryption Setting=Enabled; Attestation Protocol=HGS; Enclave Attestation Url=https://hgs.domain.com/Attestation;
 ```
+*(Nota: No Azure SQL Database com VBS, o provedor de atestação do Azure gerencia os parâmetros de URL e protocolo de forma transparente).*
 
-> [!warning] O que são Enclaves VBS no Azure SQL?
->
-> - O Azure SQL Database utiliza enclaves baseados em **VBS (Virtualization-based Security)**, que dispensam hardware de segurança dedicado (Intel SGX).
-> - Eles fornecem uma área de memória protegida na VM do SQL onde operações de range query (`BETWEEN`, `>`, `<`), correspondência parcial (`LIKE`) e indexação de dados criptografados de forma randômica são processados de forma isolada do restante do sistema operacional do banco.
+---
 
-### Exemplo de Uso de Enclave
+### Exemplo de Configuração DDL e Consulta com Enclave
 
 ```sql
--- Query filtrando intervalos de idade em coluna criptografada de forma RANDOMIZED
--- Esta consulta executa de forma segura utilizando o enclave do Azure SQL
-SELECT PatientID, Name
-FROM Patients
-WHERE Age BETWEEN 30 AND 50; -- Funciona exclusivamente se o Enclave estiver configurado
+-- 1. Registrar a Column Master Key habilitando suporte a enclave (ENCLAVE_COMPUTATIONS)
+CREATE COLUMN MASTER KEY MyEnclaveCMK
+WITH (
+    KEY_STORE_PROVIDER_NAME = 'AZURE_KEY_VAULT',
+    KEY_PATH = 'https://mykeyvault.vault.azure.net/keys/MyEnclaveCMK/version',
+    ENCLAVE_COMPUTATIONS (SIGNATURE = 0x123456...) -- Assinatura validada pelo serviço de atestação
+);
 
--- Criptografia in-place ativa online via Enclave
-ALTER TABLE Patients
+-- 2. Consulta filtrando intervalos e padrão textual em coluna RANDOMIZED via Enclave
+SELECT PatientID, Name, SSN
+FROM dbo.Patients
+WHERE Age BETWEEN 30 AND 50
+  AND SSN LIKE '123%'; -- Executa de forma transparente dentro do Secure Enclave
+
+-- 3. Criptografia in-place ativa e online no servidor SQL via Enclave
+ALTER TABLE dbo.Patients
 ALTER COLUMN SSN NVARCHAR(11) ENCRYPTED WITH (
     ENCRYPTION_TYPE = RANDOMIZED,
     ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
     COLUMN_ENCRYPTION_KEY = EnclaveCEK
 ) WITH (ONLINE = ON);
 ```
+
+---
+
+### Comparativo: Always Encrypted Padrão vs Secure Enclaves
+
+| Característica | Always Encrypted Padrão | Always Encrypted com Secure Enclaves |
+| :--- | :--- | :--- |
+| **Local de Descriptografia** | Estritamente na aplicação cliente | Aplicação cliente + RAM Isolada do Enclave |
+| **Filtro `=` em DETERMINISTIC** | ✅ Suportado | ✅ Suportado |
+| **Filtros `<`, `>`, `BETWEEN`** | ❌ Não suportado | ✅ Suportado (em DETERMINISTIC e RANDOMIZED) |
+| **Busca Parcial (`LIKE`)** | ❌ Não suportado | ✅ Suportado |
+| **Criptografia In-Place (`ALTER`)** | ❌ Exige download de dados no cliente | ✅ Processado online no próprio servidor SQL |
+| **Requisito de Infraestrutura** | Apenas driver cliente atualizado | VBS (Hyper-V) ou Intel SGX + Serviço de Atestação |
+
+> [!important] Ponto-Chave para a Prova DP-800
+> Se o enunciado solicitar proteção total contra DBAs **E** exigir suporte a filtros de intervalo (`BETWEEN`, `>`, `<`), busca parcial (`LIKE`) ou alteração de criptografia online sem mover dados pela rede, a solução **obrigatoriamente** deve ser **Always Encrypted com Secure Enclaves**. Se exigir apenas busca por igualdade exata (`=`) com menor complexidade, o **Always Encrypted Padrão (Deterministic)** é suficiente.
 
 ---
 
@@ -375,13 +474,59 @@ CLOSE SYMMETRIC KEY MySymKey;
 
 ## Tabela Comparativa de Métodos de Criptografia
 
-| Característica | TDE (Transparent Data Encryption) | Always Encrypted | Criptografia Manual (ENCRYPTBYKEY) |
-| :--- | :--- | :--- | :--- |
-| **Protege contra** | Roubo de discos físicos e arquivos de backups. | Acessos indevidos de DBAs e administradores de nuvem. | Visualização de dados sensíveis por usuários comuns. |
-| **Local da Chave** | Servidor SQL / Instância do banco. | Computador do Cliente (Azure Key Vault / HSM). | Banco de dados (Chave simétrica interna). |
-| **Transparência de Código** | 100% transparente; zero alterações de queries. | Transparente para a app (exige configuração no driver). | Não transparente; exige comandos lógicos de abertura e descriptografia. |
-| **Performance** | Excelente impacto (menor que 5%). | Overhead de processamento no cliente. | Processamento sob demanda a cada execução de query. |
-| **Consultas de Intervalo** | N/A (banco inteiro descriptografado em RAM). | Suportado apenas se utilizar Enclaves Seguros. | Não suportado. |
+![Comparativo Ilustrado dos Métodos de Criptografia no SQL Server](./images/sql_server_encryption_types_comparison.png)
+
+```mermaid
+flowchart TD
+    subgraph TDE[" "]
+        direction TB
+        T1["<b>TDE (Data at Rest)</b>"]
+        App1["Aplicação"]
+        Eng1["SQL Engine (RAM)<br/><i>Descriptografa em memória</i>"]
+        Disk1[("Disco / Backup<br/><b>Criptografado</b>")]
+        T1 --> App1 -->|"Texto Plano"| Eng1 -->|"Criptografa"| Disk1
+    end
+
+    subgraph AE[" "]
+        direction TB
+        A1["<b>Always Encrypted</b>"]
+        App2["App + Driver SQL<br/><b>Decifra no Cliente</b>"]
+        Eng2["SQL Engine<br/><i>Nunca vê dado plano</i>"]
+        Disk2[("Disco / Coluna<br/><b>Ciphertext</b>")]
+        A1 --> App2 -->|"Ciphertext"| Eng2 --> Disk2
+    end
+
+    subgraph AEE[" "]
+        direction TB
+        E1["<b>AE + Secure Enclave</b>"]
+        App3["App + Driver SQL"]
+        Eng3["SQL Engine"]
+        Enc3["Enclave VBS (RAM)<br/><b>Processa BETWEEN/LIKE</b>"]
+        Disk3[("Disco / Coluna<br/><b>Ciphertext</b>")]
+        E1 --> App3 -->|"Ciphertext"| Eng3
+        Eng3 <--> Enc3
+        Eng3 --> Disk3
+    end
+
+    subgraph MAN[" "]
+        direction TB
+        M1["<b>Criptografia Manual</b>"]
+        App4["Aplicação"]
+        Eng4["SQL Engine (RAM)<br/><b>ENCRYPTBYKEY / DECRYPTBYKEY</b>"]
+        Disk4[("Disco / Coluna<br/><b>Varbinary</b>")]
+        M1 --> App4 -->|"T-SQL"| Eng4 --> Disk4
+    end
+```
+
+| Característica | TDE (Data at Rest) | Always Encrypted (Padrão) | Always Encrypted + Enclaves | Criptografia Manual (T-SQL) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Ponto de Criptografia** | Disco / Armazenamento físico | Cliente (Driver da aplicação) | Cliente + Enclave VBS no Servidor | Servidor SQL (Funções T-SQL) |
+| **Onde o Dado é Decifrado** | RAM do SQL Engine | Computador do Cliente (App) | Sandbox de Memória VBS Isolada | RAM do SQL Engine (`DECRYPTBYKEY`) |
+| **Proteção Principal** | Roubo de discos e backups | Acesso indevido de DBAs e Admins | Acesso de DBAs com queries de intervalo | Usuários sem permissão na chave simétrica |
+| **Localização da Chave** | Servidor SQL / Master Key | Cliente (Azure Key Vault / Cert Store) | Cliente (CMK) + Atestação de Enclave | Banco de Dados (Chave Simétrica) |
+| **Transparência no Código** | 100% transparente | Transparente (requer driver compatível) | Transparente (requer driver com atestação) | Não transparente (exige alteração T-SQL) |
+| **Consultas de Intervalo / LIKE** | Suportado integralmente | Não suportado (apenas igualdade se Deterministic) | Suportado (`BETWEEN`, `>`, `<`, `LIKE`) | Não suportado diretamente |
+| **DBA Pode Ler o Dado Plano?** | **SIM** (tem acesso à RAM/Engine) | **NÃO** (vê apenas ciphertext) | **NÃO** (dado isolado no Enclave) | **SIM** (se tiver permissão na chave) |
 
 ---
 
