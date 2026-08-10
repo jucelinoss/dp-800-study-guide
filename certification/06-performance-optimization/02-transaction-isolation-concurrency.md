@@ -113,7 +113,7 @@ COMMIT;
 > SNAPSHOT isolation and Read Committed Snapshot Isolation (RCSI) are both row-versioning but are activated differently and used differently. SNAPSHOT is an explicit isolation level set by the application. RCSI changes the behavior of the existing READ COMMITTED level transparently — the app doesn't need to change.
 
 > [!note] Mental model — row versioning
-> Think of row versioning like **polaroid snapshots in tempdb**: every time a row is about to change, SQL Server takes a polaroid of the old value and stores it. Readers don't wait for writers — they read the most appropriate polaroid. **RCSI** = a polaroid for each statement's start time. **SNAPSHOT** = a polaroid for the entire transaction's start time. **Cost**: tempdb grows; old polaroids get cleaned up when no one's looking at them.
+> Think of row versioning like **polaroid snapshots in tempdb**: every time a row is about to change, SQL Server takes a polaroid of the old value and stores it. Data readers usually don't wait for data writers — they read the most appropriate polaroid. Schema locks, writer/writer conflicts, long transactions, and version-store pressure still need analysis. **RCSI** = a polaroid for each statement's start time. **SNAPSHOT** = a polaroid for the entire transaction's start time.
 
 ---
 
@@ -322,7 +322,7 @@ CROSS APPLY XmlData.nodes('//RingBufferTarget/event[@name="xml_deadlock_report"]
 
 ## Use Cases
 
-- **RCSI**: Default choice for Azure SQL OLTP — eliminates reader/writer blocking
+- **RCSI**: Common choice for Azure SQL OLTP — reduces data reader/writer blocking, but does not remove every form of blocking
 - **Serializable**: Financial operations where phantom prevention is critical
 - **Snapshot**: Long-running reports that need a consistent view without blocking writers
 - **NOLOCK hint**: `WITH (NOLOCK)` = READ UNCOMMITTED; use only for approximate counts/non-critical reads
@@ -345,7 +345,7 @@ CROSS APPLY XmlData.nodes('//RingBufferTarget/event[@name="xml_deadlock_report"]
 
 ## Best Practices
 
-- Enable RCSI on Azure SQL databases by default — it eliminates the most common reader/writer blocking with minimal overhead and no application changes.
+- Consider RCSI for Azure SQL workloads with reader/writer contention, after measuring version-store usage and transaction duration.
 - Always implement retry logic for error 1205 (deadlock victim); deadlocks are a normal occurrence under concurrent load, not a bug to prevent entirely.
 - Prefer `LOCK_ESCALATION = AUTO` over `DISABLE` on large partitioned tables — `DISABLE` conserves escalation but can exhaust lock memory under high DML.
 - Use ROWVERSION-based optimistic concurrency for any workflow that holds business logic state between read and update; never hold locks across network round trips or user think time.
@@ -363,13 +363,13 @@ CROSS APPLY XmlData.nodes('//RingBufferTarget/event[@name="xml_deadlock_report"]
 > - `WITH (NOLOCK)` is `READ UNCOMMITTED` — can return dirty data, duplicates, or miss rows
 > - **ROWVERSION** detects write conflicts without holding any locks — `@@ROWCOUNT = 0` after the update means a conflict occurred
 > - **RCSI** is statement-level (each statement sees latest committed data); **Snapshot** is transaction-level (entire transaction sees same snapshot)
-> - Lock escalation threshold is ~5,000 locks per object; `LOCK_ESCALATION = AUTO` is the safest option for partitioned tables
+> - Lock escalation is workload- and engine-dependent; treat ~5,000 locks as a traditional rule of thumb, not a guaranteed trigger
 
 ---
 
 ## Key Takeaways
 
-- RCSI eliminates reader/writer blocking using row versioning — highly recommended for OLTP
+- RCSI reduces data reader/writer blocking using row versioning; it does not replace retry logic or optimistic write checks
 - Snapshot Isolation provides transaction-level consistency without blocking writes
 - Always handle error 1205 (deadlock victim) with retry logic in applications
 - Lock escalation can unexpectedly block entire tables — monitor and tune `LOCK_ESCALATION` on high-traffic tables

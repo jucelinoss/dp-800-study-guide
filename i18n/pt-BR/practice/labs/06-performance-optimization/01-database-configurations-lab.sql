@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Limpeza preventiva / restauração das configurações padrão do laboratório
+-- ATENÇÃO: este script altera configurações do banco selecionado.
+-- Use uma base descartável ou registre os valores originais antes do exercício.
 ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 0;
 ALTER DATABASE SCOPED CONFIGURATION SET PARAMETER_SNIFFING = ON;
 GO
@@ -86,8 +88,21 @@ JOIN sys.query_store_runtime_stats qrs ON qp.plan_id = qrs.plan_id
 ORDER BY qrs.avg_cpu_time DESC;
 GO
 
--- Exemplo conceitual de forçamento de plano
--- EXEC sp_query_store_force_plan @query_id = 10, @plan_id = 15;
+-- Consulte IDs reais antes de forçar qualquer plano. Não copie IDs arbitrários:
+-- o plano deve pertencer à query selecionada e ainda estar retido no Query Store.
+SELECT TOP (10)
+    q.query_id,
+    p.plan_id,
+    p.is_forced_plan,
+    qt.query_sql_text
+FROM sys.query_store_query AS q
+JOIN sys.query_store_query_text AS qt ON qt.query_text_id = q.query_text_id
+JOIN sys.query_store_plan AS p ON p.query_id = q.query_id
+ORDER BY q.query_id DESC, p.plan_id DESC;
+GO
+
+-- Depois de selecionar IDs do resultado acima, execute uma operação direcionada:
+-- EXEC sys.sp_query_store_force_plan @query_id = <query_id_real>, @plan_id = <plan_id_real>;
 GO
 
 
@@ -98,7 +113,8 @@ GO
 --   - AUTOMATIC TUNING: Recurso do Azure SQL / SQL Server que detecta regressão e força automaticamente o último bom plano.
 --   - sys.dm_db_tuning_recommendations: Visão que exibe sugestões de criação de índices, exclusão e forçamento de plano.
 
--- Ativar forçamento automático do último bom plano
+-- Somente Azure SQL Database/Azure SQL Managed Instance. Não trate isto como
+-- uma configuração portátil de nível de servidor para qualquer instalação SQL Server.
 ALTER DATABASE CURRENT SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON);
 GO
 

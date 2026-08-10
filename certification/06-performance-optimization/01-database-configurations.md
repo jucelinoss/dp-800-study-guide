@@ -124,15 +124,15 @@ WHERE name IN ('max server memory (MB)', 'min server memory (MB)',
 
 | Setting | Recommendation |
 | :--- | :--- |
-| `max server memory` | Leave 10–15% for OS; set rest to SQL |
-| `MAXDOP` | Equal to physical CPU count or 8 (whichever is lower) |
-| `cost threshold for parallelism` | Increase from default 5 to 25–50 to reduce unnecessary parallelism |
+| `max server memory` | On SQL Server, reserve capacity for the OS and other services; size from workload measurements |
+| `MAXDOP` | Start from Microsoft guidance, then validate with plans, waits, and workload tests |
+| `cost threshold for parallelism` | Treat the default of 5 and any proposed value such as 25–50 as a starting point, not a universal target |
 
 ---
 
 ## Automatic Tuning (Azure SQL)
 
-Azure SQL can automatically create, verify, and drop indexes based on query performance:
+Azure SQL Database and Azure SQL Managed Instance can automatically create, verify, and drop indexes based on query performance. The feature is platform-specific; do not present it as an equivalent server-level setting for every SQL Server installation:
 
 ```sql
 -- Enable automatic tuning
@@ -156,7 +156,7 @@ SELECT * FROM sys.dm_db_tuning_recommendations;
 2. Database-scoped: `ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = n`
 3. Server-level: `sp_configure 'max degree of parallelism'`
 
-**Cost threshold for parallelism:** The estimated query cost (in seconds on a reference machine) must exceed this threshold before SQL Server considers a parallel plan. The default of 5 is very low — most queries on modern hardware are cheap enough to go parallel unnecessarily. Raising it to 40–50 reduces context-switch overhead for OLTP workloads.
+**Cost threshold for parallelism:** The estimated query cost is compared with a reference value before SQL Server considers a parallel plan. The default of 5 is not a performance guarantee or a universal defect; test a change against CPU, waits, concurrency, and execution plans. A value such as 40–50 can be a workload-specific experiment for chatty OLTP systems, not a prescription.
 
 > [!warning] Common Mistake
 > MAXDOP 0 does NOT disable parallelism — it means "use all available CPUs." MAXDOP 1 disables parallelism. This is a classic exam trap.
@@ -324,7 +324,7 @@ OPTION(USE HINT('ENABLE_QUERY_OPTIMIZER_HOTFIXES'));
 
 - **Business Critical tier**: Latency-sensitive workloads, In-Memory OLTP, read scale-out
 - **Serverless**: Development databases, apps with unpredictable usage patterns
-- **RCSI**: Multi-user OLTP workloads where reader/writer blocking is a problem
+- **RCSI**: Multi-user OLTP workloads where data reader/writer blocking is a problem; schema locks and writer/writer contention still require separate analysis
 - **Query Store**: Regression detection and plan forcing after upgrades or compatibility level changes
 - **MAXDOP 1**: Reporting queries on high-concurrency OLTP systems to limit CPU consumption
 
@@ -344,7 +344,7 @@ OPTION(USE HINT('ENABLE_QUERY_OPTIMIZER_HOTFIXES'));
 
 - Enable Query Store on every production database before any upgrade or compatibility level change to establish a performance baseline
 - Set `QUERY_CAPTURE_MODE = AUTO` to avoid storing trivial single-execution queries that inflate storage and obscure analysis
-- Raise `cost threshold for parallelism` to 40–50 on OLTP workloads — the default of 5 causes unnecessary parallelism for cheap queries
+- Evaluate `cost threshold for parallelism` with the workload; do not change it solely because the value is 5
 - Use database-scoped `MAXDOP` settings in Azure SQL Database rather than server-level, since the instance may host multiple databases with different workload profiles
 - Always test compatibility level changes in a non-production environment with a representative Query Store workload before promoting to production
 
@@ -354,7 +354,7 @@ OPTION(USE HINT('ENABLE_QUERY_OPTIMIZER_HOTFIXES'));
 
 > [!tip] Exam Tips
 >
-> - **RCSI** (Read Committed Snapshot Isolation) eliminates reader/writer blocking — enable for OLTP
+> - **RCSI** (Read Committed Snapshot Isolation) reduces data reader/writer blocking through row versioning; it does not eliminate schema or writer/writer blocking
 > - Compatibility level 160 enables the latest optimizer features — test before changing in production
 > - Azure SQL Business Critical has a **built-in read-only replica** at no extra cost
 > - Automatic tuning `FORCE_LAST_GOOD_PLAN` automatically reverts to previous plan on regression
@@ -368,7 +368,7 @@ OPTION(USE HINT('ENABLE_QUERY_OPTIMIZER_HOTFIXES'));
 
 - Match service tier to workload: General Purpose for most, Business Critical for low-latency
 - Enable RCSI to reduce blocking in read/write mixed workloads
-- Query Store should always be enabled — it is the foundation for plan forcing and regression detection
+- Query Store is a strong baseline for plan forcing and regression detection; verify its capture mode, storage budget, and platform defaults
 - MAXDOP and cost threshold for parallelism settings prevent parallelism from degrading OLTP concurrency
 - Compatibility level upgrades unlock new optimizer features but carry plan regression risk — always use Query Store as a safety net
 
@@ -406,6 +406,7 @@ D. Increase the cost threshold for parallelism to 100
 - [ALTER DATABASE SCOPED CONFIGURATION](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql)
 - [Automatic Tuning](https://learn.microsoft.com/en-us/azure/azure-sql/database/automatic-tuning-overview)
 - [Query Store Overview](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store)
+- [Transaction Locking and Row Versioning Guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide)
 - [Memory Grant Feedback](https://learn.microsoft.com/en-us/sql/relational-databases/performance/adaptive-query-processing)
 - [Database Compatibility Level](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-transact-sql-compatibility-level)
 

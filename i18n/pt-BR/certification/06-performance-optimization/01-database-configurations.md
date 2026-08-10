@@ -410,6 +410,7 @@ D. Alterar a configuração de MAXDOP do banco de dados para 1.
 - [ALTER DATABASE SCOPED CONFIGURATION](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql)
 - [Automatic Tuning](https://learn.microsoft.com/en-us/azure/azure-sql/database/automatic-tuning-overview)
 - [Query Store Overview](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store)
+- [Transaction Locking and Row Versioning Guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide)
 - [Memory Grant Feedback](https://learn.microsoft.com/en-us/sql/relational-databases/performance/adaptive-query-processing)
 
 ---

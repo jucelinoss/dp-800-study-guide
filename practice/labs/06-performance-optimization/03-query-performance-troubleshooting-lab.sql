@@ -65,6 +65,7 @@ GO
 -- 1. Enable I/O and time statistics for diagnostics
 SET STATISTICS IO ON;
 SET STATISTICS TIME ON;
+SET STATISTICS XML ON;
 GO
 
 -- Query that triggers a Key Lookup (Filters by CustomerID but needs TotalAmount and OrderStatus)
@@ -87,6 +88,7 @@ GO
 
 SET STATISTICS IO OFF;
 SET STATISTICS TIME OFF;
+SET STATISTICS XML OFF;
 GO
 
 
@@ -137,14 +139,22 @@ FROM sys.plan_guides
 WHERE name = N'PG_FixParameterSniffing';
 GO
 
+-- Execute the exact parameterized text used when the guide was created.
+EXEC sys.sp_executesql
+    N'SELECT OrderID, CustomerID, TotalAmount FROM lab.PerfTestOrders WHERE CustomerID = @CustIDParam',
+    N'@CustIDParam INT',
+    @CustIDParam = 1001;
+GO
+
 
 -- =================================================================================
 -- PART 4: STATISTICS MAINTENANCE AND INDEX FRAGMENTATION ANALYSIS
 -- =================================================================================
 -- KEY CONCEPTS AND DEFINITIONS:
 --   - sys.dm_db_stats_properties: Displays the number of modifications (`modification_counter`) since last update.
---   - REORGANIZE: Recommended for fragmentation between 5% and 30% (lightweight online operation).
---   - REBUILD: Recommended for fragmentation > 30% (rebuilds physical structure and updates statistics with FULLSCAN).
+--   - REORGANIZE/REBUILD: use fragmentation, page count, index type, availability,
+--     and workload as inputs. The 5%/30% values are illustrative test branches,
+--     not universal SQL Server thresholds.
 
 -- -- [DP-800 EXAM SPOTLIGHT]
 -- 1. Check statistics update status and accumulated modification count

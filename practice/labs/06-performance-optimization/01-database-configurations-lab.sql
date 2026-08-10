@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup / restore lab default settings
+-- WARNING: this changes database-scoped settings on the selected database.
+-- Run in a disposable lab database or record the original values before testing.
 ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 0;
 ALTER DATABASE SCOPED CONFIGURATION SET PARAMETER_SNIFFING = ON;
 GO
@@ -86,8 +88,21 @@ JOIN sys.query_store_runtime_stats qrs ON qp.plan_id = qrs.plan_id
 ORDER BY qrs.avg_cpu_time DESC;
 GO
 
--- Conceptual example of plan forcing
--- EXEC sp_query_store_force_plan @query_id = 10, @plan_id = 15;
+-- Find real query/plan IDs before forcing anything. Never copy arbitrary IDs from
+-- an example: the plan must belong to the selected query and be retained by Query Store.
+SELECT TOP (10)
+    q.query_id,
+    p.plan_id,
+    p.is_forced_plan,
+    qt.query_sql_text
+FROM sys.query_store_query AS q
+JOIN sys.query_store_query_text AS qt ON qt.query_text_id = q.query_text_id
+JOIN sys.query_store_plan AS p ON p.query_id = q.query_id
+ORDER BY q.query_id DESC, p.plan_id DESC;
+GO
+
+-- After selecting IDs from the result above, run a targeted force operation:
+-- EXEC sys.sp_query_store_force_plan @query_id = <real_query_id>, @plan_id = <real_plan_id>;
 GO
 
 
@@ -98,7 +113,8 @@ GO
 --   - AUTOMATIC TUNING: Azure SQL / SQL Server feature that detects regression and automatically forces the last good plan.
 --   - sys.dm_db_tuning_recommendations: View that displays suggestions for index creation, deletion, and plan forcing.
 
--- Enable automatic last good plan forcing
+-- Azure SQL Database/Azure SQL Managed Instance only. Do not treat this as a
+-- portable server-level setting for every SQL Server installation.
 ALTER DATABASE CURRENT SET AUTOMATIC_TUNING (FORCE_LAST_GOOD_PLAN = ON);
 GO
 

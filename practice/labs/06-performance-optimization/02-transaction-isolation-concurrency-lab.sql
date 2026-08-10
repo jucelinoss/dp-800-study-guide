@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup
+-- WARNING: enabling RCSI/SNAPSHOT changes database-wide behavior. Use a
+-- disposable lab database and review the cleanup commands in README.md.
 DROP TABLE IF EXISTS lab.InventoryStock;
 GO
 
@@ -47,7 +49,8 @@ GO
 --   - READ_COMMITTED_SNAPSHOT (RCSI): Enabled at the database level. Readers use the TempDB Version Store without blocking writers.
 --   - SNAPSHOT ISOLATION: Enabled at the database (`ALLOW_SNAPSHOT_ISOLATION ON`) and activated per transaction (`SET TRANSACTION ISOLATION LEVEL SNAPSHOT`).
 
--- 1. Enable RCSI on the database to eliminate read blocking in OLTP
+-- 1. Enable RCSI on the database to reduce data reader/writer blocking in OLTP
+-- This ALTER DATABASE requires exclusive access while the option changes.
 ALTER DATABASE AdventureWorks2025 SET READ_COMMITTED_SNAPSHOT ON;
 GO
 

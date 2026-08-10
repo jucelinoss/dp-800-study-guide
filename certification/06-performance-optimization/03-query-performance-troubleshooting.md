@@ -329,8 +329,8 @@ Statistics are histograms describing the distribution of data values in index an
 ### Auto-Update Thresholds
 
 - **Small tables** (< 500 rows): triggered after 500 row changes
-- **Larger tables**: triggered after approximately 20% of rows change
-- **SQL Server 2016+ with trace flag 2371 / compat level 130+**: dynamic threshold — roughly `sqrt(1000 * rows)`, which scales better for very large tables
+- **Larger tables**: the trigger is version- and compatibility-level-dependent; do not assume a fixed 20% threshold
+- **SQL Server 2016+ with compatibility level 130+**: dynamic thresholds are used for many workloads; inspect the current platform/version behavior and measure statistics freshness
 
 ### Manual Statistics Updates
 
@@ -375,9 +375,9 @@ EXEC sp_updatestats;
 | :--- | :--- | :--- |
 | Query fast first run, slow after | Parameter sniffing | OPTION(RECOMPILE) or OPTIMIZE FOR UNKNOWN |
 | Plan changed after index rebuild | Statistics updated with new distribution | Verify plan; force if needed |
-| Plan guide not applied | Query text mismatch (whitespace, case) | `Use `sys.fn_validate_plan_guide` to diagnose` |
+| Plan guide not applied | Query text mismatch (whitespace, case) | Use `sys.fn_validate_plan_guide` to diagnose |
 | Query Store full | Max storage size reached | Increase `MAX_STORAGE_SIZE_MB` or change cleanup mode |
-| Stale stats on large table | 20% threshold not reached | Manual `UPDATE STATISTICS WITH FULLSCAN` |
+| Stale stats on large table | Automatic update did not yet reflect the workload or sampling was insufficient | Inspect `modification_counter`, row counts, and plans; update manually only when evidence supports it |
 
 ---
 
