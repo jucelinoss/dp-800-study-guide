@@ -75,6 +75,10 @@ Fabric can host a Data Vault in Lakehouse or Warehouse tables. A practical arran
 
 The architecture should still define ownership, contracts, data quality, security, and retention. Fabric does not make a model Data Vault merely because the tables are stored in OneLake.
 
+## Practical coverage
+
+The [Data Vault lab](../../practice/labs/12-other-topics/03-data-vault-architecture-lab.sql) loads two source snapshots into SQL Server Hubs, Links, and Satellites. It demonstrates idempotent business-key loading, relationship loading, SHA2_256 hashdiff history, a point-in-time query, and quality gates. Fabric-specific storage and orchestration remain platform concerns to implement in a Fabric workspace.
+
 ## Review checklist
 
 - Is every hub based on a governed business key?

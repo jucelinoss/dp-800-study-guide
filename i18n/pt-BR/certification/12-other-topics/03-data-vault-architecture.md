@@ -75,6 +75,10 @@ O Fabric pode hospedar Data Vault em tabelas de Lakehouse ou Warehouse:
 
 O Fabric não transforma um modelo em Data Vault apenas porque as tabelas estão no OneLake. Ainda é necessário definir propriedade, contratos, qualidade, segurança e retenção.
 
+## Cobertura prática
+
+O [laboratório Data Vault](../../practice/labs/12-other-topics/03-data-vault-architecture-lab.sql) carrega dois snapshots de origem em Hubs, Links e Satellites no SQL Server. Ele demonstra carga idempotente de chaves de negócio, carga de relacionamentos, histórico por hashdiff SHA2_256, consulta point-in-time e gates de qualidade. O armazenamento e a orquestração específicos do Fabric continuam sendo responsabilidades da plataforma a implementar em um workspace do Fabric.
+
 ## Checklist
 
 - Cada hub usa uma chave de negócio governada?
