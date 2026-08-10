@@ -40,7 +40,8 @@ DROP TABLE IF EXISTS lab.HybridGroundTruth;
 DROP TABLE IF EXISTS lab.HybridProductCatalog;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 -- =================================================================================
@@ -55,26 +56,26 @@ GO
 SELECT
     N'SKU exato, codigo de produto (BK-M38S-42), numero de serial' AS CenarioQuery,
     N'Somente FTS (CONTAINS/CONTAINSTABLE)'                      AS MelhorAbordagem,
-    N'Palavras exatas = FTS e infalivel. Vetorial = "parecido" = risco de erro.' AS PorQue
+    N'Palavras exatas favorecem FTS; ainda valide idioma, stoplist e qualidade dos dados.' AS PorQue
 UNION ALL SELECT
     N'Query intencao vaga: "bike confortavel para trilha longa"',
     N'Somente Vetorial (VECTOR_DISTANCE cosine)',
     N'Vetorial encontra por SEMANTICA, nao por palavras. O usuario nao sabe o nome do produto.'
 UNION ALL SELECT
     N'Query curta misturando palavras-chave + conceito: "Mountain 200 bike"',
-    N'HIBRIDO RRF (recomendado 70% dos casos reais)',
+    N'HIBRIDO RRF (candidato para validar)',
     N'Palavras exatas batem com FTS, significado parecido com vetores. RRF combina os ranks.'
 UNION ALL SELECT
     N'Multilingue (ingles + portugues misturados, traduzir na busca)',
-    N'Principalmente Vetorial + fallback FTS para palavras exatas',
-    N'Embeddings fazem cross-lingual bem. FTS exige idioma LCID definido por coluna.'
+    N'Verifique embeddings multilingues; combine com FTS quando houver termos exatos',
+    N'A cobertura cross-lingual depende do modelo. FTS exige idioma/LCID configurado.'
 UNION ALL SELECT
     N'Busca em FAQ / Help Desk / KB de Suporte Tecnico',
-    N'HIBRIDO RRF (MELHOR CASO DE USO!)',
+    N'HIBRIDO RRF (candidato para validar)',
     N'Usuarios parafraseiam FAQ: FTS erra por sinonimos, vec pega intencao. RRF combina!';
 GO
 
-PRINT CHAR(13)+CHAR(10) + N'--- Formula RRF OFICIAL Microsoft Learn ---';
+PRINT CHAR(13)+CHAR(10) + N'--- Formula RRF usada neste laboratorio ---';
 PRINT N'';
 PRINT N'   RRF_score(documento)  =  Σ  1 / (k + rank_dentro_da_lista)';
 PRINT N'';

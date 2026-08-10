@@ -10,23 +10,24 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
+> - 📍 [Quando Usar Full-Text Search ou Embeddings](#quando-usar-full-text-search-ou-embeddings)
 > - 📍 [2. Catálogos e Índices Full-Text](#catálogos-e-índices-full-text)
 >   - 🔹 [Criando um Full-Text Catalog](#criando-um-full-text-catalog)
 >   - 🔹 [Criando um Full-Text Index](#criando-um-full-text-index)
 >   - 🔹 [Opções de Change Tracking](#opções-de-change-tracking)
 >   - 🔹 [Population (Construindo o Índice)](#population-construindo-o-índice)
 > - 📍 [3. Stop Lists](#stop-lists)
-> - 📍 [4. CONTAINS — Predicado de Busca Precisa](#contains-predicado-de-busca-precisa)
+> - 📍 [4. CONTAINS — Predicado de Busca Precisa](#contains--predicado-de-busca-precisa)
 >   - 🔹 [Busca de Termo Simples](#busca-de-termo-simples)
 >   - 🔹 [Busca por Prefixo](#busca-por-prefixo)
 >   - 🔹 [Busca por Frase](#busca-por-frase)
 >   - 🔹 [Operadores Booleanos](#operadores-booleanos)
->   - 🔹 [NEAR — Busca por Proximidade](#near-busca-por-proximidade)
->   - 🔹 [FORMSOF — Correspondência Inflexional e de Thesaurus](#formsof-correspondência-inflexional-e-de-thesaurus)
-> - 📍 [5. FREETEXT — Busca em Linguagem Natural](#freetext-busca-em-linguagem-natural)
-> - 📍 [6. CONTAINSTABLE e FREETEXTTABLE — Resultados Ranqueados](#containstable-e-freetexttable-resultados-ranqueados)
+>   - 🔹 [NEAR — Busca por Proximidade](#near--busca-por-proximidade)
+>   - 🔹 [FORMSOF — Correspondência Inflexional e de Thesaurus](#formsof--correspondência-inflexional-e-de-thesaurus)
+> - 📍 [5. FREETEXT — Busca em Linguagem Natural](#freetext--busca-em-linguagem-natural)
+> - 📍 [6. CONTAINSTABLE e FREETEXTTABLE — Resultados Ranqueados](#containstable-e-freetexttable--resultados-ranqueados)
 >   - 🔹 [CONTAINSTABLE](#containstable)
 >   - 🔹 [FREETEXTTABLE](#freetexttable)
 >   - 🔹 [Top N Resultados com FREETEXTTABLE](#top-n-resultados-com-freetexttable)
@@ -54,9 +55,15 @@ A Full-Text Search (FTS) habilita a busca linguística de dados baseados em cara
 
 > [!tip] O Que o Exame Testa
 >
-> - `CONTAINS` = **precisão**: termos exatos, prefixo (`"data*"`), proximidade (`NEAR`), termos ponderados (`ISABOUT`)
-> - `FREETEXT` = **recall**: query em linguagem natural e flexões; mapeamentos configurados do thesaurus podem ampliar a correspondência
+> - `CONTAINS` tende a produzir **maior precisão**: termos exatos, prefixos (`"data*"`), proximidade (`NEAR`), condições booleanas e termos ponderados (`ISABOUT`) permitem restringir o que conta como correspondência
+> - `FREETEXT` tende a produzir **maior recall**: entrada em linguagem natural, formas flexionadas e mapeamentos configurados do thesaurus ampliam os candidatos, o que também pode incluir resultados menos relevantes
 > - `CONTAINSTABLE` / `FREETEXTTABLE` retornam uma tabela com coluna `RANK` (0–1000) — use quando precisar de resultados ranqueados ou quiser fazer join com outras tabelas
+
+> [!note] Precisão, recall e `RANK`
+>
+> **Precisão** é a proporção dos resultados retornados que é relevante. **Recall** é a proporção de todos os resultados relevantes que foi retornada. Essas são métricas de avaliação da experiência de busca, não rótulos fixos das funções do SQL Server. `CONTAINS` frequentemente melhora a precisão ao aplicar critérios linguísticos mais restritos; `FREETEXT` frequentemente melhora o recall ao expandir linguisticamente a entrada. O equilíbrio real depende do idioma, da stoplist, do thesaurus, dos dados e da consulta. `CONTAINSTABLE` e `FREETEXTTABLE` não aumentam, por si só, a precisão ou o recall: elas expõem as linhas correspondentes e um `RANK` relativo para ordenação. `RANK` não é porcentagem, probabilidade nem pontuação de precisão.
+
+> As fórmulas são as mesmas usadas em Data Science: `precisão = resultados relevantes retornados / todos os resultados retornados`, e `recall = resultados relevantes retornados / todos os resultados relevantes existentes`. A diferença está no contexto de avaliação. Em classificação, os rótulos positivos normalmente são fixos para cada exemplo e costumam ser expressos como verdadeiros positivos (`TP`), falsos positivos (`FP`) e falsos negativos (`FN`). Em busca, a relevância depende da consulta e normalmente exige um conjunto de avaliação rotulado por pessoas ou conhecido por outra forma. `CONTAINS` e `FREETEXT` retornam candidatos; não calculam nem garantem essas métricas.
 
 ---
 
@@ -66,11 +73,35 @@ Um índice full-text não percorre cada texto procurando caracteres como uma con
 
 Antes de indexar, o mecanismo interpreta o texto conforme o idioma: separa palavras, pode reduzir flexões a formas relacionadas e ignora *stop words* frequentes. A consulta passa pelo mesmo tipo de análise. Isso explica por que Full-Text Search é mais rica que `LIKE`, mas não é busca por significado: ela ainda depende de termos e regras linguísticas, não de embeddings.
 
-`CONTAINS` é indicado quando a aplicação controla a sintaxe e quer precisão — uma frase, prefixo, operador booleano ou proximidade. `FREETEXT` recebe uma frase em linguagem natural e amplia a correspondência por formas flexionadas e, quando houver mapeamentos configurados, pelo thesaurus. Quando o resultado precisa ser ordenado ou combinado com outros dados, `CONTAINSTABLE` e `FREETEXTTABLE` devolvem chaves e um `RANK`; esse rank é específico da FTS e não deve ser comparado diretamente com scores vetoriais.
+`CONTAINS` é indicado quando a aplicação controla a sintaxe e quer precisão — uma frase, prefixo, operador booleano ou proximidade. `FREETEXT` recebe uma frase em linguagem natural e amplia a correspondência por formas flexionadas e, quando houver mapeamentos configurados, pelo thesaurus. Na descrição da Microsoft, “significado” aqui se refere a essa expansão linguística; não é similaridade semântica baseada em embeddings. Quando o resultado precisa ser ordenado ou combinado com outros dados, `CONTAINSTABLE` e `FREETEXTTABLE` devolvem chaves e um `RANK`; esse rank é específico da FTS e não deve ser comparado diretamente com scores vetoriais.
+
+### O que um Thesaurus Faz
+
+Um thesaurus de Full-Text Search é uma configuração XML específica de um idioma que define mapeamentos de sinônimos ou substituições. Por exemplo, um conjunto de expansão pode tratar `rápido`, `veloz` e `ágil` como termos equivalentes na correspondência Full-Text. `FREETEXT` usa o thesaurus configurado automaticamente; `CONTAINS` e `CONTAINSTABLE` só o usam quando a consulta inclui explicitamente `FORMSOF(THESAURUS, ...)`.
+
+O thesaurus não é um modelo de IA e não infere o significado geral de uma frase. Ele aplica os mapeamentos configurados pelo administrador para um idioma. Se nenhum mapeamento estiver configurado, a busca com thesaurus não descobrirá sinônimos automaticamente.
 
 > [!note] Limite importante
 >
 > Full-Text Search recupera correspondência linguística, não conhecimento semântico geral. “Cancelar plano” pode não recuperar “encerrar assinatura” se os termos não forem relacionados pelo idioma/thesaurus. Para esse tipo de intenção, considere busca vetorial ou híbrida.
+
+## Quando Usar Full-Text Search ou Embeddings
+
+Use Full-Text Search quando a consulta depender de termos exatos ou regras linguísticas: códigos de produto, números de pedido, cláusulas legais, nomes, frases entre aspas, prefixos, operadores booleanos, proximidade, formas flexionadas ou sinônimos configurados no thesaurus. Também é preferível quando a explicabilidade das correspondências, o ranking linguístico e a ausência de chamada a modelo/API externa forem prioridades.
+
+Use embeddings/busca vetorial quando a consulta expressar intenção ou significado e o texto relevante puder usar palavras diferentes: paráfrases, perguntas em linguagem natural, similaridade semântica, conceitos multilíngues suportados pelo modelo, recomendações ou recuperação para RAG. Embeddings exigem um modelo, vetores armazenados com dimensão fixa e a geração do vetor da consulta usando o mesmo modelo e espaço vetorial dos vetores indexados.
+
+Escolha busca híbrida quando os dois sinais forem importantes: por exemplo, um código ou identificador deve coincidir exatamente, mas o restante da pergunta pode ser uma paráfrase. Execute FTS e busca vetorial separadamente, aplique filtros de autorização e tenant às duas buscas e combine as listas de candidatos ranqueadas (por exemplo, com RRF). Não some diretamente o `RANK` da FTS à distância vetorial, pois eles têm significados e escalas diferentes.
+
+**Reciprocal Rank Fusion (RRF)** combina a posição de um documento em cada lista de resultados. Uma fórmula comum é `RRF(documento) = Σ 1 / (k + posição)`, em que `posição` é o lugar começando em 1 na lista de FTS ou vetorial e `k` é uma constante de suavização, frequentemente 60. Um documento bem posicionado nas duas buscas recebe um score combinado maior; um documento que aparece em apenas uma lista ainda pode ser mantido. O RRF usa posições, não o `RANK` bruto da FTS nem a distância vetorial, portanto os dois sistemas não precisam ter escalas de score compatíveis.
+
+| Necessidade | Prefira |
+|---|---|
+| Termo exato, código, frase, prefixo, lógica booleana ou proximidade | Full-Text Search |
+| Significado, paráfrase ou intenção em linguagem natural | Embeddings/busca vetorial |
+| Termos exatos e intenção semântica | Busca híbrida |
+| Sem modelo/API ou manutenção de vetores | Full-Text Search |
+| Maior recall diante de variações de redação | Embeddings, validados com consultas reais |
 
 ## Catálogos e Índices Full-Text
 
@@ -116,7 +147,7 @@ SELECT * FROM sys.fulltext_index_columns;
 | :--- | :--- |
 | `AUTO` | SQL Server atualiza automaticamente o índice FTS quando linhas mudam |
 | `MANUAL` | Atualiza apenas quando você chama `ALTER FULLTEXT INDEX ... START UPDATE POPULATION` |
-| `OFF` | Sem rastreamento de mudanças; apenas população manual completa |
+| `OFF` | Sem rastreamento de mudanças; a população e a repopulação devem ser iniciadas manualmente (`FULL` ou `INCREMENTAL` quando aplicável) |
 
 ### Population (Construindo o Índice)
 
@@ -124,16 +155,20 @@ SELECT * FROM sys.fulltext_index_columns;
 -- Iniciar uma população completa (reconstruir o índice inteiro)
 ALTER FULLTEXT INDEX ON dbo.Products START FULL POPULATION;
 
--- Iniciar uma população incremental (apenas linhas alteradas desde a última population)
+-- Iniciar uma população incremental quando a tabela tiver uma coluna timestamp
 ALTER FULLTEXT INDEX ON dbo.Products START INCREMENTAL POPULATION;
 
 -- Verificar o status da population
 SELECT FULLTEXTCATALOGPROPERTY('ProductCatalog', 'PopulateStatus') AS Status;
--- 0 = Idle, 1 = Full population em progresso, 5 = Throttled
+-- 0 = Idle, 1 = Full, 3 = Throttled, 6 = população incremental em progresso
 
 -- Verificar se o índice full-text está populado
 SELECT OBJECTPROPERTYEX(OBJECT_ID('dbo.Products'), 'TableFulltextPopulateStatus');
 ```
+
+> [!note] Verificando o status da população
+>
+> `FULLTEXTCATALOGPROPERTY(..., 'PopulateStatus')` é mantida por compatibilidade e está documentada para remoção em uma versão futura do SQL Server. Para código novo de monitoramento, prefira a verificação no nível da tabela com `OBJECTPROPERTYEX(..., 'TableFulltextPopulateStatus')`, em vez de consultar repetidamente o status do catálogo em um loop apertado.
 
 ---
 
@@ -159,7 +194,9 @@ SELECT * FROM sys.fulltext_stopwords WHERE stoplist_id =
 
 > [!warning] Stop Words Podem Suprimir Resultados Esperados
 >
-> Stop words são descartadas pelo mecanismo de Full-Text Search. Sempre verifique `sys.fulltext_stopwords` e a opção de transformação de noise words ao depurar consultas que retornam resultados inesperados.
+> Uma stopword é removida do índice full-text e do critério de busca. Muitas são palavras funcionais que aparecem com muita frequência e geralmente acrescentam pouca capacidade de distinguir documentos, como `the` (artigo), `and` (conjunção) e `of`/`to` (preposições). Suprimi-las normalmente reduz o tamanho do índice e o ruído, mas isso nem sempre é correto: um nome de produto, expressão jurídica, título, código ou frase curta pode depender de uma dessas palavras. Por isso, uma consulta por uma palavra comum como `the`, ou por uma stopword customizada como `product`, pode não retornar linhas ou pode se comportar de forma diferente de uma consulta `LIKE`. O índice ainda preserva a informação de posição das stopwords omitidas; assim, elas podem afetar o cálculo de frases e da distância do `NEAR`, mesmo não sendo tokens pesquisáveis.
+>
+> Ao depurar, verifique tanto a lista customizada (`sys.fulltext_stopwords`) quanto a lista do sistema (`sys.fulltext_system_stopwords`). Use `sys.dm_fts_parser` para inspecionar como uma palavra, o idioma, o thesaurus e a stoplist são tokenizados. A opção de servidor `transform noise words` é relevante para consultas booleanas e de proximidade que contêm stopwords: com o valor padrão `0`, o SQL Server pode emitir um aviso e retornar zero linhas; quando habilitada, ela transforma/remove a noise word para permitir a continuidade da consulta, o que pode alterar o significado da condição. Não a habilite como substituta da escolha correta da stoplist e dos termos da consulta.
 
 ---
 
@@ -240,11 +277,13 @@ WHERE CONTAINS(Description, 'headphones AND NOT "in-ear"');
 ### NEAR — Busca por Proximidade
 
 ```sql
--- NEAR: termos dentro de 50 palavras um do outro (proximidade padrão)
+-- O NEAR genérico ranqueia as correspondências pela proximidade; correspondências
+-- a mais de 50 termos lógicos recebem rank 0. Esta forma customizada limita
+-- explicitamente a distância máxima a 5 termos não pesquisados.
 SELECT ProductId, ProductName
 FROM dbo.Products
 WHERE CONTAINS(Description, 'NEAR((wireless, headphones), 5)');
--- Termos dentro de 5 palavras um do outro
+-- Até 5 termos não pesquisados podem ocorrer entre os termos pesquisados
 
 -- NEAR ordenado (primeiro termo deve vir antes do segundo)
 SELECT ProductId, ProductName
@@ -260,14 +299,16 @@ WHERE CONTAINS(Description, 'NEAR((noise, cancelling), 3, TRUE)');
 SELECT ProductId, ProductName
 FROM dbo.Products
 WHERE CONTAINS(Description, 'FORMSOF(INFLECTIONAL, "connect")');
--- Corresponde a formas flexionais do termo, como connect, connects,
--- connected e connecting; não pressupõe derivações como "connection".
+-- Corresponde a formas flexionais de acordo com o stemmer do idioma, como
+-- connect, connects, connected e connecting; não significa toda palavra
+-- derivada da mesma grafia, como "connection".
 
 -- FORMSOF THESAURUS: correspondências de sinônimos do arquivo de thesaurus
 SELECT ProductId, ProductName
 FROM dbo.Products
 WHERE CONTAINS(Description, 'FORMSOF(THESAURUS, "fast")');
--- Corresponde: fast, quick, rapid, speedy (dependendo da configuração do thesaurus)
+-- Corresponde a sinônimos configurados, como fast, quick, rapid ou speedy.
+-- Os termos reais dependem do arquivo XML de thesaurus do idioma.
 ```
 
 ---
@@ -284,7 +325,7 @@ WHERE FREETEXT(Description, 'fast wireless audio headphones');
 
 -- FREETEXT automaticamente:
 -- 1. Remove stop words
--- 2. Encontra formas flexionadas (connected → connect, connecting, connection)
+-- 2. Encontra formas flexionadas de acordo com o stemmer do idioma
 -- 3. Expande para sinônimos do thesaurus (se configurado)
 -- 4. Usa lógica OR (qualquer uma das palavras pode corresponder)
 ```
@@ -293,7 +334,7 @@ WHERE FREETEXT(Description, 'fast wireless audio headphones');
 >
 > | | CONTAINS | FREETEXT |
 > |---|---|---|
-> | **Quando usar** | Controle preciso: prefixos, frases exatas, proximidade, booleanos | Linguagem natural, intenção do usuário |
+> | **Quando usar** | Controle preciso: prefixos, frases exatas, proximidade, booleanos | Entrada em linguagem natural e correspondência linguística mais ampla |
 > | **Resultado** | Booleano na cláusula WHERE | Booleano na cláusula WHERE |
 > | **Ranking** | Não (use CONTAINSTABLE) | Não (use FREETEXTTABLE) |
 > | **Variações** | Via FORMSOF explícito | Automático |
@@ -343,12 +384,12 @@ SELECT TOP 10
 FROM FREETEXTTABLE(dbo.Products, Description, 'wireless audio', LANGUAGE 1033, 10) AS ftt
 JOIN dbo.Products p ON p.ProductId = ftt.[KEY]
 ORDER BY ftt.[RANK] DESC;
--- O 4º parâmetro (10) limita resultados dentro do engine FTS
+-- O 5º argumento (10) é top_n_by_rank e limita resultados dentro do engine FTS
 ```
 
 > [!tip] Use as Variantes TABLE para Busca Ranqueada
 >
-> `CONTAINS` e `FREETEXT` são predicados — retornam apenas SIM/NÃO. Para ordenar resultados por relevância (como uma UI de busca), use `CONTAINSTABLE` ou `FREETEXTTABLE` — eles expõem a coluna `RANK` (1–1000) que você pode usar em `ORDER BY`.
+> `CONTAINS` e `FREETEXT` são predicados — retornam apenas SIM/NÃO. Para ordenar resultados por relevância (como uma UI de busca), use `CONTAINSTABLE` ou `FREETEXTTABLE` — eles expõem a coluna `RANK` (0–1000) que você pode usar em `ORDER BY`.
 
 ---
 

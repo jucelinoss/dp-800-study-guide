@@ -11,12 +11,12 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
 > - 📍 [2. Tipo de Dado VECTOR](#tipo-de-dado-vector)
-> - 📍 [3. VECTOR_NORMALIZE](#vector-normalize)
+> - 📍 [3. VECTOR_NORMALIZE](#vector_normalize)
 > - 📍 [4. VECTORPROPERTY](#vectorproperty)
-> - 📍 [5. VECTOR_DISTANCE — Métricas de Distância](#vector-distance-métricas-de-distância)
+> - 📍 [5. VECTOR_DISTANCE — Métricas de Distância](#vector_distance--métricas-de-distância)
 >   - 🔹 [Distância Cosseno](#distância-cosseno)
 >   - 🔹 [Distância Euclidiana (L2)](#distância-euclidiana-l2)
 >   - 🔹 [Distância Dot Product](#distância-dot-product)
@@ -51,16 +51,16 @@ A busca vetorial encontra linhas cujos embeddings vetoriais são matematicamente
 
 > [!tip] O Que o Exame Testa
 >
-> - `VECTOR_DISTANCE('cosine', v1, v2)` = **exato** nearest neighbor (ENN) — compara todas as linhas; use quando precisão > velocidade
+> - `VECTOR_DISTANCE('cosine', v1, v2)` = **exact** nearest neighbor (ENN) — compara todas as linhas; use quando precisão > velocidade
 > - `SELECT TOP (N) WITH APPROXIMATE ... FROM VECTOR_SEARCH(...)` = **aproximado** (ANN) via DiskANN — mais rápido em escala
 > - DiskANN suporta métricas `cosine`, `dot` e `euclidean` — a métrica do índice **deve corresponder** ao `VECTOR_DISTANCE` da query aproximada
 
 > [!note] Status em 2026
 >
-> - `VECTOR` e `VECTOR_DISTANCE` — **GA** no SQL Server 2025 e Azure SQL Database.
-> - `VECTOR_SEARCH` e índices vetoriais são recursos em **preview**. `VECTOR_NORMALIZE` e `VECTORPROPERTY` são funções vetoriais; confirme a disponibilidade da plataforma antes de usar recursos de preview em produção.
-> - **Índice vetorial DiskANN** — **preview público**. A versão mais recente está disponível atualmente no Azure SQL Database e SQL database no Microsoft Fabric; no SQL Server 2025 preview, `PREVIEW_FEATURES = ON` é obrigatório.
-> - **Vetores de meia precisão (`float16`)** — preview; reduz armazenamento pela metade e suporta até **3.996** dimensões, contra **1.998** para `float32`.
+> - `VECTOR`, `VECTOR_DISTANCE`, `VECTOR_NORM`, `VECTOR_NORMALIZE` e `VECTORPROPERTY` — tipo de dado/funções vetoriais **GA**, sujeitos à disponibilidade específica de cada plataforma documentada para o recurso.
+> - `VECTOR_SEARCH` e `CREATE VECTOR INDEX`/índices vetoriais — continuam sendo recursos em **preview**. No SQL Server 2025, habilite `PREVIEW_FEATURES = ON`; o Azure SQL Database e o SQL database no Microsoft Fabric têm suas próprias regras de implantação e limitações.
+> - **DiskANN** — é o algoritmo usado pelo índice vetorial aproximado e continua fazendo parte do recurso de índice vetorial em preview. A versão mais recente do índice está disponível atualmente no Azure SQL Database e no SQL database no Microsoft Fabric; o SQL Server 2025 usa a implementação em preview e exige `PREVIEW_FEATURES = ON`.
+> - **Vetores de meia precisão (`float16`)** — continuam em preview; reduzem pela metade o armazenamento por componente e suportam até **3.996** dimensões, contra **1.998** para `float32`.
 
 ---
 
@@ -227,7 +227,7 @@ ORDER BY vs.distance;
 
 ## Índice Vetorial (DiskANN)
 
-**DiskANN** (Disk-based Approximate Nearest Neighbor) é o tipo de índice vetorial no Azure SQL e Fabric SQL:
+**DiskANN** (Disk-based Approximate Nearest Neighbor) é o algoritmo usado pelo índice vetorial aproximado. O recurso `CREATE VECTOR INDEX` com DiskANN está disponível em preview no Azure SQL Database, no SQL database do Microsoft Fabric e no SQL Server 2025 local (on-premises):
 
 ```sql
 -- Criar um índice vetorial DiskANN na coluna DescriptionVector

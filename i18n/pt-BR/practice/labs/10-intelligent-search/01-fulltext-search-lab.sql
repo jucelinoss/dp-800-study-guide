@@ -14,6 +14,7 @@
 --   9. Procedure usp_FtsProductSearch reutilizavel com AdventureWorks
 --  10. Tabela 6 Problemas Comuns + 4 tabelas comparativas exame
 --  11. Questao estilo exame (4 alternativas + gabarito comentado)
+--  12. Experimento controlado de precisao/recall comparando CONTAINS e FREETEXT
 -- =================================================================================
 -- REFERENCIAS MS LEARN:
 --   Full-Text Search (SQL Server):
@@ -46,7 +47,8 @@ DROP PROCEDURE IF EXISTS lab.usp_FtsProductSearch;
 DROP TABLE IF EXISTS lab.FtsProductDocs;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 -- =================================================================================
@@ -196,6 +198,20 @@ GO
 WAITFOR DELAY '00:00:03';
 GO
 
+-- --- EXPERIMENTO CONTROLADO: conjunto rotulado para precisao/recall ---
+-- ProductID -201 e -202 sao relevantes para a consulta "wireless headphones".
+-- ProductID -203 e um distrator: compartilha apenas a palavra "wireless".
+-- Os rotulos sao definidos manualmente para avaliar a busca; nao sao metadados da FTS.
+INSERT INTO lab.FtsProductDocs
+    (ProductID, ProductName, Subcategory, Category, SearchDocument, PrefixedDocument, ListPrice)
+VALUES
+    (-201, N'Wireless Headphones', N'Test', N'FTS Demo', N'Wireless headphones for calls.', N'FTS demo: Wireless headphones.', 1.00),
+    (-202, N'Wireless Headphone', N'Test', N'FTS Demo', N'Wireless headphone with microphone.', N'FTS demo: Wireless headphone.', 1.00),
+    (-203, N'Wireless Bike Light', N'Test', N'FTS Demo', N'Wireless bike light for night riding.', N'FTS demo: Wireless bike light.', 1.00);
+GO
+WAITFOR DELAY '00:00:02';
+GO
+
 PRINT N'--- Catalogo: PopulateStatus 0 = Idle (OK) ---';
 SELECT FULLTEXTCATALOGPROPERTY(N'AW_ProductFtsCatalog', 'PopulateStatus') AS PopulateStatus,
        CASE FULLTEXTCATALOGPROPERTY(N'AW_ProductFtsCatalog', 'PopulateStatus')
@@ -309,6 +325,68 @@ PRINT N'>>> FREETEXT automaticamente: 1) Remove stopwords, 2) OR logico entre pa
 PRINT N'    3) Aplica flexoes, 4) Expande thesaurus se configurado.';
 GO
 
+-- --- COMPARACAO CONTROLADA: CONTAINS x FREETEXT ---
+-- A mesma consulta e executada sobre os tres documentos rotulados acima.
+DECLARE @Relevantes TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @Relevantes (ProductID) VALUES (-201), (-202);
+
+DECLARE @ResultadosContains TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @ResultadosContains (ProductID)
+SELECT ProductID
+FROM lab.FtsProductDocs
+WHERE ProductID < 0
+  AND CONTAINS(SearchDocument, N'wireless AND headphones');
+
+DECLARE @ResultadosFreetext TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @ResultadosFreetext (ProductID)
+SELECT ProductID
+FROM lab.FtsProductDocs
+WHERE ProductID < 0
+  AND FREETEXT(SearchDocument, N'wireless headphones');
+
+-- Primeiro veja quais candidatos cada predicado retornou.
+SELECT N'CONTAINS' AS Predicado, p.ProductID, p.ProductName,
+       CASE WHEN r.ProductID IS NULL THEN N'Nao' ELSE N'Sim' END AS RotuladoRelevante
+FROM @ResultadosContains c
+INNER JOIN lab.FtsProductDocs p ON p.ProductID = c.ProductID
+LEFT JOIN @Relevantes r ON r.ProductID = c.ProductID
+UNION ALL
+SELECT N'FREETEXT', p.ProductID, p.ProductName,
+       CASE WHEN r.ProductID IS NULL THEN N'Nao' ELSE N'Sim' END
+FROM @ResultadosFreetext f
+INNER JOIN lab.FtsProductDocs p ON p.ProductID = f.ProductID
+LEFT JOIN @Relevantes r ON r.ProductID = f.ProductID
+ORDER BY Predicado, ProductID;
+
+-- Precisao = linhas relevantes retornadas / todas as linhas retornadas.
+-- Recall = linhas relevantes retornadas / todas as linhas relevantes rotuladas.
+SELECT N'CONTAINS' AS Predicado,
+       COUNT(*) AS LinhasRetornadas,
+       SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) AS LinhasRelevantesRetornadas,
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) AS TaxaPrecisao,
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / (SELECT COUNT(*) FROM @Relevantes) AS DECIMAL(5,2)) AS TaxaRecall
+FROM @ResultadosContains c
+LEFT JOIN @Relevantes r ON r.ProductID = c.ProductID
+UNION ALL
+SELECT N'FREETEXT',
+       COUNT(*),
+       SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END),
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)),
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / (SELECT COUNT(*) FROM @Relevantes) AS DECIMAL(5,2))
+FROM @ResultadosFreetext f
+LEFT JOIN @Relevantes r ON r.ProductID = f.ProductID;
+GO
+
+PRINT N'>>> Licao esperada: CONTAINS deve retornar apenas -201 (maior precisao,';
+PRINT N'    menor recall), enquanto FREETEXT pode retornar -201, -202 e -203';
+PRINT N'    (maior recall, com possivel troca na precisao). O resultado depende';
+PRINT N'    do idioma, stoplist, thesaurus, dados e rotulos escolhidos.';
+GO
+
 -- Busca "como se fosse humano digitando na barra de busca"
 SELECT TOP 20
     ProductID, ProductName, Category, Subcategory, ListPrice
@@ -327,12 +405,12 @@ GO
 PRINT CHAR(13)+CHAR(10) + N'--- TABELA EXAME SEMPRE CAI: CONTAINS vs FREETEXT ---';
 SELECT
     N'CONTAINS'                                   AS Predicado,
-    N'PRECISAO / Baixo recall'                    AS Objetivo,
+    N'Tende a maior precisao / menor recall'      AS Objetivo,
     N'Termo, prefixo, frase, NEAR, booleano, FORMSOF, ISABOUT' AS Suporta,
     N'UI de busca com filtros / campos de e-commerce tecnico'  AS QuandoUsar
 UNION ALL SELECT
     N'FREETEXT',
-    N'RECALL / Menor precisao',
+    N'Tende a maior recall / menor precisao',
     N'Apenas frase em linguagem natural. Sem prefixo, sem NEAR.',
     N'Caixa de busca global em sites, Wikipedia, CMS (Wordpress tipo).'
 UNION ALL SELECT
@@ -577,6 +655,7 @@ SELECT N'[OK] Setup Completo em AW2025: CATALOG, STOPLIST custom, CHANGE_TRACKIN
 SELECT N'[OK] 3 modos CHANGE_TRACKING: AUTO / MANUAL / OFF tabela exame.' UNION ALL
 SELECT N'[OK] 7 variantes CONTAINS: termo, prefixo, frase, booleano, NEAR, FORMSOF, ISABOUT.' UNION ALL
 SELECT N'[OK] FREETEXT linguagem natural: auto stopwords, OR, inflexoes.' UNION ALL
+SELECT N'[OK] Comparacao controlada de precisao/recall: CONTAINS vs FREETEXT.' UNION ALL
 SELECT N'[OK] FREETEXTTABLE/CONTAINSTABLE: RANK(0-1000), TOP N, JOIN com AW.' UNION ALL
 SELECT N'[OK] Idiomas: sys.fulltext_languages LCIDs 1033 English, 1046 PT-BR.' UNION ALL
 SELECT N'[OK] 3 Populacoes: FULL vs INCREMENTAL vs UPDATE tabela comparativa.' UNION ALL

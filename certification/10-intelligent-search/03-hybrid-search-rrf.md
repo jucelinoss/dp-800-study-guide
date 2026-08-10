@@ -12,19 +12,19 @@ tags:
 
 ## Overview
 
-Hybrid search combines full-text search (keyword matching) with vector search (semantic similarity) to produce better results than either alone. The challenge is merging two ranked lists with different scoring scales. **Reciprocal Rank Fusion (RRF)** is the standard algorithm for combining ranked lists without needing to normalize scores — it uses only the rank position, not the score values.
+Hybrid search combines full-text search (keyword matching) with vector search (semantic similarity) to combine lexical and semantic evidence. It can improve results that need both signals, but the gain must be measured on the application's evaluation set. The challenge is merging two ranked lists with different scoring scales. **Reciprocal Rank Fusion (RRF)** is a common algorithm for combining ranked lists without normalizing their raw scores — it uses rank position, not score values. SQL Server does not expose a built-in hybrid-search or RRF operator; the application or T-SQL query composes the two result sets.
 
 > [!abstract]
 >
 > - Covers hybrid search: combining full-text and vector search results using Reciprocal Rank Fusion (RRF)
-> - Hybrid search improves over either method alone by capturing both keyword precision and semantic recall
+> - Hybrid search can capture both keyword precision and semantic similarity; it does not guarantee better precision or recall for every corpus
 > - Key exam topics: RRF formula, k parameter, how to combine result sets, when hybrid outperforms single-method
 
 > [!tip] What the Exam Tests
 >
 > - **RRF formula**: `score = Σ 1/(k + rank)` for each result set; `k = 60` is a common convention, not a T-SQL default; higher score = more relevant
 > - RRF is a **rank-combination algorithm** — it combines the ranks of results from multiple sources, not their raw scores
-> - Hybrid search outperforms single-method when queries mix exact keywords and semantic meaning
+> - Hybrid search is a candidate when queries mix exact keywords and semantic meaning; validate it with labeled queries
 
 ---
 
@@ -44,8 +44,8 @@ RRF does not create relevance by itself. It only reorders candidates retrieved b
 | Natural language query, vague intent | Vector only |
 | Short query with specific terms and semantic meaning | Hybrid (both) |
 | Inflectional forms or configured thesaurus synonyms | Full-text (`FORMSOF`) |
-| Multi-lingual search | Vector (embeddings handle translation) |
-| High-recall requirement (don't miss relevant) | Hybrid |
+| Multi-lingual search | Full-text with the appropriate language configuration, or multilingual embeddings; verify model and language coverage |
+| High-recall requirement (don't miss relevant) | Hybrid is a candidate, but measure recall on labeled queries |
 
 ---
 
@@ -68,9 +68,18 @@ Where `k` is a constant (typically 60) that reduces the impact of very high rank
 | Product C | 2 | 50 | 1/(60+2) + 1/(60+50) = 0.0161 + 0.0091 = **0.0252** |
 | Product D | 100 | 2 | 1/(60+100) + 1/(60+2) = 0.0063 + 0.0161 = **0.0224** |
 
-Documents appearing in both lists score higher than those in only one list. The `k=60` constant prevents a rank-1 result in one list from completely dominating if it scores poorly in the other.
+Documents appearing in both lists receive contributions from both ranks. However, a document ranked very highly in one list can still outrank a document that appears near the bottom of both lists; RRF is not a guarantee that overlap always wins. The `k=60` constant controls how quickly the contribution decreases as rank grows.
 
-![Hybrid Search & Reciprocal Rank Fusion Architecture](../../../dist/images/hybrid_search_rrf_architecture.png)
+```mermaid
+flowchart LR
+    Q[User query] --> F[Full text search]
+    Q --> V[Vector search]
+    F --> RF[Ranked FTS candidates]
+    V --> RV[Ranked vector candidates]
+    RF --> R[RRF score by rank]
+    RV --> R
+    R --> O[Combined ranked list]
+```
 
 ---
 
@@ -101,18 +110,25 @@ BEGIN
     ),
 
     -- Step 3: Vector search results with rank
-    VectorResults AS (
+    VectorCandidates AS (
         SELECT TOP (50) WITH APPROXIMATE
-            vs.ProductId,
-            vs.distance AS VectorDistance,
-            ROW_NUMBER() OVER (ORDER BY vs.distance) AS VectorRank
+            p.ProductId,
+            vs.distance AS VectorDistance
         FROM VECTOR_SEARCH(
-            TABLE = dbo.Products,
+            TABLE = dbo.Products AS p,
             COLUMN = DescriptionVector,
             SIMILAR_TO = @query_vector,
             METRIC = 'cosine'
         ) AS vs
         ORDER BY vs.distance
+    ),
+
+    VectorResults AS (
+        SELECT
+            ProductId,
+            VectorDistance,
+            ROW_NUMBER() OVER (ORDER BY VectorDistance, ProductId) AS VectorRank
+        FROM VectorCandidates
     ),
 
     -- Step 4: Combine with RRF
@@ -210,7 +226,7 @@ Recall@K = |Relevant items in top K| / |Total relevant items|
 ```
 
 - Higher is better
-- Hybrid search typically improves recall over either approach alone
+- Hybrid search may improve recall over either approach alone; verify this with labeled queries
 
 ### Precision
 
@@ -232,6 +248,21 @@ MRR = (1/|Q|) × Σ (1 / rank_of_first_relevant_result)
 - Measures how quickly the first relevant result appears
 
 ### Evaluating with Ground Truth
+
+*Ground truth* is a reference set that records which documents are relevant for
+each test query. It lets you compare full-text search, vector search, and RRF
+against a known target instead of judging only the displayed order of results.
+
+For example, suppose the relevant products for `wireless headphones` are 2, 5,
+and 8. If the top three results are 2, 5, and 10, two of the three returned
+items are relevant and two of the three known relevant items were found:
+
+- **Precision@3** = 2 relevant returned / 3 returned = **66.7%**
+- **Recall@3** = 2 relevant found / 3 relevant known = **66.7%**
+
+Use the same labeled queries and relevance criteria when comparing strategies.
+Without ground truth, you cannot objectively conclude that one strategy has
+better precision or recall; you can only observe its ranking.
 
 ```sql
 -- Create a test set with known relevant products for queries
@@ -262,11 +293,11 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 
 | Lever | Impact |
 | :--- | :--- |
-| Vector index (DiskANN) | `Major — milliseconds vs seconds for ANN` |
-| FTS index | Major — instant vs full table scan |
-| Reduce approximate `TOP (N)` | Minor — fewer candidates |
-| Reduce FTS result limit | Minor — faster FTS evaluation |
-| Pre-normalize embeddings | Minor — skip VECTOR_NORMALIZE at query time |
+| Vector index (DiskANN) | Can reduce ANN work at scale; measure build cost, latency and recall |
+| FTS index | Avoids a full-text table scan; measure CPU, I/O and latency |
+| Reduce approximate `TOP (N)` | May reduce work but can lower recall |
+| Reduce FTS result limit | May reduce work but can remove candidates from the fusion |
+| Pre-normalize embeddings | Can avoid repeated normalization when the selected metric/model requires it; validate relevance |
 
 ---
 
@@ -321,8 +352,9 @@ numeric vector distance (lower is better) and normalization of the full-text
 
 ```sql
 -- Illustrative only: validate score distributions on your corpus.
-ORDER BY (VectorDistance * 0.60)
-       + ((1.0 - FullTextRank / 1000.0) * 0.40) ASC;
+-- Illustrative only: convert both signals to comparable, lower-is-better values.
+ORDER BY (NormalizedVectorDistance * 0.60)
+       + ((1.0 - NormalizedFTSRelevance) * 0.40) ASC;
 ```
 
 For a weighted formula, materialize a numeric distance and validate its
@@ -334,14 +366,14 @@ approximate retrieval is acceptable for that formula.
 > - RRF uses **ranks**, not raw scores — this makes it scale-invariant and robust to different scoring systems
 > - `k=60` is a common RRF convention; in a T-SQL implementation it is a parameter to validate against the corpus
 > - `FULL OUTER JOIN` is essential — a document may appear in only one of the two result sets
-> - Hybrid search improves **recall** (finds more relevant items) compared to using only one approach
+> - Hybrid search can improve **recall** compared to one approach, but this is an empirical result rather than a guarantee
 > - Vector search handles semantic similarity; full-text handles exact keywords — neither alone is optimal for production search
 
 ---
 
 ## Key Takeaways
 
-- Hybrid search = full-text search + vector search, merged with RRF
+- Hybrid search = full-text search + vector search, merged by a query/application pattern such as RRF
 - RRF formula: `1 / (k + rank)` summed across all result lists — higher score = better combined rank
 - Use `FULL OUTER JOIN` to merge the two lists so documents appearing in only one list are still included
 - Measure recall, precision, and latency to evaluate and tune the hybrid search pipeline
@@ -360,6 +392,7 @@ approximate retrieval is acceptable for that formula.
 
 - [Hybrid Search in Azure AI Search](https://learn.microsoft.com/en-us/azure/search/hybrid-search-overview)
 - [Reciprocal Rank Fusion](https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking)
+- [Hybrid search in the SQL Server EF Core provider](https://learn.microsoft.com/en-us/ef/core/providers/sql-server/vector-search)
 - [VECTOR_SEARCH](https://learn.microsoft.com/en-us/sql/t-sql/functions/vector-search-transact-sql)
 
 ---

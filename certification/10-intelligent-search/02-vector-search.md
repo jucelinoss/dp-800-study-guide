@@ -30,10 +30,10 @@ Vector search finds rows whose vector embeddings are mathematically similar to a
 
 > [!note] 2026 status
 >
-> - `VECTOR` and `VECTOR_DISTANCE` — **GA** in SQL Server 2025 and Azure SQL Database.
-> - `VECTOR_SEARCH` and vector indexes are **preview** features. `VECTOR_NORMALIZE` and `VECTORPROPERTY` are vector functions; confirm platform availability before using previews in production.
-> - **DiskANN vector index** — **public preview**. The latest index version is currently available in Azure SQL Database and SQL database in Microsoft Fabric; SQL Server 2025 preview requires `PREVIEW_FEATURES = ON`.
-> - **Half-precision (`float16`) vectors** — preview; halves storage and supports up to **3,996** dimensions, versus **1,998** for `float32`.
+> - `VECTOR`, `VECTOR_DISTANCE`, `VECTOR_NORM`, `VECTOR_NORMALIZE`, and `VECTORPROPERTY` — **GA** vector data type/functions, subject to the platform-specific availability documented for each feature.
+> - `VECTOR_SEARCH` and `CREATE VECTOR INDEX`/vector indexes — still **preview** features. In SQL Server 2025, enable `PREVIEW_FEATURES = ON`; Azure SQL Database and SQL database in Microsoft Fabric have their own rollout and limitation rules.
+> - **DiskANN** — the algorithm used by the approximate vector index and still part of the preview vector-index feature. The latest index version is currently available in Azure SQL Database and SQL database in Microsoft Fabric; SQL Server 2025 uses the preview implementation and requires `PREVIEW_FEATURES = ON`.
+> - **Half-precision (`float16`) vectors** — still preview; they halve the storage per component and support up to **3,996** dimensions, versus **1,998** for `float32`.
 
 ---
 
@@ -195,7 +195,7 @@ ORDER BY vs.distance;
 
 ## Vector Index (DiskANN)
 
-**DiskANN** (Disk-based Approximate Nearest Neighbor) is currently the vector index type:
+**DiskANN** (Disk-based Approximate Nearest Neighbor) is the algorithm used by the approximate vector index. `CREATE VECTOR INDEX` with DiskANN is available in preview in Azure SQL Database, SQL database in Microsoft Fabric, and SQL Server 2025 on-premises. On SQL Server 2025, enable `PREVIEW_FEATURES = ON` before creating the index; it is therefore not exclusive to Azure SQL or Fabric:
 
 ```sql
 -- Create a DiskANN vector index on the DescriptionVector column

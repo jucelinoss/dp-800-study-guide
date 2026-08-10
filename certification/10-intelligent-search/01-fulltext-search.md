@@ -23,9 +23,15 @@ Full-text search (FTS) enables linguistic searching of character-based data — 
 
 > [!tip] What the Exam Tests
 >
-> - `CONTAINS` = **precision**: exact terms, prefix (`"data*"`), proximity (`NEAR`), weighted terms (`ISABOUT`)
-> - `FREETEXT` = **recall**: natural language query and inflections; configured thesaurus mappings can broaden the match further
+> - `CONTAINS` tends toward **higher precision**: exact terms, prefixes (`"data*"`), proximity (`NEAR`), Boolean conditions, and weighted terms (`ISABOUT`) let the query restrict what counts as a match
+> - `FREETEXT` tends toward **higher recall**: natural-language input, inflectional forms, and configured thesaurus mappings broaden the candidates, which can also introduce less relevant results
 > - `CONTAINSTABLE` / `FREETEXTTABLE` return a table with a `RANK` column (0–1000) — use when you need ranked results or want to join with other tables
+
+> [!note] Precision, recall, and `RANK`
+>
+> **Precision** is the proportion of returned results that are relevant. **Recall** is the proportion of all relevant results that were returned. These are evaluation metrics for a search experience, not fixed labels attached to a SQL Server function. `CONTAINS` often improves precision by applying stricter linguistic criteria; `FREETEXT` often improves recall by expanding the input linguistically. The actual balance depends on the language, stoplist, thesaurus, data, and query. `CONTAINSTABLE` and `FREETEXTTABLE` do not inherently increase precision or recall: they expose matching rows and a relative `RANK` for ordering. `RANK` is not a percentage, probability, or precision score.
+
+> The formulas are the same used in Data Science: `precision = relevant results returned / all results returned`, and `recall = relevant results returned / all relevant results that exist`. The difference is the evaluation context. In classification, positive labels are usually fixed for each example and are commonly expressed as true positives (`TP`), false positives (`FP`), and false negatives (`FN`). In search, relevance is query-specific and normally requires a human-labeled or otherwise known evaluation set. `CONTAINS` and `FREETEXT` return candidates; they do not calculate or guarantee these metrics.
 
 ---
 
@@ -35,11 +41,35 @@ A full-text index does not scan every text looking for characters like a `LIKE` 
 
 Before indexing, the engine interprets text according to its language: it splits words, can relate inflected forms, and ignores common *stop words*. The query goes through similar analysis. This makes Full-Text Search richer than `LIKE`, but it is not meaning-based search: it still relies on terms and linguistic rules, not embeddings.
 
-Use `CONTAINS` when the application controls the syntax and needs precision — a phrase, prefix, Boolean operator, or proximity. `FREETEXT` accepts a natural-language phrase and broadens matching through inflections and, when mappings are configured, the thesaurus. When results must be ordered or combined with other data, `CONTAINSTABLE` and `FREETEXTTABLE` return keys and a `RANK`; that rank is FTS-specific and must not be compared directly with vector scores.
+Use `CONTAINS` when the application controls the syntax and needs precision — a phrase, prefix, Boolean operator, or proximity. `FREETEXT` accepts a natural-language phrase and broadens matching through inflections and, when mappings are configured, the thesaurus. In Microsoft’s description, “meaning” here refers to this linguistic expansion; it is not embedding-based semantic similarity. When results must be ordered or combined with other data, `CONTAINSTABLE` and `FREETEXTTABLE` return keys and a `RANK`; that rank is FTS-specific and must not be compared directly with vector scores.
+
+### What a Thesaurus Does
+
+A full-text thesaurus is a language-specific XML configuration that defines synonym or replacement mappings. For example, an expansion set can treat `fast`, `quick`, and `rapid` as equivalent terms for full-text matching. `FREETEXT` uses the configured thesaurus automatically; `CONTAINS` and `CONTAINSTABLE` use it only when the query explicitly includes `FORMSOF(THESAURUS, ...)`.
+
+The thesaurus is not an AI model and does not infer general meaning from a sentence. It applies the mappings that an administrator configured for a language. If no mapping is configured, a thesaurus search does not automatically discover synonyms.
 
 > [!note] Important boundary
 >
 > Full-Text Search retrieves linguistic matches, not general semantic knowledge. “Cancel plan” might not retrieve “end subscription” when the terms are not related by language processing or a thesaurus. Use vector or hybrid search for that kind of intent.
+
+## When to Use Full-Text Search vs. Embeddings
+
+Use Full-Text Search when the query depends on exact or linguistic terms: product codes, order numbers, legal clauses, names, quoted phrases, prefixes, Boolean logic, proximity, inflectional forms, or synonyms configured in a thesaurus. It is also preferable when explainable term matches, language-specific ranking, and no external model/API call are priorities.
+
+Use embeddings/vector search when the query expresses intent or meaning and the relevant text may use different words: paraphrases, natural-language questions, semantic similarity, multilingual concepts supported by the model, recommendations, or RAG retrieval. Embeddings require an embedding model, stored vectors with a fixed dimension, and query-vector generation using the same model and vector space as the indexed vectors.
+
+Choose hybrid search when both signals matter: for example, an exact code or identifier must match while the rest of the question may be paraphrased. Run FTS and vector search independently, apply authorization and tenant filters to both, and combine the ranked candidate lists (for example, with RRF). Do not add raw FTS `RANK` directly to vector distance because they have different meanings and scales.
+
+**Reciprocal Rank Fusion (RRF)** combines the position of a document in each result list. A common formula is `RRF(document) = Σ 1 / (k + rank)`, where `rank` is the 1-based position in an FTS or vector list and `k` is a smoothing constant, often 60. A document ranked highly by both searches receives a higher combined score; a document appearing in only one list can still be retained. RRF uses rank positions, not the raw FTS `RANK` or vector distance, so the two search systems do not need compatible score scales.
+
+| Need | Prefer |
+|---|---|
+| Exact term, code, phrase, prefix, Boolean logic, or proximity | Full-Text Search |
+| Meaning, paraphrase, or natural-language intent | Embeddings/vector search |
+| Both exact terms and semantic intent | Hybrid search |
+| No model/API or vector maintenance allowed | Full-Text Search |
+| Better recall across wording variations | Embeddings, validated with real queries |
 
 ## Full-Text Catalogs and Indexes
 
@@ -81,7 +111,7 @@ SELECT * FROM sys.fulltext_index_columns;
 | :--- | :--- |
 | `AUTO` | `SQL Server automatically updates the FTS index when rows change` |
 | `MANUAL` | Updates only when you call `ALTER FULLTEXT INDEX ... START UPDATE POPULATION` |
-| `OFF` | No change tracking; manual full population only |
+| `OFF` | No change tracking; population and repopulation must be started manually (`FULL` or `INCREMENTAL` when applicable) |
 
 ### Population (Building the Index)
 
@@ -89,16 +119,20 @@ SELECT * FROM sys.fulltext_index_columns;
 -- Start a full population (rebuild entire index)
 ALTER FULLTEXT INDEX ON dbo.Products START FULL POPULATION;
 
--- Start an incremental population (only changed rows since last population)
+-- Start an incremental population when the table has a timestamp column
 ALTER FULLTEXT INDEX ON dbo.Products START INCREMENTAL POPULATION;
 
 -- Check population status
 SELECT FULLTEXTCATALOGPROPERTY('ProductCatalog', 'PopulateStatus') AS Status;
--- 0 = Idle, 1 = Full population in progress, 5 = Throttled
+-- 0 = Idle, 1 = Full, 3 = Throttled, 6 = Incremental population in progress
 
 -- Check if full-text index is populated
 SELECT OBJECTPROPERTYEX(OBJECT_ID('dbo.Products'), 'TableFulltextPopulateStatus');
 ```
+
+> [!note] Checking population status
+>
+> `FULLTEXTCATALOGPROPERTY(..., 'PopulateStatus')` is retained for compatibility and is documented for removal in a future SQL Server version. For new monitoring code, prefer the table-level `OBJECTPROPERTYEX(..., 'TableFulltextPopulateStatus')` check, rather than repeatedly polling the catalog status in a tight loop.
 
 ---
 
@@ -121,6 +155,12 @@ ALTER FULLTEXT INDEX ON dbo.Products SET STOPLIST = [MyStopList];
 SELECT * FROM sys.fulltext_stopwords WHERE stoplist_id =
     (SELECT stoplist_id FROM sys.fulltext_stoplists WHERE name = 'MyStopList');
 ```
+
+> [!warning] Stop words can suppress expected results
+>
+> A stopword is removed from the full-text index and from the search condition. Many are grammatical function words that occur very frequently and usually add little discriminatory value, such as `the` (article), `and` (conjunction), and `of`/`to` (prepositions). Suppressing them usually reduces index size and noise, but it is not always correct: a product name, legal expression, title, code, or short phrase may depend on one of those words. Therefore, a query for a common word such as `the`, or a query containing a custom stopword such as `product`, may return no rows or behave differently from a `LIKE` query. The index still preserves the positional information of omitted stopwords, so they can affect phrase and `NEAR` distance calculations even though they are not searchable tokens.
+>
+> When troubleshooting, check both the custom stoplist (`sys.fulltext_stopwords`) and the system list (`sys.fulltext_system_stopwords`). Use `sys.dm_fts_parser` to inspect how a word, language, thesaurus, and stoplist are tokenized. The server option `transform noise words` is relevant to Boolean and proximity queries containing stopwords: with the default value `0`, SQL Server can raise a warning and return zero rows; when enabled, it transforms/removes the noise word so the query can continue, which may change the meaning of the condition. Do not enable it as a substitute for choosing the correct stoplist and query terms.
 
 ---
 
@@ -197,11 +237,13 @@ WHERE CONTAINS(Description, 'headphones AND NOT "in-ear"');
 ### NEAR — Proximity Search
 
 ```sql
--- NEAR: terms within 50 words of each other (default proximity)
+-- Generic NEAR ranks matches based on proximity; matches farther than
+-- 50 logical terms receive rank 0. This custom form explicitly limits
+-- the maximum distance to 5 non-search terms.
 SELECT ProductId, ProductName
 FROM dbo.Products
 WHERE CONTAINS(Description, 'NEAR((wireless, headphones), 5)');
--- Terms within 5 words of each other
+-- Up to 5 non-search terms may occur between the search terms
 
 -- Ordered NEAR (first term must come before second)
 SELECT ProductId, ProductName
@@ -217,13 +259,16 @@ WHERE CONTAINS(Description, 'NEAR((noise, cancelling), 3, TRUE)');
 SELECT ProductId, ProductName
 FROM dbo.Products
 WHERE CONTAINS(Description, 'FORMSOF(INFLECTIONAL, "connect")');
--- Matches: connect, connects, connected, connecting, connection
+-- Matches inflectional forms according to the language stemmer, such as
+-- connect, connects, connected, and connecting; it does not mean every
+-- word derived from the same spelling, such as "connection".
 
 -- FORMSOF THESAURUS: matches synonyms from the thesaurus file
 SELECT ProductId, ProductName
 FROM dbo.Products
 WHERE CONTAINS(Description, 'FORMSOF(THESAURUS, "fast")');
--- Matches: fast, quick, rapid, speedy (depending on thesaurus configuration)
+-- Matches configured synonyms such as fast, quick, rapid, or speedy.
+-- The actual terms depend on the language-specific thesaurus XML file.
 ```
 
 ---
@@ -240,7 +285,7 @@ WHERE FREETEXT(Description, 'fast wireless audio headphones');
 
 -- FREETEXT automatically:
 -- 1. Removes stop words
--- 2. Finds inflected forms (connected → connect, connecting, connection)
+-- 2. Finds inflectional forms according to the language stemmer
 -- 3. Expands to thesaurus synonyms (if thesaurus configured)
 -- 4. Uses OR logic (any of the words can match)
 ```
@@ -249,7 +294,7 @@ WHERE FREETEXT(Description, 'fast wireless audio headphones');
 
 ## CONTAINSTABLE and FREETEXTTABLE — Ranked Results
 
-These table-valued functions return matching rows with a `RANK` score (1–1000, higher = better match):
+These table-valued functions return matching rows with a `RANK` score (0–1000, higher = better relative match):
 
 ### CONTAINSTABLE
 
@@ -290,7 +335,7 @@ SELECT TOP 10
 FROM FREETEXTTABLE(dbo.Products, Description, 'wireless audio', LANGUAGE 1033, 10) AS ftt
 JOIN dbo.Products p ON p.ProductId = ftt.[KEY]
 ORDER BY ftt.[RANK] DESC;
--- The 4th parameter (10) limits results inside the FTS engine
+-- The 5th argument (10) is top_n_by_rank and limits results inside the FTS engine
 ```
 
 ---
@@ -343,7 +388,7 @@ SELECT lcid, name FROM sys.fulltext_languages ORDER BY name;
 > - **Stop words** can suppress expected results — if "product" is in the stop list, searching for "product" returns nothing
 > - `CHANGE_TRACKING = AUTO` keeps the FTS index current; `MANUAL` requires explicit repopulation
 > - `FORMSOF(INFLECTIONAL, ...)` — great for verb forms (search "run" finds "running", "ran", "runs")
-> - `RANK` from CONTAINSTABLE/FREETEXTTABLE is 1–1000 — useful for relevance-based ordering
+> - `RANK` from CONTAINSTABLE/FREETEXTTABLE is 0–1000 — useful for relative relevance ordering; the absolute value can change between executions
 
 ---
 

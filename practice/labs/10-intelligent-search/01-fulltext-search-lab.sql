@@ -12,12 +12,17 @@
 --   3. Natural Language Search Predicate with `FREETEXT`
 --   4. Ranked Queries with `CONTAINSTABLE` and `FREETEXTTABLE` (`[RANK]` column 0 to 1000)
 --   5. Stoplists, language settings, and index maintenance
+--   6. Controlled precision/recall comparison between `CONTAINS` and `FREETEXT`
 -- =================================================================================
 
 -- NOTE: Theory content for this chapter is available at:
 --       ../../../certification/10-intelligent-search/01-fulltext-search.md
 
 USE AdventureWorks2025;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 -- Preventive cleanup
@@ -45,7 +50,11 @@ GO
 INSERT INTO lab.FtsProductCatalog (ProductName, Description) VALUES
 (N'Pro Cycling Helmet', N'Lightweight carbon-fiber helmet with built-in Bluetooth headphones.'),
 (N'Trail Bike', N'Mountain bike for racing with 24 gears.'),
-(N'Sport Bluetooth Headphones', N'Wireless Bluetooth headphones with active noise cancellation.');
+(N'Sport Bluetooth Headphones', N'Wireless Bluetooth headphones with active noise cancellation.'),
+-- Controlled rows used later to calculate precision and recall for one query.
+(N'Wireless Headphones', N'Wireless headphones for calls.'),
+(N'Wireless Headphone', N'Wireless headphone with microphone.'),
+(N'Wireless Bike Light', N'Wireless bike light for night riding.');
 GO
 
 
@@ -91,7 +100,7 @@ GO
 -- =================================================================================
 -- KEY CONCEPTS AND DEFINITIONS:
 --   - CONTAINS: Precise search with boolean operators (AND, OR, NOT), prefixes ("cap*"), and proximity (NEAR).
---   - FREETEXT: Semantic natural language search (ignores stopwords and applies verb inflections).
+--   - FREETEXT: Broader linguistic natural-language search (ignores stopwords and applies inflectional forms).
 
 -- -- [DP-800 KEY POINT]
 -- 1. Term, phrase, and boolean search. A phrase requires internal double quotes.
@@ -131,6 +140,70 @@ SELECT ProductID, ProductName, Description
 FROM lab.FtsProductCatalog
 WHERE FREETEXT(Description, 'comfortable wireless headphones');
 GO
+
+-- 6. Controlled precision/recall experiment (same query, same documents)
+-- Ground truth for the query "wireless headphones": ProductID 4 and 5 are
+-- manually labeled relevant; ProductID 6 is a distractor that shares only
+-- the word "wireless". The labels are an evaluation set, not FTS metadata.
+DECLARE @Relevant TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @Relevant (ProductID) VALUES (4), (5);
+
+DECLARE @ContainsResults TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @ContainsResults (ProductID)
+SELECT ProductID
+FROM lab.FtsProductCatalog
+WHERE ProductID >= 4
+  AND CONTAINS(Description, 'wireless AND headphones');
+
+DECLARE @FreetextResults TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @FreetextResults (ProductID)
+SELECT ProductID
+FROM lab.FtsProductCatalog
+WHERE ProductID >= 4
+  AND FREETEXT(Description, 'wireless headphones');
+
+-- Inspect the actual candidates returned by each predicate.
+SELECT 'CONTAINS' AS Predicate, p.ProductID, p.ProductName,
+       CASE WHEN r.ProductID IS NULL THEN 'No' ELSE 'Yes' END AS LabeledRelevant
+FROM @ContainsResults c
+JOIN lab.FtsProductCatalog p ON p.ProductID = c.ProductID
+LEFT JOIN @Relevant r ON r.ProductID = c.ProductID
+UNION ALL
+SELECT 'FREETEXT', p.ProductID, p.ProductName,
+       CASE WHEN r.ProductID IS NULL THEN 'No' ELSE 'Yes' END
+FROM @FreetextResults f
+JOIN lab.FtsProductCatalog p ON p.ProductID = f.ProductID
+LEFT JOIN @Relevant r ON r.ProductID = f.ProductID
+ORDER BY Predicate, ProductID;
+
+-- Precision = relevant rows returned / all rows returned.
+-- Recall = relevant rows returned / all relevant rows in the labeled set.
+SELECT 'CONTAINS' AS Predicate,
+       COUNT(*) AS ReturnedRows,
+       SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) AS RelevantRowsReturned,
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)) AS PrecisionRate,
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / (SELECT COUNT(*) FROM @Relevant) AS DECIMAL(5,2)) AS RecallRate
+FROM @ContainsResults c
+LEFT JOIN @Relevant r ON r.ProductID = c.ProductID
+UNION ALL
+SELECT 'FREETEXT',
+       COUNT(*),
+       SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END),
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / NULLIF(COUNT(*), 0) AS DECIMAL(5,2)),
+       CAST(SUM(CASE WHEN r.ProductID IS NULL THEN 0 ELSE 1 END) * 1.0
+            / (SELECT COUNT(*) FROM @Relevant) AS DECIMAL(5,2))
+FROM @FreetextResults f
+LEFT JOIN @Relevant r ON r.ProductID = f.ProductID;
+GO
+
+-- Expected lesson: CONTAINS should return only ProductID 4 (higher precision,
+-- lower recall), while FREETEXT can return ProductIDs 4, 5, and 6 (higher
+-- recall, with a possible precision trade-off). Results depend on language,
+-- stoplist, thesaurus, data, and the chosen labels; this is not a guarantee
+-- that CONTAINS is always more precise or FREETEXT always has more recall.
 
 
 -- =================================================================================

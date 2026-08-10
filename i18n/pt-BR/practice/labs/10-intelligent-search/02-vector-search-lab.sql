@@ -40,7 +40,8 @@ DROP PROCEDURE IF EXISTS lab.usp_VectorProductSearch;
 DROP TABLE IF EXISTS lab.VectorProductCatalog;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 -- =================================================================================
@@ -182,9 +183,7 @@ SELECT TOP 10
     ProductName,
     Category,
     VECTORPROPERTY(Embedding3Small, N'Dimensions')     AS Dimensoes,    -- esperado 1536
-    VECTORPROPERTY(Embedding3Small, N'BaseType')       AS TipoBase,     -- esperado float32
-    -- Propriedade validada no ambiente do lab: NULL para vetores densos.
-    VECTORPROPERTY(Embedding3Small, N'IsSparse')       AS IsSparse
+    VECTORPROPERTY(Embedding3Small, N'BaseType')       AS TipoBase      -- esperado float32
 FROM lab.VectorProductCatalog
 ORDER BY Category, ProductID;
 GO
@@ -202,6 +201,16 @@ FROM lab.VectorProductCatalog
 ORDER BY ProductID;
 GO
 
+PRINT N'--- 3.3 VECTOR_NORM: medir magnitude antes/depois da normalizacao ---';
+SELECT TOP 5
+    ProductID,
+    VECTOR_NORM(Embedding3Small, N'norm2') AS NormaL2Antes,
+    VECTOR_NORM(VECTOR_NORMALIZE(Embedding3Small, N'norm2'), N'norm2') AS NormaL2Depois
+FROM lab.VectorProductCatalog
+WHERE Embedding3Small IS NOT NULL
+ORDER BY ProductID;
+GO
+
 /* -- Bloco didatico para atualizar toda tabela normalizada:
 UPDATE lab.VectorProductCatalog
 SET Embedding3Small = VECTOR_NORMALIZE(Embedding3Small, N'norm2')
@@ -209,6 +218,26 @@ WHERE Embedding3Small IS NOT NULL;
   -- Nao execute em um vetor que sera usado com cosine: nao necessario, nao melhora a metrica.
   -- Exclua isto se sua metrica for cosine (caso mais comum para embeddings texto).
 */
+
+-- --- 3.4 FLOAT16 (preview): mesma dimensao, metade dos bytes por componente ---
+-- Nao execute em plataformas nao suportadas. float16 e uma troca de precisao por
+-- armazenamento; nao e um novo modelo de embedding nem reducao de dimensoes.
+/*
+ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
+GO
+CREATE TABLE lab.VectorFloat16Demo
+(
+    ProductID INT PRIMARY KEY,
+    Embedding VECTOR(4, float16) NULL
+);
+INSERT INTO lab.VectorFloat16Demo (ProductID, Embedding)
+VALUES (-300, CAST(N'[0.025, -0.038, 0.089, 0.120]' AS VECTOR(4, float16)));
+SELECT ProductID,
+       VECTORPROPERTY(Embedding, N'Dimensions') AS Dimensoes,
+       VECTORPROPERTY(Embedding, N'BaseType') AS TipoBase
+FROM lab.VectorFloat16Demo;
+*/
+GO
 
 -- =================================================================================
 -- PARTE 4/8: ENN (Exact) com VECTOR_DISTANCE + 3 MetricAS
@@ -263,6 +292,19 @@ WHERE vpc.Embedding3Small IS NOT NULL
 ORDER BY CosineDistance ASC;    -- ASC = distancia MENOR = TOPO = MELHOR
 GO
 
+-- Filtros estruturados restringem o conjunto permitido antes do ranking.
+-- Em producao, aplique tenant/autorizacao ao conjunto de candidatos.
+SELECT TOP 10
+    ProductID,
+    ProductName,
+    Category,
+    VECTOR_DISTANCE(N'cosine', Embedding3Small, @QueryVec) AS CosineDistance
+FROM lab.VectorProductCatalog
+WHERE Embedding3Small IS NOT NULL
+  AND Category = N'Bikes'
+ORDER BY CosineDistance ASC;
+GO
+
 -- --- Exemplo: encontrar produtos similares a um capacete ---
 PRINT CHAR(13)+CHAR(10) + N'--- ENN: Top 10 similares ao capacete Sport-100 ---';
 DECLARE @HelmetVec VECTOR(1536) = (
@@ -280,6 +322,12 @@ FROM lab.VectorProductCatalog
 WHERE Embedding3Small IS NOT NULL
 ORDER BY SimilaridadeCos DESC;    -- DESC = maior similaridade = melhor
 GO
+
+-- Casos de erro para testar deliberadamente (permanecem comentados):
+-- SELECT VECTOR_DISTANCE(N'cosine', Embedding3Small,
+--     CAST(N'[0.1, 0.2, 0.3]' AS VECTOR(3))) FROM lab.VectorProductCatalog;
+-- SELECT VECTOR_DISTANCE(N'cosine', NULL, @QueryVec);
+-- O primeiro demonstra dimension mismatch; o segundo demonstra tratamento de NULL.
 
 -- =================================================================================
 -- PARTE 5/8: ANN (Approximate) — DiskANN + VECTOR_SEARCH TVF
@@ -390,6 +438,46 @@ PRINT N'  ORDER BY vs.distance;';
 PRINT N'*/';
 GO
 
+-- --- 5.5 [OPCIONAL] Benchmark de recall ANN contra o baseline ENN ---
+-- Execute somente depois de criar o índice vetorial e habilitar o preview quando
+-- necessário. ENN fornece o conjunto exato de referência; ANN e comparado por overlap.
+PRINT N'--- Recall ANN = intersecao ANN/ENN ÷ top-K ENN ---';
+PRINT N'    O recall abaixo mede qualidade da aproximacao, nao relevancia humana.';
+/*
+DECLARE @QueryAnn VECTOR(1536) = (
+    SELECT TOP 1 Embedding3Small
+    FROM lab.VectorProductCatalog
+    WHERE ProductName LIKE N'Mountain-100 Black, 42'
+);
+
+DECLARE @IdsExatos TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @IdsExatos (ProductID)
+SELECT TOP (10) ProductID
+FROM lab.VectorProductCatalog
+WHERE Embedding3Small IS NOT NULL
+ORDER BY VECTOR_DISTANCE(N'cosine', Embedding3Small, @QueryAnn);
+
+DECLARE @IdsAproximados TABLE (ProductID INT PRIMARY KEY);
+INSERT INTO @IdsAproximados (ProductID)
+SELECT TOP (10) p.ProductID
+FROM VECTOR_SEARCH(
+    TABLE = lab.VectorProductCatalog AS p,
+    COLUMN = Embedding3Small,
+    SIMILAR_TO = @QueryAnn,
+    METRIC = N'cosine'
+) AS vs
+ORDER BY vs.distance;
+
+SELECT
+    COUNT(*) AS TopKExato,
+    (SELECT COUNT(*) FROM @IdsAproximados) AS TopKAproximado,
+    COUNT(a.ProductID) AS Intersecao,
+    CAST(COUNT(a.ProductID) * 1.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,4)) AS RecallContraENN
+FROM @IdsExatos e
+LEFT JOIN @IdsAproximados a ON a.ProductID = e.ProductID;
+*/
+GO
+
 -- =================================================================================
 -- PARTE 6/8: ENN vs ANN — Fluxograma + tabela decisao EXAME
 -- =================================================================================
@@ -407,8 +495,8 @@ SELECT
 UNION ALL SELECT
     N'ANN (Approximate)',
     N'TOP(N) WITH APPROXIMATE ... FROM VECTOR_SEARCH( ... METRIC=''...'')',
-    N'~95-99% de recall vs ENN. Pode perder alguns vizinhos matematicamente ideais.',
-    N'O(log N). Sub-segundo em MILHOES de linhas. DiskANN grafo.',
+    N'Recall e latencia dependem dos dados e da configuracao. Pode perder alguns vizinhos matematicamente ideais.',
+    N'Geralmente menor latencia em escala; meca em dados reais. DiskANN usa um grafo.',
     N'PRODUCAO! > 50 mil linhas, UI de busca, RAG em escala.';
 GO
 
@@ -588,9 +676,12 @@ SELECT N'[OK] Tabela VECTOR(n) materializada em AdventureWorks JOIN reais (297+ 
 SELECT N'[OK] Dimensoes + tabela storage: 1536 × 4 bytes = 6KB / 3072×2 float16 preview' UNION ALL
 SELECT N'[OK] Geracao vetores simulados por CATEGORIA (busca semantica demo sem API!)' UNION ALL
 SELECT N'[OK] VECTORPROPERTY (Dimensions/BaseType) + VECTOR_NORMALIZE norm2' UNION ALL
+SELECT N'[OK] VECTOR_NORM: magnitude antes/depois da normalizacao + bloco float16 preview' UNION ALL
 SELECT N'[OK] 3 Metricas tabela: cosine (padrao texto!) / euclidean / dot' UNION ALL
 SELECT N'[OK] ENN real com VECTOR_DISTANCE + Top-N por similaridade Mountain/Capacete' UNION ALL
+SELECT N'[OK] Filtros estruturados tenant/categoria + testes comentados de NULL/dimensao' UNION ALL
 SELECT N'[OK] ANN bloco didatico: CREATE VECTOR INDEX DiskANN preview + VECTOR_SEARCH TVF' UNION ALL
+SELECT N'[OK] Benchmark opcional de recall ANN contra o baseline ENN' UNION ALL
 SELECT N'[OK] ENN vs ANN tabela comparativa + Fluxograma decisao com FALLBACK armadilha' UNION ALL
 SELECT N'[OK] Procedure usp_VectorProductSearch (THROW em dim mismatch / NULL / minSim)' UNION ALL
 SELECT N'[OK] 6 Problemas tabela + Questao exame Gabarito B.';

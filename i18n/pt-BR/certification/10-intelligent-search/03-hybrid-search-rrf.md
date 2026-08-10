@@ -9,7 +9,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
 > - 📍 [2. Quando Usar Cada Tipo de Busca](#quando-usar-cada-tipo-de-busca)
 > - 📍 [3. Algoritmo Reciprocal Rank Fusion](#algoritmo-reciprocal-rank-fusion)
@@ -21,7 +21,7 @@ tags:
 >   - 🔹 [Mean Reciprocal Rank (MRR)](#mean-reciprocal-rank-mrr)
 >   - 🔹 [Avaliando com Ground Truth](#avaliando-com-ground-truth)
 >   - 🔹 [Medição de Latência](#medição-de-latência)
-> - 📍 [7. Ajustando RRF — Ajustando k](#ajustando-rrf-ajustando-k)
+> - 📍 [7. Ajustando RRF — Ajustando k](#ajustando-rrf--ajustando-k)
 > - 📍 [8. Casos de Uso](#casos-de-uso)
 > - 📍 [9. Problemas Comuns e Erros](#problemas-comuns-e-erros)
 > - 📍 [10. Dicas para o Exame](#dicas-para-o-exame)
@@ -35,19 +35,19 @@ tags:
 
 ## Visão Geral
 
-O Hybrid Search combina a full-text search (correspondência por palavras-chave) com a busca vetorial (similaridade semântica) para produzir resultados melhores do que qualquer uma sozinha. O desafio é mesclar duas listas ranqueadas com diferentes escalas de pontuação. O **Reciprocal Rank Fusion (RRF)** é o algoritmo padrão para combinar listas ranqueadas sem precisar normalizar pontuações — ele usa apenas a posição do rank, não os valores de pontuação.
+O Hybrid Search combina a full-text search (correspondência por palavras-chave) com a busca vetorial (similaridade semântica) para combinar evidências lexicais e semânticas. Ele pode melhorar resultados que precisam dos dois sinais, mas o ganho deve ser medido no conjunto de avaliação da aplicação. O desafio é mesclar duas listas ranqueadas com diferentes escalas de pontuação. O **Reciprocal Rank Fusion (RRF)** é um algoritmo comum para combinar listas ranqueadas sem normalizar as pontuações brutas — ele usa apenas a posição no rank. O SQL Server não expõe um operador nativo de hybrid search ou RRF; a aplicação ou a query T-SQL combina os dois conjuntos de resultados.
 
 > [!abstract]
 >
 > - Aborda o hybrid search: combinando resultados de full-text search e busca vetorial usando Reciprocal Rank Fusion (RRF)
-> - O hybrid search melhora em relação a cada método individualmente capturando tanto precisão de palavras-chave quanto recall semântico
+> - O hybrid search pode capturar precisão de palavras-chave e similaridade semântica; ele não garante melhor precisão ou recall para todo corpus
 > - Tópicos-chave para o exame: fórmula RRF, parâmetro k, como combinar result sets, quando o hybrid supera o método único
 
 > [!tip] O Que o Exame Testa
 >
 > - **Fórmula RRF**: `score = Σ 1/(k + rank)` para cada result set; `k = 60` é uma convenção comum, mas deve ser ajustado e validado para o conjunto de dados
 > - RRF é um **algoritmo de combinação de ranks** — combina os ranks de resultados de múltiplas fontes, não suas pontuações brutas
-> - O hybrid search supera o método único quando as queries misturam palavras-chave exatas e significado semântico
+> - O hybrid search é uma opção quando as queries misturam palavras-chave exatas e significado semântico; valide-o com queries rotuladas
 
 ---
 
@@ -67,8 +67,8 @@ RRF não cria relevância do nada. Ele só reorganiza candidatos recuperados pel
 | Query em linguagem natural, intenção vaga | Apenas vetorial |
 | Query curta com termos específicos e significado semântico | Híbrida (ambas) |
 | Formas flexionadas ou sinônimos configurados no thesaurus | Full-text (`FORMSOF`) |
-| Busca multilíngue | Vetorial (embeddings lidam com tradução) |
-| Requisito de alto recall (não perder nada relevante) | Híbrida |
+| Busca multilíngue | Full-text com a configuração de idioma adequada ou embeddings multilíngues; verifique a cobertura do modelo e dos idiomas |
+| Requisito de alto recall (não perder nada relevante) | Híbrida é uma opção, mas meça o recall com queries rotuladas |
 
 ---
 
@@ -91,9 +91,18 @@ Onde `k` é uma constante (tipicamente 60) que reduz o impacto de ranks muito al
 | Produto C | 2 | 50 | 1/(60+2) + 1/(60+50) = 0,0161 + 0,0091 = **0,0252** |
 | Produto D | 100 | 2 | 1/(60+100) + 1/(60+2) = 0,0063 + 0,0161 = **0,0224** |
 
-Documentos que aparecem em ambas as listas pontuam mais alto do que os que aparecem em apenas uma. A constante `k=60` evita que um resultado em posição 1 em uma lista domine completamente se tiver pontuação ruim na outra.
+Documentos que aparecem em ambas as listas recebem contribuições dos dois ranks. Porém, um documento muito bem ranqueado em uma lista ainda pode superar um documento que aparece perto do fim das duas listas; RRF não garante que a sobreposição sempre vencerá. A constante `k=60` controla a velocidade com que a contribuição diminui conforme o rank aumenta.
 
-![Hybrid Search & Reciprocal Rank Fusion Architecture](../../../../dist/images/hybrid_search_rrf_architecture.png)
+```mermaid
+flowchart LR
+    Q[Query do usuario] --> F[Busca full text]
+    Q --> V[Busca vetorial]
+    F --> RF[Candidatos FTS ranqueados]
+    V --> RV[Candidatos vetoriais ranqueados]
+    RF --> R[Score RRF por rank]
+    RV --> R
+    R --> O[Lista combinada ranqueada]
+```
 
 > [!note] Por Que k=60?
 >
@@ -128,18 +137,25 @@ BEGIN
     ),
 
     -- Passo 3: Resultados de busca vetorial com rank
-    VectorResults AS (
+    VectorCandidates AS (
         SELECT TOP (50) WITH APPROXIMATE
-            vs.ProductId,
-            vs.distance AS VectorDistance,
-            ROW_NUMBER() OVER (ORDER BY vs.distance) AS VectorRank
+            p.ProductId,
+            vs.distance AS VectorDistance
         FROM VECTOR_SEARCH(
-            TABLE = dbo.Products,
+            TABLE = dbo.Products AS p,
             COLUMN = DescriptionVector,
             SIMILAR_TO = @query_vector,
             METRIC = 'cosine'
         ) AS vs
         ORDER BY vs.distance
+    ),
+
+    VectorResults AS (
+        SELECT
+            ProductId,
+            VectorDistance,
+            ROW_NUMBER() OVER (ORDER BY VectorDistance, ProductId) AS VectorRank
+        FROM VectorCandidates
     ),
 
     -- Passo 4: Combinar com RRF
@@ -244,7 +260,7 @@ Recall@K = |Itens relevantes no top K| / |Total de itens relevantes|
 ```
 
 - Maior é melhor
-- O hybrid search normalmente melhora o recall em relação a qualquer abordagem individual
+- O hybrid search pode melhorar o recall em relação a uma abordagem isolada; verifique isso com queries rotuladas
 
 ### Precisão
 
@@ -266,6 +282,24 @@ MRR = (1/|Q|) × Σ (1 / rank_do_primeiro_resultado_relevante)
 - Mede quão rapidamente o primeiro resultado relevante aparece
 
 ### Avaliando com Ground Truth
+
+*Ground truth* é um conjunto de referência que registra quais documentos são
+relevantes para cada query de teste. Ele permite comparar full-text, busca
+vetorial e RRF com um resultado esperado, em vez de avaliar apenas a ordem
+exibida dos resultados.
+
+Por exemplo, suponha que os produtos relevantes para `wireless headphones`
+sejam 2, 5 e 8. Se os três primeiros resultados forem 2, 5 e 10, dois dos três
+itens retornados são relevantes e dois dos três itens relevantes conhecidos
+foram encontrados:
+
+- **Precision@3** = 2 relevantes retornados / 3 retornados = **66,7%**
+- **Recall@3** = 2 relevantes encontrados / 3 relevantes conhecidos = **66,7%**
+
+Use as mesmas queries rotuladas e os mesmos critérios de relevância ao comparar
+as estratégias. Sem ground truth, não é possível concluir objetivamente que uma
+estratégia tem precisão ou recall melhores; é possível apenas observar sua
+ordenação.
 
 ```sql
 -- Criar um conjunto de testes com produtos relevantes conhecidos para queries
@@ -296,11 +330,11 @@ SELECT DATEDIFF(MILLISECOND, @start, SYSDATETIME()) AS LatencyMs;
 
 | Alavanca | Impacto |
 | :--- | :--- |
-| Índice vetorial (DiskANN) | Maior — milissegundos vs segundos para ANN |
-| Índice FTS | Maior — instantâneo vs full table scan |
-| Reduzir `TOP (N)` aproximado | Menor — menos candidatos |
-| Reduzir limite de resultados FTS | Menor — avaliação FTS mais rápida |
-| Pré-normalizar embeddings | Menor — pula VECTOR_NORMALIZE no tempo de query |
+| Índice vetorial (DiskANN) | Pode reduzir o trabalho do ANN em escala; meça custo de criação, latência e recall |
+| Índice FTS | Evita varredura completa da tabela; meça CPU, I/O e latência |
+| Reduzir `TOP (N)` aproximado | Pode reduzir o trabalho, mas também diminuir o recall |
+| Reduzir limite de resultados FTS | Pode reduzir o trabalho, mas remover candidatos da fusão |
+| Pré-normalizar embeddings | Pode evitar normalização repetida quando exigida pela métrica/modelo escolhido; valide a relevância |
 
 ---
 
@@ -351,14 +385,14 @@ k maior → distribuição mais uniforme entre ranks
 > - RRF usa **ranks**, não pontuações brutas — isso o torna invariante a escala e robusto a diferentes sistemas de pontuação
 > - `k=60` é uma convenção comum de RRF; em T-SQL, trate-o como parâmetro a validar no corpus
 > - `FULL OUTER JOIN` é essencial — um documento pode aparecer em apenas um dos dois result sets
-> - O hybrid search melhora o **recall** (encontra mais itens relevantes) comparado a usar apenas uma abordagem
+> - O hybrid search pode melhorar o **recall** em relação a uma abordagem isolada, mas isso é um resultado empírico, não uma garantia
 > - A busca vetorial lida com similaridade semântica; a full-text lida com palavras-chave exatas — nenhuma sozinha é ótima para busca em produção
 
 ---
 
 ## Principais Conclusões
 
-- Hybrid search = full-text search + busca vetorial, mesclados com RRF
+- Hybrid search = full-text search + busca vetorial, mesclados por um padrão de query/aplicação como RRF
 - Fórmula RRF: `1 / (k + rank)` somado em todas as listas de resultados — pontuação maior = melhor rank combinado
 - Use `FULL OUTER JOIN` para mesclar as duas listas para que documentos aparecendo em apenas uma lista ainda sejam incluídos
 - Meça recall, precisão e latência para avaliar e ajustar o pipeline de hybrid search
@@ -367,10 +401,20 @@ k maior → distribuição mais uniforme entre ranks
 
 ## RRF versus score ponderado
 
-RRF funde **ranks** e evita escalas incompatíveis. Fórmula ponderada requer
-distância numérica e normalização de `RANK`: `(distance * 0.60) + ((1.0 - rank /
-1000.0) * 0.40)`. Se a fórmula precisa da distância, use `VECTOR_DISTANCE`, não
-`WITH APPROXIMATE`.
+RRF funde **ranks** e evita comparar escalas incompatíveis. Uma fórmula ponderada
+é um desenho diferente: exige converter a distância vetorial e a relevância
+full-text para valores comparáveis, com a mesma direção (por exemplo, menor é
+melhor), antes de combiná-los.
+
+```sql
+-- Apenas ilustrativo: normalize os dois sinais para que menor seja melhor.
+ORDER BY (NormalizedVectorDistance * 0.60)
+       + ((1.0 - NormalizedFTSRelevance) * 0.40) ASC;
+```
+
+Se a fórmula precisa da distância numérica, materialize-a e valide sua
+distribuição. Use `VECTOR_DISTANCE` para busca exata; `WITH APPROXIMATE` só é
+adequado quando a recuperação aproximada for aceitável para o cálculo.
 
 ## Tópicos Relacionados
 
@@ -384,6 +428,7 @@ distância numérica e normalização de `RANK`: `(distance * 0.60) + ((1.0 - ra
 
 - [Hybrid Search in Azure AI Search](https://learn.microsoft.com/en-us/azure/search/hybrid-search-overview)
 - [Reciprocal Rank Fusion](https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking)
+- [Hybrid search no provedor EF Core do SQL Server](https://learn.microsoft.com/en-us/ef/core/providers/sql-server/vector-search)
 - [VECTOR_SEARCH](https://learn.microsoft.com/en-us/sql/t-sql/functions/vector-search-transact-sql)
 
 ---

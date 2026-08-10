@@ -19,6 +19,10 @@
 USE AdventureWorks2025;
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
+GO
+
 IF EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID(N'lab.HybridProductsCatalog'))
     DROP FULLTEXT INDEX ON lab.HybridProductsCatalog;
 IF EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = N'LabHybridFtsCatalog')
