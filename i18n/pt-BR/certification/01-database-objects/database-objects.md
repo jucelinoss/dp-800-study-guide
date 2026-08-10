@@ -11,13 +11,14 @@ status: complete
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Memória Rápida (Quick Recall)](#memoria-rapida-quick-recall)
 > - 📍 [2. Visão Geral dos Tópicos](#visao-geral-dos-topicos)
 > - 📍 [3. Conteúdo da Seção](#conteudo-da-secao)
 > - 📍 [4. Conceitos Chave](#conceitos-chave)
 > - 📍 [5. Recursos Relacionados](#recursos-relacionados)
 > - 📍 [6. Próximos Passos](#proximos-passos)
+>
 ---
 
 # Design e Implementação de Database Objects
