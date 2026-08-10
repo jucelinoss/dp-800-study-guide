@@ -258,6 +258,10 @@ warehouse e conectar o modelo semântico à dimensão preparada.
 - CDC, CT ou watermark atende ao nível de detalhe necessário?
 - Existem reconciliações de contagem, totais e integridade referencial?
 
+## Laboratório
+
+O [laboratório de SCD e cargas dimensionais](../../practice/labs/12-other-topics/06-scd-and-dimensional-loading-lab.sql) implementa no SQL Server SCD Tipo 1 para e-mail, Tipo 2 para segmento/região e Tipo 3 para o segmento anterior. Ele também testa hashdiff, idempotência, intervalos de vigência, resolução da dimensão pela data do fato, membro desconhecido e reconciliação de totais.
+
 ## Documentação oficial
 
 - [Implementar SCD tipo 1 no Microsoft Fabric](https://learn.microsoft.com/pt-br/fabric/data-factory/slowly-changing-dimension-type-one)
