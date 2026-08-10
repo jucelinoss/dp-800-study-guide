@@ -13,7 +13,7 @@ tags:
 
 ## Overview
 
-Reacting to data changes is fundamental to building event-driven systems. SQL Server and Azure SQL offer several mechanisms at different granularities: **Change Tracking** (did a row change?), **CDC** (what did the row change from/to?), and **CES** (Change Event Streaming in Fabric — push-based streaming). These feed downstream systems via Azure Functions SQL trigger binding, Logic Apps, or direct streaming.
+Reacting to data changes is fundamental to building event-driven systems. SQL Server and Azure SQL offer several mechanisms at different granularities: **Change Tracking** (did a row change?), **CDC** (changes stored in capture tables), and **CES** (Change Event Streaming to Azure Event Hubs). These feed downstream systems via Azure Functions SQL trigger binding, Logic Apps, Fabric Eventstream, or direct streaming.
 
 > [!abstract]
 >
@@ -23,7 +23,7 @@ Reacting to data changes is fundamental to building event-driven systems. SQL Se
 
 > [!tip] What the Exam Tests
 >
-> - **CDC**: captures full before/after row values; requires SQL Server Agent; stores changes in capture tables; used for ETL/replication
+> - **CDC**: can expose before/after values with `all update old`; requires SQL Server Agent on SQL Server and Azure SQL Managed Instance; stores changes in capture tables; used for ETL/replication
 > - **Change Tracking**: captures only that a row changed (row ID + operation); no Agent required; used for sync scenarios where you only need to know *what* changed, not *how*
 > - CDC has latency (agent job); CT is synchronous (committed with the transaction)
 
@@ -31,7 +31,19 @@ Reacting to data changes is fundamental to building event-driven systems. SQL Se
 
 ## Change Data Capture (CDC)
 
-CDC captures row-level INSERT, UPDATE, and DELETE changes with before/after values. Changes are stored in system tables and can be queried.
+**Change Data Capture (CDC)** records detailed `INSERT`, `UPDATE`, and `DELETE`
+changes made to tables. It captures which row changed, which operation occurred,
+and the values before and after the change.
+
+CDC reads the transaction log asynchronously and stores events in capture tables
+that mirror the source table columns. Functions such as
+`cdc.fn_cdc_get_all_changes...` and `cdc.fn_cdc_get_net_changes...` expose that
+history to consumers.
+
+Use CDC when you need history or the changed values, for example for incremental
+ETL, data warehouses, auditing, replication, and integration with external
+systems. Because it preserves more information, it uses more storage and
+processing than Change Tracking.
 
 ### Enabling CDC
 
@@ -89,10 +101,25 @@ SELECT
     END AS Operation,
     OrderId,
     Status
-FROM cdc.fn_cdc_get_net_changes_dbo_Orders(@from_lsn, @to_lsn, 'all');
+FROM cdc.fn_cdc_get_net_changes_dbo_Orders(@from_lsn, @to_lsn, 'all with merge');
 ```
 
 ### LSN-Based Incremental Processing
+
+An **LSN (Log Sequence Number)** is a sequential identifier used by CDC to
+order changes captured from the transaction log. A watermark is the persisted
+LSN that records how far the pipeline has processed the data. On the next run,
+the pipeline reads only the following interval instead of scanning the entire
+table again.
+
+The flow is:
+
+```text
+1. Read the last processed LSN
+2. Capture the current LSN as the run boundary
+3. Read and process changes between both points
+4. Update the watermark only after successful processing
+```
 
 ```sql
 -- Store the last processed LSN in a control table
@@ -120,11 +147,39 @@ SET LastLSN = @current_lsn
 WHERE TableName = 'dbo_Orders';
 ```
 
+For example, if the stored watermark is LSN 100 and the run finds changes up to
+LSN 120, it processes 101–120 and stores 120 as the new watermark. Changes
+created after `@current_lsn` was captured are left for the next run.
+
+The watermark must advance only after the destination load succeeds. If the
+run fails before the `UPDATE`, the next attempt reads the same interval again.
+This may process a change more than once, but it prevents data loss; therefore,
+the destination should be idempotent or use a transaction with key/LSN control.
+
+`fn_cdc_get_all_changes` returns every change in the interval. With
+`all update old`, an update is returned as a before image (`3`) and an after
+image (`4`). `fn_cdc_get_net_changes` returns only the row's final state within
+the interval. With `all with merge`, `__$operation = 5` means insert or update
+without distinguishing between them. This reduces volume but does not preserve
+every intermediate change.
+
 ---
 
 ## Change Tracking
 
-**Change Tracking** is lighter weight than CDC — it only records which rows changed and in what direction, not the before/after values. Good for synchronization scenarios where you only need to know "what changed since my last sync."
+**Change Tracking (CT)** is a lighter alternative to CDC. It records that a row
+changed, the operation (`I`, `U`, or `D`), and the change version, but it does
+not store the row's before and after values.
+
+To obtain current data, the application queries the source table using the
+primary key returned by `CHANGETABLE`. If a row is updated several times, CT
+does not preserve every intermediate step; it is intended to identify rows that
+need synchronization.
+
+Use CT for synchronization between databases and applications, cache refreshes,
+simple replication, and scenarios where only the current state matters. It has
+lower storage and processing overhead, but it does not replace CDC for auditing
+or detailed history.
 
 ### Enabling Change Tracking
 
@@ -176,6 +231,32 @@ SET @sync_version = CHANGE_TRACKING_CURRENT_VERSION();
 | Retention | Configurable (days) | Until cleanup job runs |
 | Use case | Sync, replication | Audit, ETL, streaming |
 
+Practical rule: use **CDC** when you need to know what changed and what the
+values were; use **CT** when you only need to discover which rows must be
+synchronized. CDC and CT can be enabled at the same time in the same database.
+
+### Choosing by volume and scenario
+
+The ranges below are **planning heuristics**, not SQL Server limits. The real
+decision also depends on row size, change rate per minute, latency requirements,
+retention period, and consumer capacity.
+
+| Approximate scenario | Recommended mechanism | Reason |
+| :--- | :--- | :--- |
+| Up to 10,000 changes per run, periodic synchronization, and current state is enough | CT | Lower storage and operational cost; the application retrieves current rows by primary key. |
+| 10,000 to 1 million changes per run, with ETL or a need for history | CDC | Supports LSN-based windows and preserves operations plus before/after values. |
+| More than 1 million changes per run or high daily volume | CDC with batching, watermarking, and, where appropriate, `net changes` | Controls backlog and source load; evaluate partitioning, retention, and parallel consumers. |
+| Cache synchronization, mobile application, or replica that only needs rows to reload | CT | The consumer receives changed keys and reads current state without storing full history. |
+| Auditing, compliance, event reconstruction, or integrations requiring `before`/`after` | CDC | Detailed history is required; CT cannot recover intermediate values. |
+| Low latency and a continuous high-volume event flow | CDC or CES, depending on the platform | CDC supports LSN-based polling; CES is better suited when event streaming is required. |
+
+#### High-volume considerations
+
+- With **CDC**, monitor the lag between produced and consumed LSNs, capture-table size, and history retention.
+- With **CT**, set retention longer than the worst expected interval between synchronizations. If a consumer falls behind the retention window, a full reload is required.
+- For both mechanisms, process in batches, persist the watermark only after success, and make the destination idempotent to support retries.
+- If only final state matters, `fn_cdc_get_net_changes` can reduce data volume; if every intermediate event matters, use `fn_cdc_get_all_changes`.
+
 > [!warning] Common Mistake
 > CDC and Change Tracking are often confused. CDC = captures the actual data values before and after change (heavier, requires Agent). CT = captures only that a change happened to a row (lightweight, no Agent). If the scenario requires knowing the old value of a column, the answer is CDC, not CT.
 
@@ -189,12 +270,13 @@ The Azure Functions SQL trigger binding monitors a SQL table and fires a functio
 
 ```csharp
 // Triggered when dbo.Orders changes
-[FunctionName("ProcessOrderChanges")]
+[Function("ProcessOrderChanges")]
 public static async Task Run(
     [SqlTrigger("[dbo].[Orders]", "SqlConnectionString")]
     IReadOnlyList<SqlChange<Order>> changes,
-    ILogger log)
+    FunctionContext context)
 {
+    ILogger log = context.GetLogger("ProcessOrderChanges");
     foreach (SqlChange<Order> change in changes)
     {
         Order order = change.Item;
@@ -224,35 +306,45 @@ public static async Task Run(
   "IsEncrypted": false,
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "SqlConnectionString": "Server=myserver.database.windows.net;Database=MyDB;Authentication=Active Directory Default;"
   }
 }
 ```
 
-The SQL trigger binding automatically enables Change Tracking on the target table and creates internal tracking infrastructure.
+Change Tracking must be enabled on the database and target table. The trigger
+creates internal state and lease tables in the `az_func` schema. `db_owner` is
+one broad way to grant access, but production deployments should use the
+documented least-privilege permissions. New projects should prefer the isolated
+worker model; the in-process model reaches end of support on November 10, 2026.
 
 ---
 
-## Change Event Streaming (CES) in Microsoft Fabric
+## Change Event Streaming (CES) to Azure Event Hubs and Microsoft Fabric
 
-CES is a Fabric-native feature for SQL Database in Fabric that streams change events to downstream Fabric workloads (Eventstream, Lakehouse, or KQL Database / Eventhouse) without any polling or CDC configuration.
+CES is a preview feature for SQL Server 2025, Azure SQL Database, and Azure SQL Managed Instance. It streams table changes to **Azure Event Hubs** over AMQP or Kafka. Microsoft Fabric Eventstream can consume those events through Event Hubs and route them to Lakehouse, KQL Database, or other destinations.
 
 ```text
-SQL Database in Fabric → Change Event Streaming → Eventstream → Lakehouse / KQL Database
+SQL Server 2025 / Azure SQL → CES → Azure Event Hubs → Fabric Eventstream → Lakehouse / KQL Database
 
-Setup in Fabric Portal:
-1. SQL Database in Fabric → Settings → Change Event Streaming
-2. Enable streaming for selected tables
-3. Choose destination: Eventstream, Lakehouse, or KQL Database
-4. Map columns and configure filters (optional)
+Configuration outline:
+1. Create an Azure Event Hubs namespace and event hub
+2. Enable CES in the source database
+3. Create a streaming group with credentials and destination
+4. Add the tables to be streamed
 ```
 
 CES works in near-real-time and delivers change events with:
 
 - Table name, operation type (Insert/Update/Delete)
-- Changed row values (after image)
-- LSN and timestamp
+- Current and, depending on the event, previous row values
+- Commit LSN and timestamp
+- JSON or Avro serialization
+
+CES does not perform an initial snapshot: it streams only changes that occur
+after CES is enabled. SQL Server 2025 requires the `FULL` recovery model and
+the corresponding preview database configuration. CES cannot be enabled on a
+database that already uses CDC.
 
 ---
 
@@ -322,7 +414,7 @@ END;
 - **CDC for data warehouse ETL**: Capture all row changes for incremental loading into Synapse or Fabric Lakehouse
 - **Change Tracking for mobile sync**: Sync only changed rows to mobile clients since their last connection
 - **Azure Functions SQL trigger**: Real-time event processing — update a search index, send notifications, or trigger downstream workflows whenever orders change
-- **CES in Fabric**: Stream SQL changes to Lakehouse for near-real-time analytics without infrastructure management
+- **CES with Fabric Eventstream**: Stream SQL changes through Azure Event Hubs to Lakehouse, KQL Database, or other downstream workloads
 - **Logic Apps polling**: Low-code integration with change data for alerting and notification workflows
 
 ---
@@ -331,11 +423,11 @@ END;
 
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
-| CDC capture job not running | SQL Agent not running (on-prem/MI) | `Start SQL Agent; on Azure SQL, CDC cleanup runs automatically` |
+| CDC capture job not running | SQL Agent not running (on-prem/MI) | Start SQL Agent; on Azure SQL Database, capture and cleanup are managed by the platform |
 | `@from_lsn` returns NULL | CDC not enabled or no data yet | Verify `sp_cdc_enable_db` and `sp_cdc_enable_table` ran successfully |
 | Change Tracking retention exceeded | Sync version too old | Use `CHANGE_TRACKING_MIN_VALID_VERSION()` to validate; do full resync if needed |
-| SQL trigger function not firing | Change Tracking not enabled | SQL trigger binding auto-enables it; check connection string permissions |
-| CES not available | Not a Fabric SQL Database | CES is specific to SQL Database in Microsoft Fabric |
+| SQL trigger function not firing | Change Tracking not enabled or insufficient `az_func` permissions | Enable CT on the database and table; grant the documented least-privilege permissions |
+| CES not available | Unsupported platform, destination, configuration, or preview limitation | Verify SQL Server 2025/Azure SQL Database/Azure SQL Managed Instance, Azure Event Hubs, recovery model, and current CES limitations |
 
 ---
 
@@ -343,10 +435,10 @@ END;
 
 > [!tip] Exam Tips
 >
-> - **CDC**: Captures before AND after values; requires SQL Agent (on-prem) or runs automatically (Azure SQL)
+> - **CDC**: Captures changes in capture tables; use `all update old` when before AND after values are required; requires SQL Agent on SQL Server/MI or managed capture on Azure SQL Database
 > - **Change Tracking**: Only tracks that a row changed; no before image; lighter weight; requires join to get current values
 > - **Azure Functions SQL trigger**: Uses Change Tracking under the hood — enables it automatically on the source table
-> - **CES**: Fabric-native; no infrastructure setup required; pushes events rather than requiring polling
+> - **CES**: Streams to Azure Event Hubs; Fabric Eventstream can consume the events; it requires destination, credentials, streaming-group, and table configuration
 > - `SYS_CHANGE_OPERATION` values: `I` = Insert, `U` = Update, `D` = Delete
 > - CDC `__$operation` values: `1` = Delete, `2` = Insert, `3` = Update (before), `4` = Update (after)
 
@@ -354,9 +446,9 @@ END;
 
 ## Key Takeaways
 
-- CDC provides full before/after audit trail; Change Tracking provides lightweight sync capability
+- CDC provides retained change history and can expose before/after images with the appropriate query option; Change Tracking provides lightweight sync capability
 - Azure Functions SQL trigger is the easiest way to react to SQL changes in real-time from application code
-- CES in Fabric is the cloud-native zero-configuration approach for Fabric workloads
+- CES streams SQL changes to Azure Event Hubs, which can feed Fabric Eventstream and downstream Fabric workloads
 - LSN-based watermarking is the standard pattern for incremental CDC-based ETL
 
 ---
@@ -374,7 +466,8 @@ END;
 - [CDC in SQL Server](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-data-capture-sql-server)
 - [Change Tracking](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-tracking-sql-server)
 - [Azure Functions SQL Trigger Binding](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-azure-sql-trigger)
-- [Fabric Change Event Streaming](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/change-event-streaming/overview)
+- [Change Event Streaming (CES)](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/change-event-streaming/overview)
+- [Stream SQL change events to Fabric Eventstream](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/stream-sql-change-events-to-eventstream)
 
 ---
 

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://github.com/Azure/data-api-builder/releases/download/v1.7.0/dab.draft.schema.json",
+  "data-source": {
+    "database-type": "mssql",
+    "connection-string": "@env('DATABASE_CONNECTION_STRING')"
+  },
+  "runtime": {
+    "rest": { "enabled": true, "path": "/api" },
+    "graphql": { "enabled": true, "path": "/graphql" },
+    "host": { "cors": { "origins": ["*"] } }
+  },
+  "entities": {
+    "ProductCatalog": {
+      "source": {
+        "object": "lab.vw_DabProductCatalog",
+        "type": "view"
+      },
+      "rest": { "enabled": true, "path": "/ProductCatalog" },
+      "graphql": { "enabled": true, "name": "ProductCatalog" },
+      "fields": [
+        { "name": "ItemID", "alias": "id", "primary-key": true },
+        { "name": "ItemName", "alias": "name" },
+        { "name": "SKU" },
+        { "name": "Price", "alias": "unitPrice" },
+        { "name": "LastUpdated" }
+      ],
+      "permissions": [
+        { "role": "anonymous", "actions": ["read"] }
+      ]
+    },
+    "CreateOrder": {
+      "source": {
+        "object": "lab.usp_DabCreateOrder",
+        "type": "stored-procedure"
+      },
+      "rest": { "methods": ["POST"] },
+      "graphql": { "enabled": true, "operation": "mutation" },
+      "permissions": [
+        { "role": "authenticated", "actions": ["execute"] }
+      ]
+    }
+  }
+}

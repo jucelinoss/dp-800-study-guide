@@ -12,6 +12,9 @@
 --   3. Processamento do Payload de Resposta JSON com a função `JSON_VALUE` e `OPENJSON`
 --   4. Tratamento de Erros e Timeouts em Chamadas REST síncronas
 --   5. Cenários Práticos de Projeto (Validação e Enriquecimento de Dados via Azure Function REST)
+-- ATENÇÃO: este lab não é o cliente REST do DAB. Ele usa a capacidade de saída
+-- do Azure SQL/SQL Server 2025. O endpoint e as credenciais devem ser fornecidos
+-- em um ambiente descartável; nenhum segredo é criado por este script.
 -- =================================================================================
 -- REFERÊNCIA TEÓRICA: ../../../certification/08-azure-services-integration/02-rest-graphql-endpoints.md
 --    Abra o guia teórico junto com este laboratório para contexto conceitual.
@@ -35,10 +38,11 @@ CREATE TABLE lab.CustomerValidationLog (
 );
 GO
 
--- 1. Criar Credencial de Escopo para Autenticação na API Externa (Managed Identity ou Auth Key)
-CREATE DATABASE SCOPED CREDENTIAL [AzureFunctionCredential]
-WITH IDENTITY = 'HTTPEndpointSecret', SECRET = 'MinhaApiKeySegura123';
-GO
+-- 1. Modelo de credencial. Substitua o placeholder somente em ambiente seguro.
+-- CREATE DATABASE SCOPED CREDENTIAL [AzureFunctionCredential]
+-- WITH IDENTITY = 'HTTPEndpointHeaders',
+--      SECRET = '{"Authorization":"Bearer <token>"}';
+-- GO
 
 
 -- =================================================================================
@@ -54,12 +58,13 @@ GO
 DECLARE @StatusCode INT;
 DECLARE @ResponsePayload NVARCHAR(MAX);
 
--- Modelo de Invocação Simulado (Comentado para execução em ambiente offline)
+-- Modelo de invocação. Requer endpoint permitido, credencial e permissão
+-- EXECUTE ANY EXTERNAL ENDPOINT; permanece comentado para o modo offline.
 /*
 EXEC sp_invoke_external_rest_endpoint
     @url = N'https://func-validate-customer.azurewebsites.net/api/validate',
     @method = N'POST',
-    @credential = [AzureFunctionCredential],
+    @credential = N'AzureFunctionCredential',
     @payload = N'{"CustomerID": 1001, "Email": "cliente@empresa.com"}',
     @response = @ResponsePayload OUTPUT;
 */

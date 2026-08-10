@@ -1,0 +1,24 @@
+### REST: list products
+GET http://localhost:5000/api/ProductCatalog
+
+### REST: get one product
+GET http://localhost:5000/api/ProductCatalog/680
+
+### GraphQL: query products
+POST http://localhost:5000/graphql
+Content-Type: application/json
+
+{
+  "query": "query { ProductCatalog(first: 5) { items { id name unitPrice } } }"
+}
+
+### REST: execute the procedure
+POST http://localhost:5000/api/CreateOrder
+Content-Type: application/json
+X-MS-API-ROLE: authenticated
+
+{
+  "CustomerID": 1001,
+  "ProductID": 680,
+  "Quantity": 2
+}

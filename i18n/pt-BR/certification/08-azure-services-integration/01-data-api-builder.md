@@ -10,7 +10,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Estrutura do Arquivo de Configuração do DAB](#estrutura-do-arquivo-de-configuração-do-dab)
 > - 📍 [3. Configuração de Fontes de Dados (Data Sources)](#configuração-de-fontes-de-dados-data-sources)
@@ -75,8 +75,6 @@ flowchart LR
     DAB -->|T-SQL Parametrizado| DB
 ```
 
-![Data API Builder Architecture](../../../../dist/images/data_api_builder_architecture.png)
-
 > [!abstract]
 >
 > - Cobre os conceitos do Data API Builder (DAB): o que é, estrutura do JSON de configuração, mapeamento de objetos e definições de permissões.
@@ -86,8 +84,13 @@ flowchart LR
 > [!tip] O que o Exame Testa
 >
 > - O DAB requer **zero desenvolvimento de código customizado** — as rotas lógicas são criadas estritamente por mapeamentos declarativos no JSON.
-> - Caminho base REST padrão: `/api/{NomeEntidade}/{chave_primaria}`; Endpoint GraphQL padrão: `/graphql` (um único endpoint para todas as buscas e mutations).
-> - Papéis de permissões nativos do DAB: `anonymous` (acessos públicos de usuários não autenticados), `authenticated` (usuários logados via token JWT) e roles customizadas.
+> - Caminho base REST padrão:
+>   - `/api/{NomeEntidade}/{chave_primaria}`
+>   - `/graphql`: endpoint GraphQL padrão para todas as buscas e mutations.
+> - Papéis de permissões nativos do DAB:
+>   - `anonymous`: acessos públicos de usuários não autenticados.
+>   - `authenticated`: usuários logados via token JWT.
+>   - Roles personalizadas.
 
 ---
 
@@ -278,7 +281,7 @@ Em DAB 2.0 ou posterior, a matriz `fields` substitui `mappings` e `key-fields`: 
 
 ## Relacionamentos no GraphQL (Relationships)
 
-O DAB permite declarar de forma nativa a correlação de relacionamentos entre tabelas para viabilizar consultas GraphQL encadeadas/aninhadas (nested queries):
+O DAB permite declarar de forma nativa relacionamentos entre entidades para viabilizar consultas GraphQL encadeadas/aninhadas (nested queries). Na prática, esse bloco declara uma correlação equivalente a uma condição de junção no JSON: ele informa ao DAB quais campos conectam a entidade atual à entidade relacionada. Isso não significa que o DAB sempre execute um `INNER JOIN` físico.
 
 ```json
 "Order": {
@@ -305,18 +308,65 @@ Isso autoriza a escrita de buscas complexas como:
 ```graphql
 query {
   orders {
-    orderId
     items {
-      productId
-      quantity
-    }
-    customer {
-      name
-      email
+      orderId
+      items {
+        productId
+        quantity
+      }
+      customer {
+        name
+        email
+      }
     }
   }
 }
 ```
+
+### Como interpretar o relacionamento
+
+Considere estas entidades:
+
+```text
+Orders     (OrderId, CustomerId)
+OrderItem  (OrderItemId, OrderId, ProductId, Quantity)
+Customer   (CustomerId, Name, Email)
+```
+
+No relacionamento `items`, `source.fields` aponta para o campo da entidade atual (`Order.OrderId`) e `target.fields` aponta para o campo da entidade relacionada (`OrderItem.OrderId`). Portanto, para cada pedido, o DAB localiza todos os itens cujo `OrderId` seja igual ao `OrderId` do pedido. Isso corresponde conceitualmente a:
+
+```sql
+SELECT *
+FROM Orders AS o
+LEFT JOIN OrderItem AS i
+    ON i.OrderId = o.OrderId;
+```
+
+No relacionamento `customer`, a correlação é `Order.CustomerId = Customer.CustomerId`, retornando um único cliente para o pedido:
+
+```sql
+SELECT *
+FROM Orders AS o
+LEFT JOIN Customer AS c
+    ON c.CustomerId = o.CustomerId;
+```
+
+### A relação não é sempre um `INNER JOIN`
+
+No SQL Server, escrever apenas `JOIN` equivale a escrever `INNER JOIN`. Essa não é a interpretação correta para os relacionamentos do DAB. A relação define como os campos se correspondem, enquanto a forma de materializar a consulta é responsabilidade do runtime.
+
+Do ponto de vista do resultado GraphQL, o comportamento é mais próximo de um `LEFT JOIN`: a entidade principal continua sendo retornada mesmo quando não existe entidade relacionada. Em uma relação `one`, o campo relacionado pode ser `null`; em uma relação `many`, a coleção relacionada pode ser vazia. Filtros, permissões e políticas de acesso também podem alterar os registros visíveis.
+
+As propriedades possuem estas funções:
+
+- `items` e `customer` são os nomes dos campos que aparecerão no schema GraphQL.
+- `target.entity` identifica a entidade relacionada, que também precisa estar declarada no mesmo arquivo de configuração.
+- `source.fields` contém os campos da entidade atual; `target.fields` contém os campos da entidade de destino.
+- `cardinality: "many"` retorna uma coleção; `cardinality: "one"` retorna um único objeto.
+
+A cardinalidade é definida a partir da entidade atual: um pedido possui muitos itens (`many`), mas muitos pedidos pertencem a um cliente e, ao navegar de `Order` para `Customer`, o resultado é um único cliente (`one`). O relacionamento não cria uma chave estrangeira no banco; ele apenas informa ao DAB como realizar a correlação entre entidades já expostas. Os exemplos com `LEFT JOIN` são uma aproximação conceitual do resultado, não uma promessa sobre o plano ou a instrução SQL interna usada pelo DAB.
+
+Para permitir a navegação inversa — por exemplo, de `Customer` para seus `Order` — é necessário declarar outro relacionamento na entidade `Customer`, invertendo os campos de origem e destino. Relacionamentos também são um recurso de navegação do GraphQL; eles não transformam automaticamente uma resposta REST em um grafo aninhado.
 
 > [!warning] Relacionamentos no GraphQL do DAB
 >
@@ -511,3 +561,5 @@ variável. `secretref:` não substitui a expressão de connection string do DAB.
 ---
 
 **[↑ Voltar para a Seção](./azure-services-integration.md) | [Lab: Data API Builder](../../practice/labs/08-azure-services-integration/01-data-api-builder-lab.sql) | [Next →](./02-rest-graphql-endpoints.md)**
+
+> Lab executável: [runtime DAB, configuração e requisições HTTP](../../practice/labs/08-azure-services-integration/01-data-api-builder-runtime/README.md)

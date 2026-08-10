@@ -11,6 +11,8 @@ tags:
 
 # REST and GraphQL Endpoints in DAB
 
+The executable DAB runtime is in the [complementary Data API Builder lab](../../practice/labs/08-azure-services-integration/01-data-api-builder-runtime/README.md). The SQL script in this chapter covers a different capability: outbound calls to external APIs from the database.
+
 ## Overview
 
 Data API Builder exposes both REST and GraphQL endpoints from the same configuration. REST follows OData conventions with URL-based filtering; GraphQL provides flexible querying with typed schemas. Both support pagination, caching, filtering, and security. Understanding which endpoint type to use and how to configure each is key for the DP-800 exam.

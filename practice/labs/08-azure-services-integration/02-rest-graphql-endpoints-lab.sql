@@ -12,6 +12,9 @@
 --   3. Processing JSON Response Payload with `JSON_VALUE` and `OPENJSON`
 --   4. Error and Timeout Handling in Synchronous REST Calls
 --   5. Practical Project Scenarios (Data Validation and Enrichment via Azure Function REST)
+-- NOTE: this is not the DAB REST client lab. It uses outbound REST support from
+-- Azure SQL/SQL Server 2025. The endpoint and credentials must be supplied in a
+-- disposable environment; this script creates no secret.
 -- =================================================================================
 -- THEORY REFERENCE: ../../../certification/08-azure-services-integration/02-rest-graphql-endpoints.md
 --    Open the theory guide alongside this lab for conceptual context.
@@ -34,10 +37,11 @@ CREATE TABLE lab.CustomerValidationLog (
 );
 GO
 
--- 1. Create Database Scoped Credential for External API Authentication (Managed Identity or Auth Key)
-CREATE DATABASE SCOPED CREDENTIAL [AzureFunctionCredential]
-WITH IDENTITY = 'HTTPEndpointSecret', SECRET = 'MinhaApiKeySegura123';
-GO
+-- 1. Credential template. Replace the placeholder only in a secure environment.
+-- CREATE DATABASE SCOPED CREDENTIAL [AzureFunctionCredential]
+-- WITH IDENTITY = 'HTTPEndpointHeaders',
+--      SECRET = '{"Authorization":"Bearer <token>"}';
+-- GO
 
 
 -- =================================================================================
@@ -53,12 +57,13 @@ GO
 DECLARE @StatusCode INT;
 DECLARE @ResponsePayload NVARCHAR(MAX);
 
--- Simulated Invocation Pattern (Commented out for offline environment execution)
+-- Invocation model. It requires an allowed endpoint, credential and
+-- EXECUTE ANY EXTERNAL ENDPOINT permission; it remains commented for offline mode.
 /*
 EXEC sp_invoke_external_rest_endpoint
     @url = N'https://func-validate-customer.azurewebsites.net/api/validate',
     @method = N'POST',
-    @credential = [AzureFunctionCredential],
+    @credential = N'AzureFunctionCredential',
     @payload = N'{"CustomerID": 1001, "Email": "cliente@empresa.com"}',
     @response = @ResponsePayload OUTPUT;
 */

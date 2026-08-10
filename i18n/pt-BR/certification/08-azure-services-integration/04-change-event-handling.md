@@ -21,7 +21,7 @@ tags:
 >   - 🔹 [Executando Sincronizações com Change Tracking](#executando-sincronizações-com-change-tracking)
 > - 📍 [4. SQL Trigger para Azure Functions](#sql-trigger-para-azure-functions)
 >   - 🔹 [Implementação de Código C# (C-Sharp)](#implementação-de-código-c-c-sharp)
-> - 📍 [5. Streaming de Eventos de Alteração (CES) para o Fabric](#streaming-de-eventos-de-alteração-ces-para-o-fabric)
+> - 📍 [5. Streaming de Eventos de Alteração (CES) para Azure Event Hubs e Fabric](#streaming-de-eventos-de-alteração-ces-para-azure-event-hubs-e-fabric)
 > - 📍 [6. Problemas Comuns e Soluções (Common Issues)](#problemas-comuns-e-soluções-common-issues)
 > - 📍 [7. Dicas para o Exame (Exam Tips)](#dicas-para-o-exame-exam-tips)
 > - 📍 [8. Resumo dos Conceitos (Key Takeaways)](#resumo-dos-conceitos-key-takeaways)
@@ -35,7 +35,7 @@ tags:
 
 ## Visão Geral (Overview)
 
-Reagir a alterações de dados em tempo real é fundamental no desenvolvimento de arquiteturas orientadas a eventos. O SQL Server e o Azure SQL oferecem mecanismos nativos em diferentes níveis de complexidade: o **Change Tracking** (indica se uma linha mudou), o **Change Data Capture (CDC)** (indica os valores de dados antes e depois da mudança) e o **Change Event Streaming (CES)** no Microsoft Fabric (streaming de dados push-based). Esses recursos alimentam serviços de consumo downstream via Azure Functions (SQL triggers), Logic Apps ou pipelines de streaming de eventos.
+Reagir a alterações de dados em tempo real é fundamental no desenvolvimento de arquiteturas orientadas a eventos. O SQL Server e o Azure SQL oferecem mecanismos nativos em diferentes níveis de complexidade: o **Change Tracking** (indica se uma linha mudou), o **Change Data Capture (CDC)** (captura alterações em tabelas de captura) e o **Change Event Streaming (CES)** (envia eventos para Azure Event Hubs). Esses recursos alimentam serviços de consumo downstream via Azure Functions (SQL triggers), Logic Apps, Fabric Eventstream ou pipelines de streaming de eventos.
 
 > [!abstract]
 >
@@ -45,7 +45,7 @@ Reagir a alterações de dados em tempo real é fundamental no desenvolvimento d
 
 > [!tip] O que o Exame Testa
 >
-> - **CDC**: Grava valores de registros antes/depois da alteração; exige SQL Server Agent ativo no SQL Server e no Azure SQL Managed Instance. No Azure SQL Database, um agendador CDC gerenciado executa captura e limpeza sem SQL Agent; indicado para auditorias e pipelines de ETL.
+> - **CDC**: Pode expor valores antes/depois da alteração usando `all update old`; exige SQL Server Agent ativo no SQL Server e no Azure SQL Managed Instance. No Azure SQL Database, um agendador CDC gerenciado executa captura e limpeza sem SQL Agent; indicado para auditorias e pipelines de ETL.
 > - **Change Tracking**: Registra apenas que uma linha sofreu modificação (chave primária da linha + tipo da operação); não precisa do Agent; indicado para sincronizações locais rápidas (cache).
 > - CDC opera de forma assíncrona, inclusive no Azure SQL Database, onde a captura é executada por agendador gerenciado; CT opera de forma síncrona junto ao commit da transação.
 
@@ -53,7 +53,20 @@ Reagir a alterações de dados em tempo real é fundamental no desenvolvimento d
 
 ## Captura de Dados de Alteração (Change Data Capture - CDC)
 
-O CDC grava dados lógicos detalhados sobre todas as instruções de `INSERT`, `UPDATE` e `DELETE` em tabelas do sistema dedicadas.
+O **Change Data Capture (CDC)** registra alterações detalhadas de `INSERT`,
+`UPDATE` e `DELETE` realizadas nas tabelas. Ele captura os dados necessários
+para saber qual linha mudou, qual operação ocorreu e quais eram os valores
+antes e depois da alteração.
+
+O CDC lê o log de transações de forma assíncrona e grava os eventos em tabelas
+de captura que espelham as colunas da tabela de origem. Funções como
+`cdc.fn_cdc_get_all_changes...` e `cdc.fn_cdc_get_net_changes...` permitem
+consumir esse histórico.
+
+Use CDC quando precisar de histórico ou dos valores alterados, por exemplo em
+ETL incremental, data warehouses, auditoria, replicação e integração com
+sistemas externos. Como ele preserva mais informações, seu consumo de
+armazenamento e processamento é maior que o do Change Tracking.
 
 ### Habilitando o CDC no Banco e Tabelas
 
@@ -116,10 +129,25 @@ SELECT
     END AS TipoOperacao,
     OrderId,
     Status
-FROM cdc.fn_cdc_get_net_changes_dbo_Orders(@from_lsn, @to_lsn, 'all');
+FROM cdc.fn_cdc_get_net_changes_dbo_Orders(@from_lsn, @to_lsn, 'all with merge');
 ```
 
 ### Processamento Incremental Baseado em LSN (Watermark)
+
+O **LSN (Log Sequence Number)** é um identificador sequencial usado pelo CDC
+para ordenar as alterações capturadas no log de transações. O watermark é o
+LSN persistido que informa até onde o pipeline já processou os dados. Assim, a
+próxima execução lê somente o intervalo posterior, em vez de reler a tabela
+inteira.
+
+O fluxo é:
+
+```text
+1. Ler o último LSN processado
+2. Capturar o LSN atual como limite da execução
+3. Ler e processar as alterações entre os dois pontos
+4. Atualizar o watermark somente após o processamento bem-sucedido
+```
 
 ```sql
 -- Criar tabela de controle de Watermark LSN
@@ -147,11 +175,43 @@ SET LastLSN = @current_lsn
 WHERE TableName = 'dbo_Orders';
 ```
 
+Por exemplo, se o watermark armazenar o LSN 100 e a execução encontrar
+alterações até o LSN 120, ela processará o intervalo 101–120 e gravará 120
+como o novo watermark. Alterações geradas depois da captura de
+`@current_lsn` ficarão para a próxima execução.
+
+O watermark só deve avançar depois que a carga no destino terminar com
+sucesso. Se a execução falhar antes do `UPDATE`, a próxima tentativa relerá o
+mesmo intervalo. Isso pode processar uma alteração mais de uma vez, mas evita
+perda de dados; por isso, o destino deve ser idempotente ou usar uma transação
+com controle de chaves/LSN.
+Funções de CDC:
+
+- `fn_cdc_get_all_changes` retorna todas as alterações do intervalo. Com
+  `all update old`, um `UPDATE` aparece como imagem anterior (`3`) e imagem
+  posterior (`4`).
+- `fn_cdc_get_net_changes` retorna somente o estado final da linha no intervalo.
+  Com `all with merge`, `__$operation = 5` significa inserção ou atualização,
+  sem distinguir as duas operações. Isso reduz o volume, mas não preserva todas
+  as alterações intermediárias.
+
 ---
 
 ## Rastreamento de Alterações (Change Tracking - CT)
 
-O **Change Tracking** é uma alternativa mais leve do que o CDC. Ele grava apenas a ocorrência e a direção do comando, não armazenando histórico de valores antigos das colunas.
+O **Change Tracking (CT)** é uma alternativa mais leve ao CDC. Ele registra
+que uma linha mudou, a operação realizada (`I`, `U` ou `D`) e a versão da
+alteração, mas não armazena os valores anteriores e posteriores da linha.
+
+Para obter os dados atuais, a aplicação consulta a tabela original usando a
+chave primária retornada por `CHANGETABLE`. Se uma linha for atualizada várias
+vezes, o CT não preserva todas as etapas; ele serve para descobrir quais linhas
+precisam ser sincronizadas.
+
+Use CT para sincronização entre bancos e aplicações, atualização de cache,
+replicação simples e cenários em que somente o estado atual importa. Ele é
+mais econômico em armazenamento e processamento, mas não substitui o CDC para
+auditoria ou histórico detalhado.
 
 ### Habilitando o Change Tracking (CT)
 
@@ -194,8 +254,41 @@ SET @sync_version = CHANGE_TRACKING_CURRENT_VERSION();
 
 > [!tip] Dica para a Prova: CDC vs Change Tracking (CT)
 >
-> - **CDC**: Armazena os valores de dados físicos antes (`UPDATE_BEFORE`) e depois (`UPDATE_AFTER`) da modificação. Requer tabelas do sistema adicionais (`cdc.*`) e gera consumo de disco moderado/alto.
-> - **Change Tracking (CT)**: Extremamente leve e síncrono. Captura apenas o identificador da chave primária (PK) alterada e a direção da ação (`I` = Insert, `U` = Update, `D` = Delete). Não guarda histórico de valores históricos anteriores.
+> | Característica | CDC | CT |
+> | :--- | :--- | :--- |
+> | Registra `INSERT`, `UPDATE` e `DELETE` | Sim | Sim |
+> | Armazena valores anteriores e novos | Sim | Não |
+> | Mantém histórico intermediário | Sim | Não |
+> | Identifica colunas alteradas | Sim | Sim, opcionalmente |
+> | Marcador de sincronização | LSN | Versão `BIGINT` |
+> | Captura | Assíncrona | Síncrona |
+> | Armazenamento | Maior | Menor |
+> | Uso principal | Auditoria, ETL e histórico | Sincronização e cache |
+>
+> Regra prática: use **CDC** quando precisar saber o que mudou e quais eram os valores; use **CT** quando precisar apenas descobrir quais linhas devem ser sincronizadas. CDC e CT podem ser habilitados simultaneamente no mesmo banco.
+
+### Escolha por volumetria e cenário
+
+As faixas abaixo são **orientativas para planejamento**, não limites impostos
+pelo SQL Server. A decisão real também depende do tamanho das linhas, da taxa
+de alterações por minuto, da latência desejada, do período de retenção e da
+capacidade do consumidor.
+
+| Cenário aproximado | Mecanismo recomendado | Motivo |
+| :--- | :--- | :--- |
+| Até 10 mil alterações por execução, sincronização periódica e necessidade apenas do estado atual | CT | Menor armazenamento e custo operacional; a aplicação busca as linhas atuais pela chave primária. |
+| De 10 mil a 1 milhão de alterações por execução, com ETL ou necessidade de histórico | CDC | Permite ler o intervalo por LSN e preservar operações e valores antes/depois. |
+| Mais de 1 milhão de alterações por execução ou alto volume diário | CDC com processamento em lotes, watermark e, quando apropriado, `net changes` | Reduz a carga sobre a origem e permite controlar o backlog; avalie particionamento, retenção e consumo paralelo. |
+| Sincronização de cache, aplicativo móvel ou réplica que precisa apenas saber quais linhas recarregar | CT | O consumidor obtém a chave alterada e consulta o estado atual, sem armazenar todo o histórico. |
+| Auditoria, conformidade, reconstrução de eventos ou integração que precisa de `before`/`after` | CDC | O histórico detalhado é necessário; CT não consegue recuperar valores intermediários. |
+| Baixa latência e grande fluxo contínuo de eventos | CDC ou CES, conforme a plataforma | CDC atende processamento baseado em polling/LSN; CES é mais adequado quando o cenário exige streaming de eventos. |
+
+#### Cuidados em volumes altos
+
+- No **CDC**, monitore o atraso entre o LSN produzido e o LSN consumido, o tamanho das tabelas de captura e a retenção do histórico.
+- No **CT**, configure a retenção para ser maior que o pior intervalo esperado entre sincronizações. Se o consumidor ficar atrás do período de retenção, será necessário executar uma carga completa novamente.
+- Para ambos, processe em lotes, persista o watermark somente após sucesso e torne o destino idempotente para suportar reprocessamentos.
+- Se o requisito for apenas o estado final, `fn_cdc_get_net_changes` pode reduzir o volume de dados; se cada evento intermediário for importante, use `fn_cdc_get_all_changes`.
 
 ---
 
@@ -206,12 +299,13 @@ O SQL Trigger binding para Azure Functions executa chamadas serverless de códig
 ### Implementação de Código C# (C-Sharp)
 
 ```csharp
-[FunctionName("ProcessarAlteracoesPedidos")]
+[Function("ProcessarAlteracoesPedidos")]
 public static async Task Run(
     [SqlTrigger("[dbo].[Orders]", "SqlConnectionString")]
     IReadOnlyList<SqlChange<Order>> changes,
-    ILogger log)
+    FunctionContext context)
 {
+    ILogger log = context.GetLogger("ProcessarAlteracoesPedidos");
     foreach (SqlChange<Order> change in changes)
     {
         Order order = change.Item;
@@ -236,19 +330,32 @@ public static async Task Run(
 > [!warning] O que Viabiliza o SQL Trigger no Azure Functions?
 >
 > - O SQL Trigger binding no Azure Functions responde a inserções, edições ou exclusões em tabelas físicas.
-> - **Ativação Oculta**: Sob o capô, a extensão de trigger depende do **Change Tracking (CT)** estar ativado na tabela monitorada. Ao ser inicializado, o runtime tenta habilitar o CT de forma automática na tabela-alvo, exigindo que as credenciais do usuário do banco possuam a role `db_owner`.
+> - A extensão depende do **Change Tracking (CT)** estar habilitado no banco e na tabela monitorada. O trigger também cria tabelas internas de estado no schema `az_func`.
+> - `db_owner` é uma forma ampla de conceder acesso, mas não é obrigatório. Em produção, prefira as permissões mínimas documentadas: `CREATE TABLE`, `CREATE SCHEMA`, `SELECT`, `VIEW CHANGE TRACKING` e permissões no schema `az_func`.
+> - O exemplo de C# deve preferir o modelo **isolated worker** em novos projetos; o modelo in-process entra em fim de suporte em 10 de novembro de 2026.
 
 ---
 
-## Streaming de Eventos de Alteração (CES) para o Fabric
+## Streaming de Eventos de Alteração (CES) para Azure Event Hubs e Fabric
 
-O **Change Event Streaming (CES)** é um recurso em visualização para SQL Server 2025 e Azure SQL Database. Ele transmite alterações de tabelas para Azure Event Hubs e pode entregar eventos diretamente ao endpoint personalizado de um Eventstream do Fabric.
+O **Change Event Streaming (CES)** é um recurso em visualização para SQL Server 2025, Azure SQL Database e Azure SQL Managed Instance. Ele transmite alterações de tabelas para o **Azure Event Hubs** usando AMQP ou Kafka. Um Eventstream do Microsoft Fabric pode consumir esses eventos por meio do Event Hubs.
 
 O CES transmite eventos CloudEvents quase em tempo real, contendo:
 
 - Nome da tabela de origem e tipo da operação (Insert/Update/Delete).
-- Dados da tabela no payload do evento.
-- Metadados do evento para processamento downstream.
+- Dados atuais e, conforme o tipo de evento, dados anteriores da linha.
+- Metadados como LSN de commit e timestamp.
+- Serialização em JSON ou Avro.
+
+Para usar CES, é necessário habilitar o recurso no banco, criar um grupo de
+streaming, configurar o Event Hubs, as credenciais e as tabelas monitoradas.
+CES não faz snapshot inicial: somente alterações ocorridas depois da ativação
+são transmitidas. No SQL Server 2025, o banco precisa usar recovery model
+`FULL` e a configuração de preview correspondente.
+
+CES não pode ser habilitado em um banco que já usa CDC. Para dados históricos
+anteriores à ativação, faça uma carga inicial separada e use CES apenas para as
+alterações posteriores.
 
 ---
 
@@ -258,8 +365,10 @@ O CES transmite eventos CloudEvents quase em tempo real, contendo:
 | :--- | :--- | :--- |
 | Logs do CDC ausentes no SQL Server/MI | SQL Server Agent inativo | Inicie o serviço do Agent para reativar os jobs automáticos de captura. |
 | Perda de sincronismo no Change Tracking | Versão salva de sincronismo ultrapassou a retenção configurada | Use `CHANGE_TRACKING_MIN_VALID_VERSION()` para validar. Execute carga cheia se necessário. |
-| O SQL Trigger da Function falha na inicialização | A conta de conexão não possui permissão `db_owner` | Conceda direitos de `db_owner` para autorizar a Function a criar tabelas internas de rastreamento. |
-| Sobrecarga severa de disco | CDC ativado em tabelas transacionais massivas | Monitore os logs do cdc e verifique se o job de limpeza (`cdc.cleanup_job`) está rodando conforme planejado. |
+| O SQL Trigger da Function falha na inicialização | CT desabilitado ou permissões insuficientes no schema `az_func` | Habilite CT no banco e na tabela e conceda as permissões mínimas documentadas. |
+| Sobrecarga severa de disco | CDC ativado em tabelas transacionais massivas | Monitore as tabelas de captura e verifique se o job `cdc.<nome_do_banco>_cleanup` está rodando conforme planejado. |
+| SQL Trigger não inicia | CT desabilitado ou permissões insuficientes no schema `az_func` | Habilite CT no banco e na tabela e conceda as permissões mínimas documentadas. |
+| CES indisponível | Plataforma, configuração ou destino incompatível | Confirme SQL Server 2025/Azure SQL Database/Azure SQL Managed Instance, Azure Event Hubs, recovery model e limitações do preview. |
 
 ---
 
@@ -267,7 +376,7 @@ O CES transmite eventos CloudEvents quase em tempo real, contendo:
 
 > [!tip] Dicas para a Prova
 >
-> - O **CDC** grava o histórico completo de valores modificados (antes/depois). Exige SQL Agent ativo em infraestruturas físicas/MI.
+> - O **CDC** grava alterações em tabelas de captura; use `all update old` quando precisar da imagem anterior e posterior. Exige SQL Agent ativo em infraestruturas físicas/MI.
 > - O **Change Tracking (CT)** é leve, síncrono e grava apenas as chaves PKs modificadas.
 > - O **Azure Functions SQL Trigger** depende do Change Tracking ativado na tabela-alvo sob o capô.
 > - No CT, use a função `CHANGETABLE(CHANGES...)` para buscar os dados incrementais desde a última versão sincronizada.
@@ -279,7 +388,7 @@ O CES transmite eventos CloudEvents quase em tempo real, contendo:
 - O CDC provê auditoria rica de dados, ideal para pipelines incrementais de ETL.
 - O Change Tracking é a ferramenta recomendada para sincronização rápida de caches.
 - Use a extensão de trigger SQL no Azure Functions para arquiteturas de microsserviços orientados a eventos.
-- O CES no Fabric abstrai a complexidade operacional de envio de eventos para Lakehouses na nuvem.
+- O CES envia eventos para Azure Event Hubs; o Fabric Eventstream pode encaminhá-los para Lakehouse, KQL Database ou outros destinos.
 
 ---
 
@@ -317,7 +426,8 @@ D. Triggers DDL de tabelas.
 - [CDC in SQL Server](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-data-capture-sql-server)
 - [Change Tracking](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-tracking-sql-server)
 - [Azure Functions SQL Trigger Binding](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-azure-sql-trigger)
-- [Fabric Change Event Streaming](https://learn.microsoft.com/en-us/fabric/database/sql/change-event-streaming)
+- [Change Event Streaming (CES)](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/change-event-streaming/overview)
+- [Enviar eventos SQL para o Fabric Eventstream](https://learn.microsoft.com/en-us/fabric/real-time-intelligence/event-streams/stream-sql-change-events-to-eventstream)
 
 ---
 

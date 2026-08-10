@@ -8,7 +8,7 @@
 -- =================================================================================
 -- Este script demonstra técnicas de monitoramento no Azure SQL Database:
 --   1. Consulta de Consumo de Recursos via DMVs (`sys.dm_db_resource_stats` e `sys.dm_exec_requests`)
---   2. Identificação de Waists Dominantes na Instância via `sys.dm_os_wait_stats`
+--   2. Identificação de Waits Dominantes na Instância via `sys.dm_os_wait_stats`
 --   3. Estruturação de Consultas Kusto Query Language (KQL) para Log Analytics
 --   4. Configuração de Alertas do Azure Monitor via Azure CLI (`az monitor metrics alert`)
 --   5. Cenários Práticos de Projeto (Investigação de Exaustão de vCores / DTUs e Deadlocks)

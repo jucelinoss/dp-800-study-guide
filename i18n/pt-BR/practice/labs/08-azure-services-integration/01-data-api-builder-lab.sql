@@ -12,6 +12,8 @@
 --   3. Mapeamento de Colunas (Renomeação de campos sem alterar o banco via `"mappings"`)
 --   4. Configuração de Segurança por Papel (`anonymous`, `authenticated`)
 --   5. Cenários Práticos de Projeto (Comandos da CLI DAB `dab init`, `dab add`, `dab start`)
+-- O arquivo executável dab-config.json e as requisições HTTP ficam na pasta
+-- 01-data-api-builder-runtime deste laboratório.
 -- =================================================================================
 -- REFERÊNCIA TEÓRICA: ../../../certification/08-azure-services-integration/01-data-api-builder.md
 --    Abra o guia teórico junto com este laboratório para contexto conceitual.
@@ -23,6 +25,7 @@ GO
 -- Limpeza preventiva
 DROP VIEW IF EXISTS lab.vw_DabProductCatalog;
 DROP PROCEDURE IF EXISTS lab.usp_DabCreateOrder;
+DROP TABLE IF EXISTS lab.DabOrders;
 GO
 
 -- 1. View otimizada para exposição REST/GraphQL via DAB
@@ -38,20 +41,27 @@ FROM SalesLT.Product;
 GO
 
 -- 2. Stored Procedure pronta para exposição como Mutation no GraphQL ou POST no REST
+CREATE TABLE lab.DabOrders
+(
+    OrderID INT IDENTITY(1,1) CONSTRAINT PK_DabOrders PRIMARY KEY,
+    CustomerID INT NOT NULL,
+    ProductID INT NOT NULL,
+    Quantity INT NOT NULL
+);
+GO
+
 CREATE PROCEDURE lab.usp_DabCreateOrder
     @CustomerID INT,
     @ProductID INT,
-    @Quantity INT,
-    @NewOrderID INT OUTPUT
+    @Quantity INT
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-    -- Simulação de gravação
-    SET @NewOrderID = SCOPE_IDENTITY();
-    IF @NewOrderID IS NULL SET @NewOrderID = 10001;
 
-    PRINT 'Pedido criado via DAB com Sucesso!';
+    INSERT INTO lab.DabOrders (CustomerID, ProductID, Quantity)
+    VALUES (@CustomerID, @ProductID, @Quantity);
+
+    SELECT CAST(SCOPE_IDENTITY() AS INT) AS NewOrderID;
 END;
 GO
 
@@ -59,6 +69,9 @@ GO
 -- =================================================================================
 -- PARTE 1: ESTRUTURA DO ARQUIVO DAB-CONFIG.JSON (SIMULAÇÃO T-SQL/JSON)
 -- =================================================================================
+-- O arquivo executável usa `fields[].alias` e `fields[].primary-key`, formato
+-- atual do DAB 2.0. O bloco abaixo mantém `mappings` apenas para comparar com
+-- projetos anteriores.
 -- CONCEITOS E DEFINIÇÕES CHAVE:
 --   - dab-config.json: Arquivo central lido pelo mecanismo do DAB. Não requer escrita de código C# ou Node.js.
 --   - SEGURANÇA: Credenciais de conexão usam `@env('DATABASE_CONNECTION_STRING')` para evitar exposição de senhas.

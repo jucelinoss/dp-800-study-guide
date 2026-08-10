@@ -72,7 +72,7 @@ flowchart TD
 - **GraphQL Relationships**: DAB exposes foreign key relationships as nested GraphQL types
 - **Change Data Capture (CDC)**: Captures row-level changes in SQL Server/Azure SQL at the transaction log level
 - **Change Event Streaming (CES)**: Near-real-time event stream from SQL databases in Fabric
-- **Azure Functions SQL Trigger Binding**: Triggers a function on data changes using CDC under the hood
+- **Azure Functions SQL Trigger Binding**: Triggers a function on data changes using Change Tracking under the hood
 
 ## Related Resources
 

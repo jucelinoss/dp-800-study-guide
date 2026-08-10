@@ -48,8 +48,6 @@ flowchart LR
     DAB -->|Parameterized T-SQL| DB
 ```
 
-![Data API Builder Architecture](../../../dist/images/data_api_builder_architecture.png)
-
 > [!abstract]
 >
 > - Covers Data API Builder (DAB): what it is, config file structure, entity mapping, and permissions
@@ -245,7 +243,7 @@ Server=myserver.database.windows.net;Database=MyDB;Authentication=Active Directo
 
 ## Relationships
 
-DAB can express relationships between entities for GraphQL nested queries:
+DAB can declare relationships between entities for GraphQL nested queries. In practice, the relationship block declares a join-like correlation in JSON: it tells DAB which fields connect the current entity to the related entity. This does not mean that DAB always executes a physical `INNER JOIN`.
 
 ```json
 "Order": {
@@ -286,6 +284,51 @@ query {
   }
 }
 ```
+
+### How to read the relationship
+
+Consider these entities:
+
+```text
+Orders     (OrderId, CustomerId)
+OrderItem  (OrderItemId, OrderId, ProductId, Quantity)
+Customer   (CustomerId, Name, Email)
+```
+
+In the `items` relationship, `source.fields` points to the field in the current entity (`Order.OrderId`) and `target.fields` points to the field in the related entity (`OrderItem.OrderId`). For each order, DAB therefore finds every item whose `OrderId` matches the order's `OrderId`. Conceptually, this is equivalent to:
+
+```sql
+SELECT *
+FROM Orders AS o
+LEFT JOIN OrderItem AS i
+    ON i.OrderId = o.OrderId;
+```
+
+In the `customer` relationship, the correlation is `Order.CustomerId = Customer.CustomerId`, returning one customer for the order:
+
+```sql
+SELECT *
+FROM Orders AS o
+LEFT JOIN Customer AS c
+    ON c.CustomerId = o.CustomerId;
+```
+
+### The relationship is not always an `INNER JOIN`
+
+In SQL Server, writing `JOIN` without a qualifier means `INNER JOIN`. That is not the correct interpretation of DAB relationships. The relationship defines how fields match; the runtime is responsible for materializing the query.
+
+From the GraphQL result perspective, the behavior is closer to a `LEFT JOIN`: the parent entity is still returned when no related entity exists. For a `one` relationship, the related field may be `null`; for a `many` relationship, the related collection may be empty. Filters, permissions, and access policies can also change which records are visible.
+
+The properties work as follows:
+
+- `items` and `customer` are the field names exposed in the GraphQL schema.
+- `target.entity` identifies the related entity, which must also be declared in the same configuration file.
+- `source.fields` contains fields from the current entity; `target.fields` contains fields from the target entity.
+- `cardinality: "many"` returns a collection; `cardinality: "one"` returns a single object.
+
+Cardinality is defined from the perspective of the current entity: an order has many items (`many`), while many orders belong to one customer, so navigation from `Order` to `Customer` returns one object (`one`). The relationship does not create a foreign key in the database; it only tells DAB how to correlate entities that are already exposed. The `LEFT JOIN` examples are a conceptual approximation of the result, not a promise about the internal SQL statement or execution plan used by DAB.
+
+To enable reverse navigation—for example, from `Customer` to its `Order` records—you must declare another relationship on the `Customer` entity, reversing the source and target fields. Relationships are also a GraphQL navigation feature; they do not automatically turn a REST response into a nested graph.
 
 ---
 
@@ -484,3 +527,5 @@ valid replacement for DAB's connection-string expression.
 ---
 
 **[↑ Back to Section](./azure-services-integration.md) | [Lab: Data API Builder](../../practice/labs/08-azure-services-integration/01-data-api-builder-lab.sql) | [Next →](./02-rest-graphql-endpoints.md)**
+
+> Executable lab: [DAB runtime, configuration and HTTP requests](../../practice/labs/08-azure-services-integration/01-data-api-builder-runtime/README.md)

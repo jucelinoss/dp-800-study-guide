@@ -12,6 +12,8 @@
 --   3. Change Tracking (CT): Lightweight enabling and queries with `CHANGETABLE(CHANGES ...)`
 --   4. Architecture Comparison: CDC vs CT vs Event Grid / Fabric Change Event Streaming
 --   5. Practical Project Scenarios (Integration Queue for Azure Functions and Logic Apps)
+-- NOTE: CDC and Change Tracking change database state. Run this in a disposable
+-- database with the required permissions and read the cleanup section at the end.
 -- =================================================================================
 -- THEORY REFERENCE: ../../../certification/08-azure-services-integration/04-change-event-handling.md
 --    Open the theory guide alongside this lab for conceptual context.
@@ -48,15 +50,22 @@ GO
 
 -- -- [DP-800 KEY POINT]
 -- 1. Enable CDC at database level
-EXEC sys.sp_cdc_enable_db;
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = DB_NAME() AND is_cdc_enabled = 0)
+    EXEC sys.sp_cdc_enable_db;
 GO
 
 -- 2. Enable CDC on a specific table
--- EXEC sys.sp_cdc_enable_table
---     @source_schema = N'lab',
---     @source_name   = N'InventoryCT',
---     @role_name     = NULL,
---     @supports_net_changes = 1;
+IF NOT EXISTS
+(
+    SELECT 1 FROM sys.tables
+    WHERE object_id = OBJECT_ID(N'lab.InventoryCT')
+      AND is_tracked_by_cdc = 1
+)
+    EXEC sys.sp_cdc_enable_table
+        @source_schema = N'lab',
+        @source_name = N'InventoryCT',
+        @role_name = NULL,
+        @supports_net_changes = 1;
 GO
 
 -- 3. Set up Incremental Read Control Table (Watermarking)
@@ -83,8 +92,13 @@ SET CHANGE_TRACKING = ON
 GO
 
 -- 2. Enable Change Tracking on Table
-ALTER TABLE lab.InventoryCT
-ENABLE CHANGE_TRACKING WITH (TRACK_COLUMNS_UPDATED = ON);
+IF NOT EXISTS
+(
+    SELECT 1 FROM sys.change_tracking_tables
+    WHERE object_id = OBJECT_ID(N'lab.InventoryCT')
+)
+    ALTER TABLE lab.InventoryCT
+    ENABLE CHANGE_TRACKING WITH (TRACK_COLUMNS_UPDATED = ON);
 GO
 
 -- 3. Capture initial synchronization version
@@ -94,6 +108,16 @@ PRINT 'Versao Atual de Sincronizacao: ' + CAST(@SyncVersion AS VARCHAR);
 -- Make changes to the table to generate tracked changes
 UPDATE lab.InventoryCT SET Price = 280.00 WHERE ItemID = 1;
 INSERT INTO lab.InventoryCT (ItemName, Price) VALUES (N'Headset USB', 190.00);
+
+-- CDC is asynchronous: allow the capture job to process the log before querying.
+WAITFOR DELAY '00:00:05';
+
+-- 5. Read captured changes (the option below includes before and after images)
+DECLARE @CdcFromLSN BINARY(10) = sys.fn_cdc_get_min_lsn(N'lab_InventoryCT');
+DECLARE @CdcToLSN BINARY(10) = sys.fn_cdc_get_max_lsn();
+
+SELECT *
+FROM cdc.fn_cdc_get_all_changes_lab_InventoryCT(@CdcFromLSN, @CdcToLSN, N'all update old');
 
 -- 4. Query changed rows from the synchronization point
 SELECT 
@@ -127,6 +151,14 @@ SELECT
     'Sincronização com Clientes Mobile, Azure Functions Trigger Binding';
 GO
 
+-- =================================================================================================
+-- OPTIONAL CLEANUP (run only in a disposable database):
+-- ALTER TABLE lab.InventoryCT DISABLE CHANGE_TRACKING;
+-- ALTER DATABASE AdventureWorks2025 SET CHANGE_TRACKING = OFF;
+-- EXEC sys.sp_cdc_disable_table @source_schema = N'lab', @source_name = N'InventoryCT', @capture_instance = N'lab_InventoryCT';
+-- EXEC sys.sp_cdc_disable_db;
+-- DROP TABLE IF EXISTS lab.CDCWatermark;
+-- DROP TABLE IF EXISTS lab.InventoryCT;
 -- =================================================================================================
 -- NEXT STEP: Review the theory at ../../../certification/08-azure-services-integration/04-change-event-handling.md
 -- =================================================================================================
