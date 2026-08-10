@@ -133,7 +133,7 @@ Remember these distinctions:
 
 ## Practical coverage
 
-No dedicated lab for medallion architecture currently exists in `practice/labs/12-other-topics/`. The existing lab covers EAV, JSON metadata, and Data Mesh. A future Fabric lab should demonstrate ingestion into Bronze, validation into Silver, a curated Gold model, and access or quality checks.
+The [Medallion Architecture lab](../../practice/labs/12-other-topics/02-medallion-architecture-fabric-lab.sql) simulates the Bronze, Silver, and Gold boundaries in SQL Server. It preserves raw JSON in Bronze, validates and quarantines records in Silver, publishes a dimensional Gold product, and runs lineage and certification gates. Fabric-specific lakehouses, OneLake storage, Delta tables, and orchestration remain platform concerns to implement in a Fabric workspace.
 
 ## Official Microsoft Learn documentation
 

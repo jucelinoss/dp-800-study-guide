@@ -133,7 +133,7 @@ Lembre-se destas distinções:
 
 ## Cobertura prática
 
-Atualmente não existe um laboratório dedicado à arquitetura medalhão em `practice/labs/12-other-topics/`. O laboratório existente cobre EAV, metadados JSON e Data Mesh. Um futuro laboratório do Fabric deve demonstrar ingestão na Bronze, validação na Silver, um modelo curado na Gold e verificações de acesso ou qualidade.
+O [laboratório de arquitetura medalhão](../../practice/labs/12-other-topics/02-medallion-architecture-fabric-lab.sql) simula no SQL Server os limites Bronze, Silver e Gold. Ele preserva JSON bruto na Bronze, valida e coloca registros em quarentena na Silver, publica um produto dimensional na Gold e executa gates de linhagem e certificação. Lakehouses específicos do Fabric, armazenamento no OneLake, tabelas Delta e orquestração continuam sendo responsabilidades da plataforma a implementar em um workspace do Fabric.
 
 ## Documentação oficial do Microsoft Learn
 
