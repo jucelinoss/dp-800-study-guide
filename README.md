@@ -358,6 +358,7 @@ dp-800-study-guide/
 │   ├── 09-models-embeddings/        # external models, embedding maintenance
 │   ├── 10-intelligent-search/       # full-text, vector, hybrid (RRF)
 │   ├── 11-rag/                      # RAG, sp_invoke_external_rest_endpoint
+│   ├── 12-other-topics/             # Data Vault, Fabric, Medallion, EAV, Data Mesh
 │   └── resources/
 │       ├── cheat-sheets/            # quick-reference for exam day
 │       ├── practice-questions/      # per-domain Q&A

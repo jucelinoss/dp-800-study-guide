@@ -22,6 +22,8 @@ RELEASE_NOTES.md
 # Build outputs & local temp files
 dist/
 output/
+bin/
+obj/
 nul
 .agents/
 .gemini/
