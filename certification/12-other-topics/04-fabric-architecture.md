@@ -76,6 +76,10 @@ Direct Lake loads columns from Delta tables in OneLake into the Power BI engine 
 - Can the design avoid unnecessary copies through Delta sharing or shortcuts?
 - What is the promotion and rollback strategy across environments?
 
+## Practical coverage
+
+The [Fabric architecture lab](../../practice/labs/12-other-topics/04-fabric-architecture-lab.sql) simulates an end-to-end governed flow in SQL Server: source registration, catalog and contracts, Bronze ingestion, Silver validation and quarantine, Gold serving, semantic metadata, lineage, access policies, and pipeline gates. OneLake, Lakehouse, Warehouse, Data Factory, and Power BI remain platform services to configure in a Fabric workspace.
+
 ## Related topics
 
 - [Medallion Architecture](./02-medallion-architecture-fabric.md)

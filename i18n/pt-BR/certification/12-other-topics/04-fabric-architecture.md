@@ -278,7 +278,7 @@ Este é um tópico complementar de arquitetura. Para o exame, conecte Data Fabri
 
 ## Laboratório
 
-Não há, neste momento, um laboratório executável dedicado à arquitetura Data Fabric completa em `practice/labs/12-other-topics/`. Os laboratórios existentes demonstram partes do problema, como modelagem, integração e cargas incrementais. Uma implementação ponta a ponta exigiria um ambiente SQL Server e um tenant/capacidade do Fabric, além de credenciais e dados de teste.
+O [laboratório de arquitetura Fabric](../../practice/labs/12-other-topics/04-fabric-architecture-lab.sql) simula no SQL Server um fluxo governado de ponta a ponta: registro de fontes, catálogo e contratos, ingestão Bronze, validação e quarentena Silver, serving Gold, metadados semânticos, linhagem, políticas de acesso e gates do pipeline. OneLake, Lakehouse, Warehouse, Data Factory e Power BI continuam sendo serviços da plataforma a configurar em um workspace do Fabric.
 
 ## Tópicos relacionados
 
