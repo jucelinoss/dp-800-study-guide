@@ -1,4 +1,7 @@
 -- =================================================================================
+-- SEGURANÇA: Execute somente em um banco descartável. O lab remove/recria tabelas
+-- RAG e uma procedure. A recuperação e a geração são simuladas; a busca vetorial
+-- real e a chamada REST são praticadas nas seções/labs relacionados.
 -- DP-800 - LAB PRATICO COMPLETO: ARQUITETURA E CASOS DE USO DE RAG NATIVO EM T-SQL
 -- Banco de Dados: AdventureWorks2025 (ou superior / LT - versao leve tambem funciona)
 -- =================================================================================
@@ -36,7 +39,8 @@ DROP TABLE IF EXISTS lab.PolicyDocuments;
 DROP TABLE IF EXISTS lab.ProductEmbeddings;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 PRINT '=========================================================';

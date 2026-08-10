@@ -6,6 +6,9 @@
 -- AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
+-- SAFETY: Run only in a disposable lab database. This lab drops/recreates logging
+-- tables and procedures. The HTTP/model response is simulated unless you explicitly
+-- configure a test endpoint, credential, and least-privilege permission.
 -- This script demonstrates AI JSON payload construction and response extraction:
 --   1. Formatting Relational Data into JSON for Prompts with `FOR JSON PATH` and `STRING_AGG`
 --   2. Defining the JSON Payload for Chat Completions (`role: system`, `user`, `temperature: 0`)
@@ -17,6 +20,10 @@
 --    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 -- Preventive cleanup

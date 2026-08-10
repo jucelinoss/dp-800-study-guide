@@ -60,12 +60,23 @@ The `@response` output parameter contains the full HTTP response as a JSON strin
 
 ```sql
 -- Store the API key securely (never hardcode in procedure)
-CREATE DATABASE SCOPED CREDENTIAL [AzureOpenAICredential]
+CREATE DATABASE SCOPED CREDENTIAL [https://myopenai.openai.azure.com]
 WITH IDENTITY = 'HTTPEndpointHeaders',
 SECRET = '{"api-key": "your-azure-openai-api-key-here"}';
 ```
 
-The credential is referenced in `sp_invoke_external_rest_endpoint` via `@credential` — the API key header is automatically injected.
+The credential is referenced in `sp_invoke_external_rest_endpoint` via `@credential` — the API key header is automatically injected. For this procedure, the credential name must be a URL whose host/path is compatible with the request URL; replace `myopenai.openai.azure.com` consistently in both places.
+
+In SQL Server 2025, the external REST endpoint feature is disabled by default. Enable it only where required, grant `EXECUTE ANY EXTERNAL ENDPOINT` to the least-privileged caller, and grant `REFERENCES` on the scoped credential. Azure SQL Database and SQL database in Fabric enable the feature by default.
+
+```sql
+-- SQL Server 2025 only; requires ALTER SETTINGS and should be reviewed as a server change
+EXECUTE sp_configure 'external rest endpoint enabled', 1;
+RECONFIGURE WITH OVERRIDE;
+
+GRANT EXECUTE ANY EXTERNAL ENDPOINT TO RagAppRole;
+GRANT REFERENCES ON DATABASE SCOPED CREDENTIAL::[https://myopenai.openai.azure.com] TO RagAppRole;
+```
 
 ---
 
@@ -193,7 +204,7 @@ BEGIN
         @method     = N'POST',
         @headers    = N'{"Content-Type": "application/json"}',
         @payload    = @payload,
-        @credential = [AzureOpenAICredential],
+        @credential = [https://myopenai.openai.azure.com],
         @response   = @response OUTPUT;
 
     -- ── Step 5: Parse and return the response ─────────────────────────────
@@ -298,7 +309,7 @@ EXEC sp_invoke_external_rest_endpoint
     @method     = N'POST',
     @headers    = N'{"Content-Type": "application/json"}',
     @payload    = @payload,
-    @credential = [AzureOpenAICredential],
+    @credential = [https://myopenai.openai.azure.com],
     @response   = @response OUTPUT;
 
 -- Parse structured JSON response
@@ -330,7 +341,7 @@ BEGIN TRY
         @method     = N'POST',
         @headers    = N'{"Content-Type": "application/json"}',
         @payload    = @payload,
-        @credential = [AzureOpenAICredential],
+        @credential = [https://myopenai.openai.azure.com],
         @response   = @response OUTPUT,
         @timeout    = 30;
 

@@ -10,18 +10,18 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
-> - 📍 [2. Sintaxe de sp_invoke_external_rest_endpoint](#sintaxe-de-sp-invoke-external-rest-endpoint)
+> - 📍 [2. Sintaxe de sp_invoke_external_rest_endpoint](#sintaxe-de-sp_invoke_external_rest_endpoint)
 > - 📍 [3. DATABASE SCOPED CREDENTIAL para OpenAI](#database-scoped-credential-para-openai)
 > - 📍 [4. Convertendo Dados para JSON com FOR JSON](#convertendo-dados-para-json-com-for-json)
 > - 📍 [5. Construindo Prompts](#construindo-prompts)
-> - 📍 [6. Procedure RAG Completa — End to End](#procedure-rag-completa-end-to-end)
+> - 📍 [6. Procedure RAG Completa — End to End](#procedure-rag-completa--end-to-end)
 > - 📍 [7. Parseando Respostas JSON](#parseando-respostas-json)
->   - 🔹 [JSON_VALUE — Valores Escalares Únicos](#json-value-valores-escalares-únicos)
->   - 🔹 [OPENJSON — Parseando Arrays](#openjson-parseando-arrays)
->   - 🔹 [JSON_QUERY — Extraindo Objetos/Arrays JSON](#json-query-extraindo-objetosarrays-json)
-> - 📍 [8. Saída Estruturada — Forçando Respostas JSON](#saída-estruturada-forçando-respostas-json)
+>   - 🔹 [JSON_VALUE — Valores Escalares Únicos](#json_value--valores-escalares-únicos)
+>   - 🔹 [OPENJSON — Parseando Arrays](#openjson--parseando-arrays)
+>   - 🔹 [JSON_QUERY — Extraindo Objetos/Arrays JSON](#json_query--extraindo-objetosarrays-json)
+> - 📍 [8. Saída Estruturada — Forçando Respostas JSON](#saída-estruturada--forçando-respostas-json)
 > - 📍 [9. Tratamento de Erros](#tratamento-de-erros)
 > - 📍 [10. Gerenciamento de Tokens](#gerenciamento-de-tokens)
 > - 📍 [11. Casos de Uso](#casos-de-uso)
@@ -102,12 +102,21 @@ O parâmetro de saída `@response` pode conter a resposta HTTP completa como uma
 
 ```sql
 -- Armazenar a chave de API com segurança (nunca hardcode na procedure)
-CREATE DATABASE SCOPED CREDENTIAL [AzureOpenAICredential]
+CREATE DATABASE SCOPED CREDENTIAL [https://myopenai.openai.azure.com]
 WITH IDENTITY = 'HTTPEndpointHeaders',
 SECRET = '{"api-key": "your-azure-openai-api-key-here"}';
 ```
 
-A credencial é referenciada em `sp_invoke_external_rest_endpoint` via `@credential` — o header da chave de API é injetado automaticamente. Restrinja também quem pode executar chamadas externas e prefira uma identidade gerenciada quando o serviço intermediário oferecer suporte.
+A credencial é referenciada em `sp_invoke_external_rest_endpoint` via `@credential` — o header da chave de API é injetado automaticamente. Para essa procedure, o nome da credencial precisa ser uma URL cujo host/caminho seja compatível com a URL da requisição; substitua `myopenai.openai.azure.com` de forma consistente nos dois lugares. No SQL Server 2025, habilite o recurso somente onde necessário, conceda `EXECUTE ANY EXTERNAL ENDPOINT` ao chamador de menor privilégio e conceda `REFERENCES` na credencial. Azure SQL Database e SQL database no Fabric habilitam o recurso por padrão. Prefira identidade gerenciada quando o serviço intermediário oferecer suporte.
+
+```sql
+-- Somente SQL Server 2025; requer ALTER SETTINGS e deve ser tratado como mudança de servidor
+EXECUTE sp_configure 'external rest endpoint enabled', 1;
+RECONFIGURE WITH OVERRIDE;
+
+GRANT EXECUTE ANY EXTERNAL ENDPOINT TO RagAppRole;
+GRANT REFERENCES ON DATABASE SCOPED CREDENTIAL::[https://myopenai.openai.azure.com] TO RagAppRole;
+```
 
 > [!caution] Nunca Hardcode a Chave de API
 >
@@ -250,7 +259,7 @@ BEGIN
         @method     = N'POST',
         @headers    = N'{"Content-Type": "application/json"}',
         @payload    = @payload,
-        @credential = [AzureOpenAICredential],
+        @credential = [https://myopenai.openai.azure.com],
         @response   = @response OUTPUT;
 
     -- ── Passo 4: Parsear e retornar a resposta ────────────────────────────────
@@ -368,7 +377,7 @@ EXEC sp_invoke_external_rest_endpoint
     @method     = N'POST',
     @headers    = N'{"Content-Type": "application/json"}',
     @payload    = @payload,
-    @credential = [AzureOpenAICredential],
+    @credential = [https://myopenai.openai.azure.com],
     @response   = @response OUTPUT;
 
 -- Parsear resposta JSON estruturada
@@ -400,7 +409,7 @@ BEGIN TRY
         @method     = N'POST',
         @headers    = N'{"Content-Type": "application/json"}',
         @payload    = @payload,
-        @credential = [AzureOpenAICredential],
+        @credential = [https://myopenai.openai.azure.com],
         @response   = @response OUTPUT,
         @timeout    = 30;
 

@@ -6,6 +6,9 @@
 -- to restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
+-- SAFETY: Run only in a disposable lab database. This lab drops/recreates RAG tables
+-- and a procedure. Retrieval and generation are intentionally simulated; the real
+-- embedding/vector search and REST call are practiced in the adjacent sections/lab.
 -- This script demonstrates the implementation of the Retrieval-Augmented Generation (RAG) pattern in T-SQL:
 --   1. RETRIEVE Step: Retrieval of Relevant Chunks via Hybrid / Vector Search
 --   2. AUGMENT Step: Formatting and Appending Context to the Prompt
@@ -17,6 +20,10 @@
 --    Open the theory guide alongside this lab for conceptual context.
 
 USE AdventureWorks2025;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 -- Preventive cleanup

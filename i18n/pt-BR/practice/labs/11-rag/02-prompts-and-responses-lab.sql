@@ -1,4 +1,7 @@
 -- =================================================================================
+-- SEGURANÇA: Execute somente em um banco descartável. O lab remove/recria tabelas
+-- de log e procedures. A resposta HTTP/modelo é simulada, salvo se você configurar
+-- endpoint, credencial de teste e permissão de menor privilégio.
 -- DP-800 - LAB PRATICO COMPLETO: PROMPTS E RESPOSTAS EM RAG VIA T-SQL
 -- Banco de Dados: AdventureWorks2025 (ou LT - leve)
 -- =================================================================================
@@ -40,7 +43,8 @@ DROP TABLE IF EXISTS lab.RAGErrorLog;
 DROP TABLE IF EXISTS lab.CustomerFeedback;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 PRINT '=========================================================';
@@ -60,7 +64,7 @@ PRINT '-------------------------------------------------------------------';
 PRINT '';
 PRINT '  SINTAXE OFICIAL (copie e adapte com sua chave real):';
 PRINT '';
-PRINT '  CREATE DATABASE SCOPED CREDENTIAL [AzureOpenAICredential]';
+PRINT '  CREATE DATABASE SCOPED CREDENTIAL [https://SEU-RECURSO.openai.azure.com]';
 PRINT '  WITH IDENTITY = ''HTTPEndpointHeaders'',        -- <- Modo: injeta como HEADERS';
 PRINT '       SECRET   = ''{"api-key": "SUA_CHAVE_AQUI"}''; -- <- Headers JSON injetados';
 PRINT '';
@@ -72,7 +76,7 @@ PRINT '    - Azure OpenAI, Azure AI Search, Azure Functions, etc.';
 PRINT '  Para outros destinos use intermediario: Azure API Management (APIM).';
 PRINT '';
 PRINT '  Remover credencial (se precisar recriar):';
-PRINT '    DROP DATABASE SCOPED CREDENTIAL IF EXISTS [AzureOpenAICredential];';
+PRINT '    DROP DATABASE SCOPED CREDENTIAL [https://SEU-RECURSO.openai.azure.com];';
 PRINT '-------------------------------------------------------------------';
 GO
 
@@ -148,9 +152,9 @@ SELECT
 UNION ALL SELECT N'@method',     N'VARCHAR(10)', N'OBRIGATORIO', N'Metodo HTTP: GET | POST | PUT | DELETE | PATCH', N'POST'
 UNION ALL SELECT N'@headers',    N'NVARCHAR(MAX)', N'OPCIONAL', N'Objeto JSON com headers da requisicao (Content-Type, etc.)', N'{"Content-Type": "application/json"}'
 UNION ALL SELECT N'@payload',    N'NVARCHAR(MAX)', N'OPCIONAL', N'Corpo da requisicao (JSON para POST/PUT)', N'{"messages":[...]}'
-UNION ALL SELECT N'@credential', N'SYSNAME',       N'OPCIONAL', N'DATABASE SCOPED CREDENTIAL com IDENTITY=HTTPEndpointHeaders', N'[AzureOpenAICredential]'
+UNION ALL SELECT N'@credential', N'SYSNAME',       N'OPCIONAL', N'Credencial URL com IDENTITY=HTTPEndpointHeaders; host/caminho devem corresponder ao @url', N'[https://SEU-RECURSO.openai.azure.com]'
 UNION ALL SELECT N'@response',   N'NVARCHAR(MAX) OUTPUT', N'OPCIONAL', N'Variavel de saida com a resposta completa (JSON envelope)', N'DECLARE @resp NVARCHAR(MAX); ... @response = @resp OUTPUT'
-UNION ALL SELECT N'@timeout',    N'INT',           N'OPCIONAL (padrao=30)', N'Timeout em segundos (ate 600 = 10min)', N'30'
+UNION ALL SELECT N'@timeout',    N'INT',           N'OPCIONAL (padrao=30)', N'Timeout em segundos (até 230)', N'30'
 UNION ALL SELECT N'@retry_count',N'TINYINT',       N'OPCIONAL (padrao=0, max=10)', N'Numero de retries automaticos para falhas transitorias', N'2';
 GO
 
@@ -163,7 +167,7 @@ EXEC @return_code = sp_invoke_external_rest_endpoint
     @method     = N''POST'',
     @headers    = N''{"Content-Type": "application/json"}'',
     @payload    = @json_payload,              -- <- montado nas proximas etapas
-    @credential = [AzureOpenAICredential],    -- <- segura, injeta api-key como header
+    @credential = [https://SEU-RECURSO.openai.azure.com], -- host deve corresponder ao @url
     @response   = @response OUTPUT,
     @timeout    = 30,
     @retry_count = 2;

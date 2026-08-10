@@ -23,12 +23,12 @@ tags:
 > - 📍 [6. Dados Estruturados vs Não Estruturados no RAG](#dados-estruturados-vs-não-estruturados-no-rag)
 >   - 🔹 [Dados Não Estruturados (Documentos, Artigos)](#dados-não-estruturados-documentos-artigos)
 >   - 🔹 [Dados Estruturados (Tabelas, Relatórios)](#dados-estruturados-tabelas-relatórios)
->   - 🔹 [Híbrido: Estruturado + Não Estruturado](#híbrido-estruturado-não-estruturado)
+>   - 🔹 [Híbrido: Estruturado + Não Estruturado](#híbrido-estruturado--não-estruturado)
 > - 📍 [7. RAG Multi-Turn (Conversacional)](#rag-multi-turn-conversacional)
 > - 📍 [8. Padrões de Arquitetura](#padrões-de-arquitetura)
 >   - 🔹 [RAG In-Database (Tudo no SQL)](#rag-in-database-tudo-no-sql)
 >   - 🔹 [RAG na Camada de Aplicação](#rag-na-camada-de-aplicação)
->   - 🔹 [Azure AI Search + SQL](#azure-ai-search-sql)
+>   - 🔹 [Azure AI Search + SQL](#azure-ai-search--sql)
 > - 📍 [9. Casos de Uso por Tipo de Dado](#casos-de-uso-por-tipo-de-dado)
 > - 📍 [10. Problemas Comuns e Erros](#problemas-comuns-e-erros)
 > - 📍 [11. Dicas para o Exame](#dicas-para-o-exame)
@@ -42,7 +42,7 @@ tags:
 
 ## Visão Geral
 
-O Retrieval-Augmented Generation (RAG) ancora as respostas de Large Language Models (LLMs) em dados de um banco de dados, reduzindo o risco de respostas não fundamentadas e tornando-as mais relevantes e atuais. Em vez de depender apenas do que o modelo "conhece" de seu treinamento, o RAG recupera contexto relevante de uma fonte de dados confiável e o inclui no prompt. O SQL Database no Fabric e o Azure SQL são backends naturais para RAG porque armazenam tanto dados estruturados quanto embeddings em um único lugar.
+O Retrieval-Augmented Generation (RAG) ancora as respostas de Large Language Models (LLMs) em dados recuperados de uma fonte confiável, reduzindo o risco de respostas não fundamentadas e tornando-as mais relevantes e atuais. Em vez de depender apenas do que o modelo "conhece" de seu treinamento, o RAG recupera contexto relevante e o inclui no prompt. SQL Server 2025, Azure SQL Database, Azure SQL Managed Instance (com política de atualização compatível) e SQL database no Microsoft Fabric podem atuar como backends quando os dados estruturados, o texto e os embeddings ficam próximos; Azure AI Search e outros mecanismos também podem executar a etapa de recuperação.
 
 > [!abstract]
 >
@@ -54,9 +54,13 @@ O Retrieval-Augmented Generation (RAG) ancora as respostas de Large Language Mod
 >
 > - Padrão RAG: (1) embeder query → (2) buscar no DB com VECTOR_SEARCH + CONTAINS → (3) recuperar top-K chunks → (4) construir prompt → (5) chamar LLM → (6) retornar resposta ancorada
 > - **Grounding ≠ fine-tuning** — RAG injeta contexto em tempo de inferência; os pesos do modelo **não** são alterados
-> - Azure SQL é um backend RAG natural: armazena tanto dados estruturados QUANTO embeddings vetoriais em um banco
+> - O SQL Database Engine pode ser um backend RAG: armazena dados estruturados, texto e embeddings no mesmo banco; o serviço de recuperação e o provedor do modelo podem ser separados
 
-RAG não garante que toda resposta será correta: recupere fontes relevantes, instrua o modelo a declarar quando a evidência for insuficiente e, quando aplicável, retorne citações para os chunks usados.
+RAG não garante que toda resposta será correta: recupere fontes relevantes, aplique filtros de autorização antes de montar o contexto, instrua o modelo a declarar quando a evidência for insuficiente e, quando aplicável, retorne citações para os chunks usados.
+
+> [!note] Disponibilidade das funções vetoriais
+>
+> `VECTOR_DISTANCE` executa busca exata. `VECTOR_SEARCH` e os índices vetoriais aproximados são recursos em preview nas plataformas documentadas pelo Learn; no SQL Server 2025, habilite `PREVIEW_FEATURES = ON`. Confirme a disponibilidade e as limitações da plataforma antes de usar ANN em produção.
 
 ---
 
@@ -74,9 +78,9 @@ Um desenho seguro separa responsabilidades: a busca recupera somente documentos 
 sequenceDiagram
     participant U as Usuário
     participant App as Aplicação
-    participant DB as Azure SQL Database
-    participant E as Azure OpenAI (embeddings)
-    participant L as Azure OpenAI (chat)
+    participant DB as SQL Database Engine
+    participant E as Embedding model or API
+    participant L as Chat model or API
 
     U->>App: pergunta
     App->>E: gerar embedding da pergunta
@@ -89,11 +93,23 @@ sequenceDiagram
     App-->>U: resposta
 ```
 
-![RAG End-to-End Architecture in SQL Server](../../../../dist/images/rag_architecture_sql_server.png)
+```mermaid
+flowchart LR
+    I[Documentos e dados] --> P[Ingestao e chunking]
+    P --> V[Embeddings e metadados]
+    V --> S[Indice ou tabelas de busca]
+    Q[Query do usuario] --> R[Recuperacao com filtros]
+    S --> R
+    R --> C[Contexto com fontes]
+    C --> G[LLM gera resposta]
+    Q --> G
+    G --> A[Resposta com citacoes]
+```
 
 > **Modelo Mental**: RAG é uma **prova com consulta** — o modelo lê as anotações que você entregou a ele para esta questão específica; seus pesos não mudam. Fine-tuning é **estudar** — muda o que o aluno sabe.
 
 Para um walkthrough em T-SQL, combine as etapas deste capítulo com os exemplos de embeddings e busca híbrida das seções relacionadas ao final da página.
+
 ---
 
 ## O Padrão RAG
@@ -121,7 +137,7 @@ Pergunta do Usuário
      ▼
 ┌─────────────────────────────────────────────────┐
 │  GENERATE                                       │
-│  5. Chamar LLM (ex: GPT-4o-mini)                │
+│  5. Chamar um modelo de chat                    │
 │  6. Retornar resposta ancorada ao usuário       │
 └─────────────────────────────────────────────────┘
 ```
@@ -144,6 +160,10 @@ Pergunta do Usuário
 > - **Fine-tuning**: atualiza os **pesos** do modelo com novos dados de treinamento. Custo: compute de treinamento uma vez + modelo customizado persistente.
 >
 > Use RAG quando os dados mudam frequentemente (preços, inventário, políticas). Use fine-tuning quando você quer que o modelo aprenda um estilo de resposta ou domínio específico de forma permanente.
+
+> [!note] Avalie recuperação e resposta separadamente
+>
+> **Groundedness** verifica se a resposta permanece apoiada no contexto recuperado; **relevância** verifica se ela responde à pergunta; e **completude** verifica se não omite informações esperadas. Avalie também a recuperação com queries rotuladas (*ground truth*), porque uma resposta não pode corrigir evidência que não foi recuperada.
 
 ---
 
@@ -286,14 +306,24 @@ INNER JOIN dbo.ReviewChunks AS r
     ON r.ProductId = p.ProductId
 WHERE p.Category = 'Headphones'
   AND p.InStock = 1
+  AND r.Embedding IS NOT NULL
   AND VECTOR_DISTANCE('cosine', r.Embedding, @query_vector) < 0.3;
 ```
+
+O limite `0.3` é apenas ilustrativo: a escala depende da métrica, do modelo de
+embedding e do corpus. Em produção, compare candidatos por distância e avalie
+um `TOP (K)` ou um limiar com dados rotulados; não reutilize um valor universal.
 
 ---
 
 ## RAG Multi-Turn (Conversacional)
 
-Para conversas multi-turn, inclua o histórico da conversa no prompt:
+Para conversas multi-turn, use o histórico para entender a referência da nova
+pergunta, mas não trate todo o histórico como evidência. Em geral, reescreva a
+pergunta atual como uma consulta independente, faça a recuperação novamente com
+os filtros de autorização e envie ao modelo somente o histórico e o contexto
+necessários. Mensagens anteriores também são entradas não confiáveis e podem
+conter instruções que não devem substituir as regras do sistema.
 
 ```sql
 CREATE TABLE dbo.ConversationHistory (
@@ -324,7 +354,7 @@ SELECT @history = (
 
 > [!tip] Limitando o Histórico de Conversa
 >
-> Não inclua o histórico completo de conversa no prompt — os tokens acumulam rapidamente e podem exceder a janela de contexto do modelo. Limite por tempo (ex: última 1 hora) ou por contagem (ex: últimas 10 mensagens). Priorize as mensagens mais recentes, pois são as mais relevantes para a pergunta atual.
+> Não inclua o histórico completo de conversa no prompt — os tokens acumulam rapidamente e podem exceder a janela de contexto do modelo. Limite por tempo (ex: última 1 hora), por contagem (ex: últimas 10 mensagens) ou por orçamento de tokens. Priorize as mensagens necessárias para resolver a referência atual e mantenha a evidência recuperada separada do histórico.
 
 ---
 
@@ -341,7 +371,11 @@ SQL Database → Procedure T-SQL:
   5. RETORNAR resposta
 ```
 
-Vantagens: Todo o processamento em um lugar, sem código de aplicação, latência em um único round trip
+Vantagens: processamento centralizado e uma interface transacional para a aplicação. Isso não elimina a latência da chamada externa: cada chamada HTTPS pode sofrer throttling, timeout e limites do provedor.
+
+> [!warning] `sp_invoke_external_rest_endpoint`
+>
+> A procedure depende da plataforma e da configuração. No SQL Server 2025 e no Azure SQL Managed Instance, ela pode estar desabilitada e exige configuração/permissão; no Azure SQL Database e no SQL database no Fabric, a disponibilidade e os endpoints permitidos seguem as regras do serviço. Restrinja credenciais, endpoints e dados enviados.
 
 ### RAG na Camada de Aplicação
 
@@ -370,13 +404,17 @@ Vantagens: Serviço de busca gerenciado com RRF integrado; escala independenteme
 
 ## Casos de Uso por Tipo de Dado
 
-| Caso de Uso | Tipo de Dado | Tipo de Busca | Meta de Latência |
+| Caso de Uso | Tipo de Dado | Tipo de Busca | Meta de Latência (exemplo) |
 | :--- | :--- | :--- | :--- |
-| Chat de política/FAQ | Documentos | Híbrida (FTS + vector) | < 3 segundos |
-| Advisor de produtos | Catálogo | Vector + filtro estruturado | < 2 segundos |
-| Q&A em documentos | Não estruturado | Vector | < 3 segundos |
-| Resumo de análises | Tabelas estruturadas | Apenas query SQL | < 5 segundos |
-| Histórico de cliente | Estruturado | SQL (match exato em IDs) | < 1 segundo |
+| Chat de política/FAQ | Documentos | Híbrida (FTS + vector) | Defina e meça um SLO |
+| Advisor de produtos | Catálogo | Vector + filtro estruturado | Defina e meça um SLO |
+| Q&A em documentos | Não estruturado | Vector ou híbrida | Defina e meça um SLO |
+| Resumo de análises | Tabelas estruturadas | Apenas query SQL | Defina e meça um SLO |
+| Histórico de cliente | Estruturado | SQL (match exato em IDs) | Defina e meça um SLO |
+
+As metas dependem do tamanho dos dados, modelo, região, concorrência, cache,
+quantidade de candidatos e limites do provedor. Meça separadamente geração de
+embedding, recuperação, montagem do prompt e geração da resposta.
 
 ---
 
@@ -386,9 +424,9 @@ Vantagens: Serviço de busca gerenciado com RRF integrado; escala independenteme
 | :--- | :--- | :--- |
 | LLM dá resposta errada apesar do RAG | Contexto errado recuperado | Melhore a recuperação (hybrid, melhores embeddings, chunking) |
 | LLM "inventa" informação | Contexto não contém a resposta | Adicione "Only answer from the provided context. Say I don't know if not found." |
-| Alta latência end-to-end | Embedding + busca + LLM em sequência | Paralelizar onde possível; use índice ANN; use modelo mais rápido (gpt-4o-mini) |
-| Contexto muito longo para o LLM | Muitos chunks recuperados | Limite a 3–5 chunks mais relevantes; use chunks menores |
-| Respostas inconsistentes | LLM não determinístico | Defina `temperature=0` para Q&A factual |
+| Alta latência end-to-end | Embedding + busca + LLM em sequência | Meça cada etapa; paralelize o que for independente; use ANN somente quando o recall for aceitável |
+| Contexto muito longo para o LLM | Muitos chunks recuperados | Defina um orçamento de tokens e selecione/reranqueie os melhores chunks; valide o tamanho |
+| Respostas inconsistentes | Amostragem, modelo ou contexto variáveis | Fixe versões/deployments quando possível, controle parâmetros e avalie; `temperature=0` não garante determinismo absoluto |
 
 ---
 
@@ -423,9 +461,10 @@ Vantagens: Serviço de busca gerenciado com RRF integrado; escala independenteme
 
 ## Documentação Oficial
 
-- [RAG with Azure SQL](https://learn.microsoft.com/en-us/azure/azure-sql/database/ai-artificial-intelligence-intelligent-applications)
-- [Azure OpenAI RAG Patterns](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/retrieval-augmented-generation)
-- [Fabric SQL AI Features](https://learn.microsoft.com/en-us/fabric/database/sql/ai-embedding-generation)
+- [RAG e índices no Microsoft Foundry](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/retrieval-augmented-generation)
+- [RAG no Azure AI Search](https://learn.microsoft.com/en-us/azure/search/retrieval-augmented-generation-overview)
+- [Avaliadores de RAG no Microsoft Foundry](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/evaluation-evaluators/rag-evaluators)
+- [`sp_invoke_external_rest_endpoint`](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-invoke-external-rest-endpoint-transact-sql?view=sql-server-ver17)
 
 ---
 

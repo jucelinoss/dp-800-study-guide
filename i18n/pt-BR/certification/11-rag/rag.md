@@ -11,7 +11,7 @@ status: complete
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Memória Rápida (Quick Recall)](#memória-rápida-quick-recall)
 > - 📍 [2. Visão Geral dos Tópicos](#visão-geral-dos-tópicos)
 > - 📍 [3. Conteúdo da Seção](#conteúdo-da-seção)
