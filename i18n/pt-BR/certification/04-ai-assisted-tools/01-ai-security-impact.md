@@ -10,23 +10,23 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
-> - 📍 [1. Visão Geral (Overview)](#visao-geral-overview)
-> - 📍 [2. Principais Riscos de Segurança](#principais-riscos-de-seguranca-key-security-risks)
->   - 🔹 [Exposição de Dados & Injeção de Prompt](#exposicao-de-dados-data-exposure)
->   - 🔹 [Problemas de Segurança no Código Gerado](#problemas-de-seguranca-no-codigo-gerado-generated-code-security-issues)
-> - 📍 [3. Proteção & Classificação de Dados](#protecao-de-dados-do-github-copilot-enterprise)
->   - 🔹 [Proteção no GitHub Copilot Enterprise](#protecao-de-dados-do-github-copilot-enterprise)
->   - 🔹 [Configurar Exclusões de Conteúdo (.github/copilot-instructions.md)](#interpretando-o-impacto-de-seguranca-na-pratica)
->   - 🔹 [Princípios de IA Responsável & Purview Information Protection](#principios-de-ia-responsavel-para-desenvolvimento-de-bancos-de-dados)
+>
+> - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
+> - 📍 [2. Principais Riscos de Segurança](#principais-riscos-de-segurança-key-security-risks)
+>   - 🔹 [Exposição de Dados & Injeção de Prompt](#exposição-de-dados-data-exposure)
+>   - 🔹 [Problemas de Segurança no Código Gerado](#problemas-de-segurança-no-código-gerado-generated-code-security-issues)
+> - 📍 [3. Proteção & Classificação de Dados](#proteção-de-dados-do-github-copilot-enterprise)
+>   - 🔹 [Proteção no GitHub Copilot Enterprise](#proteção-de-dados-do-github-copilot-enterprise)
+>   - 🔹 [Configurar Exclusões de Conteúdo (.github/copilot-instructions.md)](#interpretando-o-impacto-de-segurança-na-prática)
+>   - 🔹 [Princípios de IA Responsável & Purview Information Protection](#princípios-de-ia-responsável-para-desenvolvimento-de-bancos-de-dados)
 > - 📍 [4. Logs de Auditoria & Validação de Saídas](#logs-de-auditoria-para-uso-de-ferramentas-de-ia)
 >   - 🔹 [Azure SQL Audit & Tagging de Consultas IA](#logs-de-auditoria-para-uso-de-ferramentas-de-ia)
 >   - 🔹 [Extended Events para Rastreamento On-Prem](#extended-events-para-rastreamento-local-on-prem)
->   - 🔹 [Validação de Saídas & Sandbox Execution](#validacao-de-saidas-de-modelos-model-output-validation-patterns)
+>   - 🔹 [Validação de Saídas & Sandbox Execution](#validação-de-saídas-de-modelos-model-output-validation-patterns)
 > - 📍 [5. Aplicação Prática & Síntese](#casos-de-uso-use-cases)
 >   - 🔹 [Casos de Uso](#casos-de-uso-use-cases)
->   - 🔹 [Problemas Comuns, Práticas & Exam Tips](#problemas-comuns-e-solucoes-common-issues)
->   - 🔹 [Questões de Prática](#questoes-de-pratica-practice-questions)
+>   - 🔹 [Problemas Comuns, Práticas & Exam Tips](#problemas-comuns-e-soluções-common-issues)
+>   - 🔹 [Questões de Prática](#questões-de-prática-practice-questions)
 
 ---
 
@@ -162,7 +162,7 @@ O banco continua sendo o ponto de imposição mesmo que um prompt seja manipulad
 Connection strings, API keys, senhas, tokens de acesso e certificados privados nunca devem aparecer em prompts ou no código versionado. Armazene segredos no Azure Key Vault, use autenticação do Microsoft Entra e identidades gerenciadas quando houver suporte, e faça varredura dos repositórios.
 
 ```text
-Ruim:  Server=tcp:prod.database.windows.net;User ID=admin;Password=P@ssw0rd!;
+Ruim:  Server=tcp:<servidor>.database.windows.net;User ID=<usuario-admin>;Password=<segredo-do-vault>;
 Bom:   Use a conexão ProductionReadOnly fornecida pelo runtime gerenciado.
 ```
 
@@ -482,7 +482,7 @@ Antes de rodar qualquer SQL gerado por IA no seu banco de dados produtivo:
 | :--- | :--- |
 | Consultas parametrizadas | Garantir ausência de concatenação de variáveis de usuários no SQL. |
 | Princípio do menor privilégio | A procedure roda sob login de baixas permissões; sem necessidade de `sysadmin`/`db_owner`. |
-| Validação de objetos dinâmicos | `Garantir que objetos dinâmicos usem uma allowlist restrita ou a função `QUOTENAME()``. |
+| Validação de objetos dinâmicos | Garantir que objetos dinâmicos usem uma allowlist restrita ou a função `QUOTENAME()`. |
 | Ausência de credenciais expostas | Zero senhas, API keys ou connection strings explícitas no código. |
 | Escopo de `EXECUTE AS` | O usuário de personificação possui estritamente o menor privilégio necessário. |
 | Schemabinding ativo | UDFs e Views críticas implementadas com `WITH SCHEMABINDING`. |

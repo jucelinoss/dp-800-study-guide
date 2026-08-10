@@ -11,13 +11,13 @@ status: complete
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
-> - 📍 [1. Memória Rápida (Quick Recall)](#mapa-mental-de-recapitulacao-rapida-quick-recall)
-> - 📍 [2. Visão Geral dos Tópicos](#visao-geral-dos-topicos-topics-overview)
-> - 📍 [3. Conteúdo da Seção](#conteudo-da-secao-section-contents)
+>
+> - 📍 [1. Memória Rápida (Quick Recall)](#mapa-mental-de-recapitulação-rápida-quick-recall)
+> - 📍 [2. Visão Geral dos Tópicos](#visão-geral-dos-tópicos-topics-overview)
+> - 📍 [3. Conteúdo da Seção](#conteúdo-da-seção-section-contents)
 > - 📍 [4. Conceitos Chave](#conceitos-chave-key-concepts)
 > - 📍 [5. Recursos Relacionados](#recursos-relacionados-related-resources)
-> - 📍 [6. Próximos Passos](#proximos-passos-next-steps)
+> - 📍 [6. Próximos Passos](#próximos-passos-next-steps)
 
 ---
 

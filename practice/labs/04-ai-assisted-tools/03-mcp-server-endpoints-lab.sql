@@ -9,6 +9,10 @@
 -- restore the AdventureWorks (OLTP version) database backup available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
+-- SAFETY: This lab changes the selected database by creating and dropping tables,
+-- a database user, and permissions. Run it only in a disposable lab database.
+-- The MCP account below simulates the database side of an endpoint; transport,
+-- tool allowlists, authentication, and the actual MCP client are configured outside SQL.
 -- This script demonstrates security configuration and inspection for MCP Servers (Model Context Protocol):
 --   1. Creation of a dedicated Least-Privilege Account for MCP Servers (`mcp_service_user`)
 --   2. Granting Schema Discovery Permissions (`VIEW DEFINITION` and `SELECT`)
@@ -55,6 +59,12 @@ GO
 -- -- [DP-800 EXAM TIP]
 -- 1. Create a dedicated user for the MCP Server connection
 CREATE USER mcp_service_user WITHOUT LOGIN;
+
+-- In Azure SQL, a production endpoint can use a managed identity instead. Keep this
+-- example commented because the identity must already exist in Microsoft Entra ID:
+-- CREATE USER [my-mcp-managed-identity] FROM EXTERNAL PROVIDER;
+-- GRANT VIEW DEFINITION ON SCHEMA::lab TO [my-mcp-managed-identity];
+-- GRANT SELECT ON OBJECT::lab.PublicCatalog TO [my-mcp-managed-identity];
 
 -- 2. Grant schema definition inspection permission (Catalog read)
 GRANT VIEW DEFINITION ON SCHEMA::lab TO mcp_service_user;
@@ -124,6 +134,15 @@ FROM sys.database_permissions pe
 JOIN sys.database_principals dp ON pe.grantee_principal_id = dp.principal_id
 LEFT JOIN sys.objects o ON pe.major_id = o.object_id
 WHERE dp.name = 'mcp_service_user';
+GO
+
+-- Explicitly verify that the simulated endpoint has no write or DDL permissions.
+SELECT pe.permission_name, pe.state_desc, o.name AS ObjectName
+FROM sys.database_permissions pe
+JOIN sys.database_principals dp ON pe.grantee_principal_id = dp.principal_id
+LEFT JOIN sys.objects o ON pe.major_id = o.object_id
+WHERE dp.name = 'mcp_service_user'
+  AND pe.permission_name IN ('INSERT', 'UPDATE', 'DELETE', 'ALTER', 'CONTROL');
 GO
 
 -- SCENARIO 2: Governance inventory. Capture the identity, scope, operation type,

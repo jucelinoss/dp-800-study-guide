@@ -10,22 +10,22 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
-> - 📍 [1. Visão Geral (Overview)](#visao-geral-overview)
+>
+> - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Habilitando Copilot no Azure Data Studio, VS Code & Fabric](#habilitando-o-github-copilot-enabling-github-copilot)
 >   - 🔹 [Habilitando GitHub Copilot (Individual & Organização)](#para-desenvolvedores-individuais)
 >   - 🔹 [Copilot no Microsoft Fabric](#habilitando-o-copilot-no-microsoft-fabric-enabling-copilot-in-microsoft-fabric)
-> - 📍 [3. Custom Instructions & Configuração de Modelos](#arquivos-de-instrucoes-do-copilot-copilot-instruction-files)
->   - 🔹 [Arquivos `.github/copilot-instructions.md`](#arquivos-de-instrucoes-do-copilot-copilot-instruction-files)
->   - 🔹 [Configurando Modelos & Ferramentas MCP](#configurando-opcoes-de-modelos-no-chat-configuring-model-options-in-chat)
+> - 📍 [3. Custom Instructions & Configuração de Modelos](#arquivos-de-instruções-do-copilot-copilot-instruction-files)
+>   - 🔹 [Arquivos `.github/copilot-instructions.md`](#arquivos-de-instruções-do-copilot-copilot-instruction-files)
+>   - 🔹 [Configurando Modelos & Ferramentas MCP](#configurando-opções-de-modelos-no-chat-configuring-model-options-in-chat)
 > - 📍 [4. Desenvolvimento SQL, Copilot CLI & Validação](#utilizando-o-copilot-para-desenvolvimento-sql)
 >   - 🔹 [Gerando Queries, Explicações & Code Review](#utilizando-o-copilot-para-desenvolvimento-sql)
 >   - 🔹 [Copilot CLI (`gh copilot suggest`) & SQL Database Projects](#copilot-cli-para-projetos-de-banco-de-dados)
 >   - 🔹 [Avaliando SQL Gerado & SQL Dinâmico Seguro](#avaliando-sql-gerado-por-ia-evaluating-ai-generated-sql)
 > - 📍 [5. Aplicação Prática & Síntese](#casos-de-uso-use-cases)
 >   - 🔹 [Casos de Uso](#casos-de-uso-use-cases)
->   - 🔹 [Problemas Comuns, Práticas & Exam Tips](#problemas-comuns-e-solucoes-common-issues)
->   - 🔹 [Questões de Prática](#questoes-de-pratica-practice-questions)
+>   - 🔹 [Problemas Comuns, Práticas & Exam Tips](#problemas-comuns-e-soluções-common-issues)
+>   - 🔹 [Questões de Prática](#questões-de-prática-practice-questions)
 
 ---
 
@@ -348,7 +348,7 @@ EXEC sp_executesql @sql, N'@Name NVARCHAR(100)', @Name = @UserInput;
 | Problema | Causa | Solução |
 | :--- | :--- | :--- |
 | O Copilot não sugere códigos SQL | Extensão correspondente não está instalada ou logada | Instale e faça login no GitHub Copilot e Copilot Chat. |
-| Instruções do projeto ignoradas | Caminho ou formato incorreto do markdown | `Certifique-se de salvar na pasta `.github/copilot-instructions.md` na raiz`. |
+| Instruções do projeto ignoradas | Caminho ou formato incorreto do markdown | Certifique-se de salvar na pasta `.github/copilot-instructions.md` na raiz |
 | Servidor MCP falha na conexão | Erro nas configurações do arquivo de conexões | Revise o arquivo `mcp.json` e as variáveis de ambiente necessárias. |
 | Nomes de colunas alucinados pela IA | Falta de contexto de schemas locais | Descreva o schema no arquivo de instruções ou conecte um servidor MCP. |
 

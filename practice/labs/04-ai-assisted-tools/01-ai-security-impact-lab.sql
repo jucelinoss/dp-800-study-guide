@@ -9,6 +9,10 @@
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
+-- SAFETY: This lab changes the selected database by creating and dropping lab objects,
+-- users, permissions, and a server-level Extended Events session. Run it only in a
+-- disposable lab database. The PII values below are synthetic; never paste real PII
+-- or production credentials into an AI prompt or this script.
 -- This script demonstrates security practices when using AI-assisted tools (Copilot):
 --   1. Discovery and Classification of Sensitive Data (PII) via `sys.sensitivity_classifications`
 --   2. Applying Sensitivity Labels with `ADD SENSITIVITY CLASSIFICATION`
@@ -30,7 +34,11 @@ IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'ai_masked_user')
 IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'ai_rls_user')
     DROP USER ai_rls_user;
 IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'ai_readonly_user')
+BEGIN
+    IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'ai_readonly_role')
+        ALTER ROLE ai_readonly_role DROP MEMBER ai_readonly_user;
     DROP USER ai_readonly_user;
+END;
 IF EXISTS (SELECT * FROM sys.database_principals WHERE name = 'ai_readonly_role')
     DROP ROLE ai_readonly_role;
 IF EXISTS (SELECT 1 FROM sys.security_policies WHERE name = 'CustomerTenantPolicy' AND schema_id = SCHEMA_ID('lab'))
@@ -323,6 +331,11 @@ ADD EVENT sqlserver.sql_batch_completed (
 ADD TARGET package0.ring_buffer (SET max_memory = 4096)
 WITH (STARTUP_STATE = OFF);
 GO
+
+-- Optional cleanup after reviewing the events. Do not run automatically if you want
+-- to inspect the ring buffer from a second session first.
+-- ALTER EVENT SESSION [AuditAIGeneratedSQL] ON SERVER WITH (STATE = STOP);
+-- DROP EVENT SESSION [AuditAIGeneratedSQL] ON SERVER;
 
 
 -- =================================================================================

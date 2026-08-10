@@ -10,24 +10,24 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
-> - 📍 [1. Visão Geral (Overview)](#visao-geral-overview)
-> - 📍 [2. O que é o MCP & Conectando a Endpoints](#o-que-e-o-mcp-what-is-mcp)
->   - 🔹 [Model Context Protocol (MCP)](#o-que-e-o-mcp-what-is-mcp)
+>
+> - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
+> - 📍 [2. O que é o MCP & Conectando a Endpoints](#o-que-é-o-mcp-what-is-mcp)
+>   - 🔹 [Model Context Protocol (MCP)](#o-que-é-o-mcp-what-is-mcp)
 >   - 🔹 [Servidor MCP para SQL Server & Fabric Data Warehouse](#conectando-se-a-endpoints-de-servidores-mcp)
->   - 🔹 [Configurando MCP no Copilot Chat](#configurando-o-mcp-em-uma-sessao-do-copilot-chat)
-> - 📍 [3. Ciclo de Vida, Transporte & Segurança](#exemplos-de-definicoes-de-ferramentas-mcp-tools)
->   - 🔹 [Definições de Tools & Schema](#exemplos-de-definicoes-de-ferramentas-mcp-tools)
+>   - 🔹 [Configurando MCP no Copilot Chat](#configurando-o-mcp-em-uma-sessão-do-copilot-chat)
+> - 📍 [3. Ciclo de Vida, Transporte & Segurança](#exemplos-de-definições-de-ferramentas-mcp-tools)
+>   - 🔹 [Definições de Tools & Schema](#exemplos-de-definições-de-ferramentas-mcp-tools)
 >   - 🔹 [Ciclo de Vida, Transportes & Credenciais](#ciclo-de-vida-do-servidor-mcp-mcp-server-lifecycle)
->   - 🔹 [Segurança: Managed Identity & Menor Privilégio](#seguranca-de-endpoints-mcp)
+>   - 🔹 [Segurança: Managed Identity & Menor Privilégio](#segurança-de-endpoints-mcp)
 > - 📍 [4. Tratamento de Erros & MCP vs REST APIs](#tratamento-de-erros-em-ferramentas-mcp)
 >   - 🔹 [Tratamento de Erros & Mensagens MCP](#tratamento-de-erros-em-ferramentas-mcp)
 >   - 🔹 [MCP vs APIs REST Tradicionais](#mcp-vs-apis-rest-tradicionais-para-acesso-a-dados)
-> - 📍 [5. Aplicação Prática & Síntese](#melhores-praticas-best-practices)
->   - 🔹 [Melhores Práticas](#melhores-praticas-best-practices)
+> - 📍 [5. Aplicação Prática & Síntese](#melhores-práticas-best-practices)
+>   - 🔹 [Melhores Práticas](#melhores-práticas-best-practices)
 >   - 🔹 [Dicas para o Exame](#dicas-para-o-exame-exam-tips)
 >   - 🔹 [Resumo dos Conceitos](#resumo-dos-conceitos-key-takeaways)
->   - 🔹 [Questões de Prática](#questoes-de-pratica-practice-questions)
+>   - 🔹 [Questões de Prática](#questões-de-prática-practice-questions)
 
 ---
 
@@ -267,7 +267,7 @@ Os servidores MCP devem estruturar as falhas em formatos JSON legíveis de erro,
 | Erro | Causa provável | Mitigação recomendada |
 | :--- | :--- | :--- |
 | `CONNECTION_TIMEOUT` | Regras de firewall bloqueando acesso lúdico ou lentidão na nuvem | Verifique regras de IP no Azure; tente executar novamente. |
-| `PERMISSION_DENIED` | Conta de serviço não possui os grants mínimos necessários | `Conceder privilégios de `SELECT` ou `VIEW DEFINITION` no banco`. |
+| `PERMISSION_DENIED` | Conta de serviço não possui os grants mínimos necessários | Conceder privilégios de `SELECT` ou `VIEW DEFINITION` no banco |
 | `INVALID_TOOL_INPUT` | Parâmetros informados pela IA violam a validação de JSON Schema | Revise o manifesto da ferramenta e as lógicas declaradas. |
 | `AUTH_FAILURE` | Tokens de segurança expirados ou connection string incorreta | Atualize os parâmetros seguidos em variáveis de ambiente. |
 
