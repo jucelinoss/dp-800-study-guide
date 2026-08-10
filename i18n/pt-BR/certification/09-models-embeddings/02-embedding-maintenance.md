@@ -9,7 +9,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
 > - 📍 [2. Comparação dos Métodos de Manutenção de Embeddings](#comparação-dos-métodos-de-manutenção-de-embeddings)
 > - 📍 [3. Método 1: Table Triggers](#método-1-table-triggers)
@@ -21,7 +21,7 @@ tags:
 > - 📍 [9. Nota sobre Microsoft Foundry](#nota-sobre-microsoft-foundry)
 >   - 🔹 [Arquitetura](#arquitetura)
 >   - 🔹 [Quando Escolher Foundry](#quando-escolher-foundry)
->   - 🔹 [Foundry vs CES — A Comparação Canônica](#foundry-vs-ces-a-comparação-canônica)
+>   - 🔹 [Foundry vs CES — A Comparação Canônica](#método-5-ces-change-event-streaming)
 > - 📍 [10. Escolhendo uma Abordagem](#escolhendo-uma-abordagem)
 > - 📍 [11. Casos de Uso](#casos-de-uso)
 > - 📍 [12. Problemas Comuns e Erros](#problemas-comuns-e-erros)
@@ -69,7 +69,7 @@ O ciclo de vida confiável é: detectar inserções, atualizações e exclusões
 | Table Triggers | Quase real-time | Baixa | Nenhuma (in-DB) | Tabelas pequenas, baixo volume de escrita |
 | Change Tracking | Baixa (polling) | Média | SQL Agent ou scheduler | Volume moderado, amigável a lotes |
 | CDC | Média (polling) | Média | SQL Agent (on-prem) | Audit trail necessário com embeddings |
-| CES | Quase real-time | Média | Azure Event Hubs / Eventstream | SQL Server 2025 ou Azure SQL Database (visualização) |
+| CES | Quase real-time | Média | Azure Event Hubs / Eventstream | SQL Server 2025, Azure SQL Database ou Azure SQL Managed Instance (visualização) |
 | Azure Functions SQL Trigger | Quase real-time | Média | Azure Functions + Change Tracking | Processamento desacoplado por polling |
 | Azure Logic Apps | Minutos | Baixa | Logic Apps | Low-code, baixo volume |
 
@@ -252,7 +252,7 @@ public static async Task Run(
 
 ## Método 5: CES (Change Event Streaming)
 
-CES é um recurso em visualização de SQL Server 2025 e Azure SQL Database. Ele envia eventos de alteração para Azure Event Hubs e pode alimentar um Eventstream do Fabric, que então aciona um Pipeline ou Notebook para regenerar embeddings.
+CES é um recurso em visualização do SQL Server 2025, Azure SQL Database e Azure SQL Managed Instance. Ele envia eventos de alteração para Azure Event Hubs e pode alimentar um Eventstream do Fabric, que então aciona um Pipeline ou Notebook para regenerar embeddings.
 
 ```text
 Fabric SQL DB (tabela Products)
@@ -328,7 +328,7 @@ END;
 
 O Microsoft Foundry pode compor soluções de IA, mas não deve ser tratado neste material como um mecanismo nativo e declarativo de manutenção de embeddings com leitura e escrita automática em qualquer banco SQL. Defina a orquestração, a autenticação, o destino e a estratégia de atualização conforme os serviços efetivamente adotados.
 
-Ele aparece no blueprint de 2026-03-12 como um dos métodos de manutenção de embeddings nomeados, então espere ao menos uma questão do DP-800 que peça para você **escolher entre Foundry, CES, CDC e triggers** para um cenário dado.
+Trate-o como uma opção arquitetural a ser comparada com Change Tracking, CDC, CES e triggers; confirme as habilidades medidas atuais do DP-800 e a documentação atual do Foundry antes de depender de um recurso específico.
 
 ### Arquitetura
 
@@ -377,16 +377,16 @@ Evite Foundry quando:
 
 | Aspecto | Microsoft Foundry | CES (Change Event Streaming) |
 | :--- | :--- | :--- |
-| **Plataforma de origem** | SQL Server, Azure SQL DB, SQL DB in Fabric, on-prem (com SHIR) | SQL Server 2025 ou Azure SQL Database (visualização) |
-| **Código necessário** | Nenhum (pipeline declarativo) | Código de Notebook (Python) ou atividades de Pipeline |
+| **Plataforma de origem** | Depende do conector Foundry e do runtime de integração escolhidos | SQL Server 2025, Azure SQL Database ou Azure SQL Managed Instance (visualização) |
+| **Código necessário** | Depende dos componentes do pipeline escolhidos | Código de Notebook (Python) ou atividades de Pipeline |
 | **Trigger** | Schedule / event-driven / on-demand | Event-driven (push do CES) |
 | **Latência** | Segundos a minutos (dependendo do trigger) | Quase real-time (baseado em push) |
-| **Lógica de embedding** | Step `Embed` integrado | Você escreve no Notebook |
+| **Lógica de embedding** | Depende do modelo/componente de pipeline escolhido | Você escreve no Notebook ou no pipeline |
 | **Monitoramento** | Histórico de execuções do Foundry (centralizado) | Eventstream + histórico de jobs do Notebook (separado) |
 | **Melhor para** | Projetos de IA multi-workflow, refresh em lote + schedule, times sem código | Streaming para Event Hubs/Eventstream com consumidor downstream |
 
 > [!warning] Erro Comum
-> "Microsoft Foundry **requer** o Fabric" — falso. O Foundry conecta ao Azure SQL Database e SQL Server on-prem (via Self-Hosted Integration Runtime) também. CES é um recurso de visualização separado para SQL Server 2025 e Azure SQL Database; o Eventstream do Fabric pode ser um de seus consumidores.
+> "Microsoft Foundry **requer** Fabric" é uma suposição insegura. Verifique o suporte a conectores e runtimes de integração do serviço Foundry escolhido. CES é um recurso de visualização separado para SQL Server 2025, Azure SQL Database e Azure SQL Managed Instance; o Eventstream do Fabric pode ser um de seus consumidores.
 
 > [!note] Modelo Mental — Foundry vs os Outros
 > **Foundry é a opção de "cartão de crédito"** — você paga (em custo de serviço + lock-in) pela ergonomia. **CES é o "pagamento por tap"** — caminho de visualização baseado em push por Event Hubs ou Eventstream. **CDC/Change Tracking são "transferências bancárias"** — funcionam em qualquer lugar mas você escreve o plumbing. **Triggers são "dinheiro vivo"** — imediatos, mas adicionam latência à escrita.
@@ -425,7 +425,7 @@ flowchart TD
 | Trigger causa timeouts em bulk loads | Trigger dispara por linha para grandes importações | Desabilite o trigger durante bulk load; use re-embedding em lote depois |
 | Versão mínima do Change Tracking excedida | Versão de sync mais antiga que o período de retenção | Faça um re-embedding completo de todas as linhas; reset do watermark |
 | Embedding drift não detectado | Texto de origem atualizado sem regenerar embedding | Adicione coluna `EmbeddingGeneratedAt` e compare com `UpdatedAt` |
-| Azure Functions não dispara | Change Tracking não habilitado na tabela | O binding do SQL trigger habilita o CT automaticamente; verifique a permissão `db_owner` |
+| Azure Functions não dispara | Change Tracking não habilitado ou retenção curta demais | Habilite Change Tracking no banco e na tabela, configure a retenção e conceda as permissões documentadas do trigger |
 
 ---
 
@@ -436,7 +436,7 @@ flowchart TD
 > - **Triggers**: Mais simples, mas síncronos — adiciona latência da API de IA a cada escrita; arriscado se o endpoint cair
 > - **Change Tracking**: Melhor para cenários em lote — desacopla embedding do caminho de escrita
 > - **Azure Functions SQL trigger**: usa Change Tracking e consulta mudanças por polling; desacopla o processamento, mas não é push
-> - **CES**: streaming baseado em push, em visualização, de SQL Server 2025 ou Azure SQL Database para Event Hubs/Eventstream
+> - **CES**: streaming baseado em push, em visualização, de SQL Server 2025, Azure SQL Database ou Azure SQL Managed Instance para Azure Event Hubs; Eventstream é opcional
 > - Mantenha sempre um watermark (versão ou timestamp) para saber quais linhas foram embeddadas
 
 ---
@@ -462,7 +462,7 @@ flowchart TD
 
 - [Azure Functions SQL Trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-azure-sql-trigger)
 - [Change Tracking](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-tracking-sql-server)
-- [Fabric Change Event Streaming](https://learn.microsoft.com/en-us/fabric/database/sql/change-event-streaming)
+- [Change Event Streaming](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/change-event-streaming/overview)
 
 ---
 

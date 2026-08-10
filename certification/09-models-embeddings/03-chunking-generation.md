@@ -76,7 +76,9 @@ JOIN dbo.Categories c ON p.CategoryId = c.CategoryId;
 
 ## Chunking Strategies
 
-Embedding models have a maximum input token limit (e.g., 8191 tokens for `text-embedding-3-small`). Documents longer than this must be split into chunks.
+Embedding limits are provider- and model-specific; do not assume one token limit for every embedding model. Check the deployed model's documentation and leave headroom for the request. `AI_GENERATE_CHUNKS` measures `CHUNK_SIZE` in characters, not tokens, so validate the resulting chunks against the model's token limit before generating embeddings.
+
+`AI_GENERATE_CHUNKS` is a table-valued function available in SQL Server 2025, Azure SQL Database, Azure SQL Managed Instance with the Always-up-to-date policy, and SQL database in Microsoft Fabric. It requires database compatibility level 170 or higher. Its native `CHUNK_TYPE` currently supports `FIXED`; sentence-, paragraph-, and semantic-based strategies in this document are application/T-SQL implementations, not additional values for `CHUNK_TYPE`.
 
 ### Fixed-Size Chunking
 
@@ -254,7 +256,7 @@ WHERE dc.Embedding IS NULL;
 
 ### Generating Embeddings via sp_invoke_external_rest_endpoint
 
-For environments without external model support, call Azure OpenAI directly:
+For environments without an external model definition, call a compatible embeddings endpoint directly:
 
 ```sql
 -- Generate embedding for a single chunk via REST
@@ -269,7 +271,7 @@ EXEC sp_invoke_external_rest_endpoint
     @method  = 'POST',
     @headers = '{"Content-Type":"application/json"}',
     @payload = @payload,
-    @credential = [https://myopenai.openai.azure.com/],
+    @credential = [MyAzureOpenAICredential],
     @response = @response OUTPUT;
 
 -- Extract the embedding array from the JSON response
@@ -287,7 +289,7 @@ WHERE ChunkId = 1;
 For efficiency, batch multiple texts in a single API call:
 
 ```sql
--- Batch embedding: send up to 2048 texts in one request
+-- Batch embedding: choose a batch size supported by the provider and deployment
 DECLARE @batch_size INT = 100;
 
 -- Build input array for batch
@@ -307,7 +309,7 @@ EXEC sp_invoke_external_rest_endpoint
     @method  = 'POST',
     @headers = '{"Content-Type":"application/json"}',
     @payload = @payload,
-    @credential = [https://myopenai.openai.azure.com/],
+    @credential = [MyAzureOpenAICredential],
     @response = @response OUTPUT;
 
 -- Parse the batch response and update the table
@@ -317,7 +319,7 @@ EXEC sp_invoke_external_rest_endpoint
 
 ### Token Estimation
 
-Before calling the API, estimate token counts to avoid exceeding the 8191-token limit:
+Before calling the API, estimate token counts to avoid exceeding the limit documented for the selected model:
 
 ```sql
 -- Rough token estimate: ~4 characters per token for English text
@@ -325,10 +327,10 @@ UPDATE dbo.DocumentChunks
 SET TokenCount = LEN(ChunkText) / 4
 WHERE TokenCount IS NULL;
 
--- Flag chunks that may be too long
+-- Flag chunks that may be too long; 7500 is an example threshold, not a universal limit
 SELECT ChunkId, DocumentId, ChunkNumber, LEN(ChunkText) AS CharCount, TokenCount
 FROM dbo.DocumentChunks
-WHERE TokenCount > 7500;  -- Leave headroom below the 8191-token limit
+WHERE TokenCount > 7500;  -- Adjust to the selected model's documented limit
 ```
 
 ---
@@ -349,8 +351,31 @@ WHERE TokenCount > 7500;  -- Leave headroom below the 8191-token limit
 | `Token limit exceeded` | Chunk text too long | Reduce chunk size; add token estimation check before embedding |
 | Embeddings are `NULL` after update | AI_GENERATE_EMBEDDINGS error silently swallowed | Test AI_GENERATE_EMBEDDINGS on a single row first; check error logs |
 | Poor retrieval quality | Chunks too large or split mid-sentence | Use smaller chunks with overlap, or sentence-based splitting |
-| Very slow batch embedding | One API call per row | Use batch REST calls or PREDICT in a set-based UPDATE |
-| Storage bloat | 1536 floats × 4 bytes × millions of rows | Use `text-embedding-3-small` (same dims as ada-002 but better quality); consider VECTOR compression |
+| Very slow batch embedding | One API call per row | Use a set-based `AI_GENERATE_EMBEDDINGS` update or provider-supported batch REST calls |
+| Storage bloat | 1536 floats × 4 bytes × millions of rows | Choose dimensions based on measured quality; SQL Server 2025 also supports `float16` vectors as a preview feature |
+
+### What the `float16` preview feature means
+
+By default, `VECTOR(n)` stores each component as a 32-bit floating-point value (`float32`), so `VECTOR(1536)` requires approximately 1536 × 4 = 6,144 bytes (about 6 KB) for the vector payload of one row. SQL Server 2025 also supports the optional half-precision base type, `VECTOR(1536, float16)`: each component uses 16 bits (2 bytes), reducing the vector payload to approximately 3 KB. Across one million rows, that is roughly 6 GB with `float32` versus 3 GB with `float16`, before row, index, and transaction-log overhead.
+
+> [!note] Precision, quantization, and dimensions are different concepts
+>
+> Changing `float32` to `float16` reduces the precision and storage size of each component, but keeps the same number of dimensions. This is not the same as conventional vector quantization, such as converting values to `int8`, binary codes, or product-quantization codes. It is also not dimensionality reduction, which changes the number of components—for example, from 1,536 to 768. In short: `VECTOR(1536)` defines how many dimensions exist; `float32`/`float16` defines how each dimension is represented.
+
+This is a preview feature, not a separate embedding model. Enable it at database scope only in an environment where you are testing it:
+
+```sql
+ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
+GO
+
+CREATE TABLE dbo.DocumentEmbeddingsFloat16
+(
+    DocumentId INT PRIMARY KEY,
+    Embedding VECTOR(1536, float16) NULL
+);
+```
+
+The trade-off is precision: `float16` represents numbers less precisely than `float32`. It can be useful for approximate semantic search when storage and memory matter, but measure recall and ranking quality with representative queries before adopting it. Keep the same base type and dimensions for the vectors used in a distance calculation; mixed `float32`/`float16` vector operations and implicit conversion between those base types are not supported in the current preview. The preview may also require changes before production use, so do not treat it as a stable production contract without validating the target SQL Server version and update level.
 
 ---
 
@@ -358,7 +383,7 @@ WHERE TokenCount > 7500;  -- Leave headroom below the 8191-token limit
 
 > [!tip] Exam Tips
 >
-> - Embedding models have a **token limit** — chunk text before embedding; ~4 chars per token for English
+> - Embedding models have a **provider-specific token limit** — chunk text before embedding and validate token counts
 > - **Overlapping chunks** improve recall at chunk boundaries — use when retrieval quality matters more than cost
 > - `VECTOR(1536)` stores 1536 floats × 4 bytes = 6KB per row — plan storage accordingly
 > - Always store the `ChunkText` alongside the embedding — it's needed to assemble the context for the LLM
@@ -387,7 +412,10 @@ WHERE TokenCount > 7500;  -- Leave headroom below the 8191-token limit
 ## Official Documentation
 
 - [VECTOR Data Type](https://learn.microsoft.com/en-us/sql/t-sql/data-types/vector-data-type)
-- [PREDICT Function](https://learn.microsoft.com/en-us/sql/t-sql/queries/predict-transact-sql)
+- [AI_GENERATE_CHUNKS](https://learn.microsoft.com/en-us/sql/t-sql/functions/ai-generate-chunks-transact-sql)
+- [AI_GENERATE_EMBEDDINGS](https://learn.microsoft.com/en-us/sql/t-sql/functions/ai-generate-embeddings-transact-sql)
+- [Vector Search and Vector Indexes](https://learn.microsoft.com/en-us/sql/sql-server/ai/vectors)
+- [sp_invoke_external_rest_endpoint](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-invoke-external-rest-endpoint-transact-sql)
 - [Azure OpenAI Embeddings](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/embeddings)
 
 ---

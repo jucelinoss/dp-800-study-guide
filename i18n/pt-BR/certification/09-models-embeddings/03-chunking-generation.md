@@ -9,9 +9,9 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
-> - 📍 [2. Identificando Quais Colunas Embeder](#identificando-quais-colunas-embeder)
+> - 📍 [2. Identificando Quais Colunas Embedar](#identificando-quais-colunas-embedar)
 >   - 🔹 [Combinando Múltiplas Colunas](#combinando-múltiplas-colunas)
 > - 📍 [3. Estratégias de Chunking](#estratégias-de-chunking)
 >   - 🔹 [Chunking de Tamanho Fixo](#chunking-de-tamanho-fixo)
@@ -21,7 +21,7 @@ tags:
 > - 📍 [4. Gerando Embeddings](#gerando-embeddings)
 >   - 🔹 [Estrutura da Tabela para Documentos Chunkados](#estrutura-da-tabela-para-documentos-chunkados)
 >   - 🔹 [Gerando Embeddings via External Model](#gerando-embeddings-via-external-model)
->   - 🔹 [Gerando Embeddings via sp_invoke_external_rest_endpoint](#gerando-embeddings-via-sp-invoke-external-rest-endpoint)
+>   - 🔹 [Gerando Embeddings via sp_invoke_external_rest_endpoint](#gerando-embeddings)
 >   - 🔹 [Embedding em Lote com JSON Batching](#embedding-em-lote-com-json-batching)
 >   - 🔹 [Estimativa de Tokens](#estimativa-de-tokens)
 > - 📍 [5. Casos de Uso](#casos-de-uso)
@@ -37,7 +37,7 @@ tags:
 
 ## Visão Geral
 
-Antes de gerar embeddings, você deve decidir quais colunas embeder e como preparar o texto. Para documentos longos, você também deve dividir o texto em segmentos que caibam no limite de tokens do modelo. A **estratégia de chunking** afeta significativamente a qualidade da recuperação. Após o chunking, os embeddings são gerados via chamada de external model e armazenados em uma coluna vetorial.
+Antes de gerar embeddings, você deve decidir quais colunas embedar e como preparar o texto. Para documentos longos, você também deve dividir o texto em segmentos que caibam no limite de tokens do modelo. A **estratégia de chunking** afeta significativamente a qualidade da recuperação. Após o chunking, os embeddings são gerados via chamada de external model e armazenados em uma coluna vetorial.
 
 > [!abstract]
 >
@@ -61,11 +61,11 @@ Chunking existe porque documentos longos podem ultrapassar o limite de tokens do
 
 Avalie a estratégia com perguntas reais: a resposta esperada aparece entre os primeiros resultados? O trecho tem contexto suficiente? A divisão cortou uma ideia importante? Antes de trocar de modelo, revise o texto selecionado, os limites dos chunks, o overlap e os filtros de metadados — esses fatores frequentemente explicam mais a qualidade da recuperação do que aumentar a dimensão do vetor.
 
-## Identificando Quais Colunas Embeder
+## Identificando Quais Colunas Embedar
 
 Nem toda coluna precisa de embedding. Escolha colunas onde a busca semântica agregaria valor:
 
-| Tipo de Coluna | Embeder? | Razão |
+| Tipo de Coluna | Embedar? | Razão |
 | :--- | :--- | :--- |
 | Descrição em texto livre | Sim | Linguagem natural, alto conteúdo semântico |
 | Avaliação / feedback de clientes | Sim | Linguagem variada, busca baseada em intenção |
@@ -77,7 +77,7 @@ Nem toda coluna precisa de embedding. Escolha colunas onde a busca semântica ag
 
 ### Combinando Múltiplas Colunas
 
-Quando múltiplas colunas contribuem para o significado semântico, concatene-as antes de embeder:
+Quando múltiplas colunas contribuem para o significado semântico, concatene-as antes de Embedar:
 
 ```sql
 -- Criar uma representação textual que combina campos relevantes
@@ -101,7 +101,9 @@ JOIN dbo.Categories c ON p.CategoryId = c.CategoryId;
 
 ## Estratégias de Chunking
 
-Modelos de embedding têm um limite máximo de tokens de entrada (ex: 8191 tokens para `text-embedding-3-small`). Documentos mais longos que isso devem ser divididos em chunks.
+Os limites de embedding são específicos do provedor e do modelo; não presuma um único limite de tokens para todos os modelos. Consulte a documentação do modelo implantado e deixe margem no request. `AI_GENERATE_CHUNKS` mede `CHUNK_SIZE` em caracteres, não em tokens; portanto, valide os chunks gerados contra o limite de tokens do modelo antes de gerar os embeddings.
+
+`AI_GENERATE_CHUNKS` é uma função com valor de tabela disponível no SQL Server 2025, Azure SQL Database, Azure SQL Managed Instance com a política Always-up-to-date e SQL database no Microsoft Fabric. Ela exige nível de compatibilidade 170 ou superior. O `CHUNK_TYPE` nativo atualmente aceita `FIXED`; as estratégias por sentença, parágrafo e semântica deste documento são implementações em T-SQL/aplicação, não valores adicionais de `CHUNK_TYPE`.
 
 ### Chunking de Tamanho Fixo
 
@@ -287,7 +289,7 @@ WHERE dc.Embedding IS NULL;
 
 ### Gerando Embeddings via sp_invoke_external_rest_endpoint
 
-Para ambientes sem suporte a external model, chame o Azure OpenAI diretamente:
+Para ambientes sem uma definição de external model, chame diretamente um endpoint de embeddings compatível:
 
 ```sql
 -- Gerar embedding para um único chunk via REST
@@ -302,7 +304,7 @@ EXEC sp_invoke_external_rest_endpoint
     @method  = 'POST',
     @headers = '{"Content-Type":"application/json"}',
     @payload = @payload,
-    @credential = [https://myopenai.openai.azure.com/],
+    @credential = [MinhaCredencialAzureOpenAI],
     @response = @response OUTPUT;
 
 -- Extrair o array de embedding da resposta JSON
@@ -320,7 +322,7 @@ WHERE ChunkId = 1;
 Para eficiência, agrupe múltiplos textos em uma única chamada de API:
 
 ```sql
--- Embedding em lote: enviar até 2048 textos em uma requisição
+-- Embedding em lote: escolha um tamanho suportado pelo provedor e deployment
 DECLARE @batch_size INT = 100;
 
 -- Construir array de input para o lote
@@ -340,7 +342,7 @@ EXEC sp_invoke_external_rest_endpoint
     @method  = 'POST',
     @headers = '{"Content-Type":"application/json"}',
     @payload = @payload,
-    @credential = [https://myopenai.openai.azure.com/],
+    @credential = [MinhaCredencialAzureOpenAI],
     @response = @response OUTPUT;
 
 -- Parsear a resposta do lote e atualizar a tabela
@@ -350,7 +352,7 @@ EXEC sp_invoke_external_rest_endpoint
 
 ### Estimativa de Tokens
 
-Antes de chamar a API, estime as contagens de tokens para evitar exceder o limite de 8191 tokens:
+Antes de chamar a API, estime as contagens de tokens para evitar exceder o limite documentado para o modelo selecionado:
 
 ```sql
 -- Estimativa grosseira de tokens: ~4 caracteres por token para texto em inglês
@@ -358,10 +360,10 @@ UPDATE dbo.DocumentChunks
 SET TokenCount = LEN(ChunkText) / 4
 WHERE TokenCount IS NULL;
 
--- Sinalizar chunks que podem ser muito longos
+-- Sinalizar chunks que podem ser muito longos; 7500 é apenas um exemplo
 SELECT ChunkId, DocumentId, ChunkNumber, LEN(ChunkText) AS CharCount, TokenCount
 FROM dbo.DocumentChunks
-WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
+WHERE TokenCount > 7500;  -- Ajustar ao limite documentado do modelo selecionado
 ```
 
 > [!caution] Limite de Tokens do Modelo
@@ -384,10 +386,33 @@ WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
 | Problema | Causa | Correção |
 | :--- | :--- | :--- |
 | `Token limit exceeded` | Texto do chunk muito longo | Reduza o tamanho do chunk; adicione verificação de estimativa de tokens antes do embedding |
-| Embeddings são `NULL` após update | Erro do PREDICT silenciosamente suprimido | Teste PREDICT em uma única linha primeiro; verifique os logs de erro |
+| Embeddings são `NULL` após update | Erro na chamada de `AI_GENERATE_EMBEDDINGS` | Teste a função em uma única linha primeiro; verifique o endpoint, permissões e logs |
 | Má qualidade de recuperação | Chunks muito grandes ou divididos no meio de uma frase | Use chunks menores com overlap, ou divisão baseada em sentenças |
-| Embedding em lote muito lento | Uma chamada de API por linha | Use chamadas REST em lote ou PREDICT em UPDATE baseado em conjunto |
-| Inchaço de armazenamento | 1536 floats × 4 bytes × milhões de linhas | Use `text-embedding-3-small` (mesmas dims que ada-002 mas melhor qualidade); considere compressão de VECTOR |
+| Embedding em lote muito lento | Uma chamada de API por linha | Use um UPDATE baseado em conjunto com `AI_GENERATE_EMBEDDINGS` ou chamadas REST em lote suportadas pelo provedor |
+| Inchaço de armazenamento | 1536 floats × 4 bytes × milhões de linhas | Escolha dimensões com base na qualidade medida; o SQL Server 2025 também oferece vetores `float16` como recurso de visualização |
+
+### O que significa o recurso de visualização `float16`
+
+Por padrão, `VECTOR(n)` armazena cada componente como um número de ponto flutuante de 32 bits (`float32`); por isso, `VECTOR(1536)` precisa de aproximadamente 1536 × 4 = 6.144 bytes (cerca de 6 KB) para o payload do vetor de uma linha. O SQL Server 2025 também oferece o tipo base opcional de meia precisão, `VECTOR(1536, float16)`: cada componente usa 16 bits (2 bytes), reduzindo o payload do vetor para aproximadamente 3 KB. Em um milhão de linhas, isso representa cerca de 6 GB com `float32` contra 3 GB com `float16`, antes do overhead da linha, dos índices e do log de transações.
+
+> [!note] Precisão, quantização e dimensões são conceitos diferentes
+>
+> Trocar `float32` por `float16` reduz a precisão e o armazenamento de cada componente, mas mantém a mesma quantidade de dimensões. Isso não é o mesmo que a quantização vetorial tradicional, como converter os valores para `int8`, códigos binários ou códigos de Product Quantization. Também não é redução dimensional, que altera a quantidade de componentes — por exemplo, de 1.536 para 768. Em resumo: `VECTOR(1536)` define quantas dimensões existem; `float32`/`float16` define como cada dimensão é representada.
+
+Esse é um recurso de visualização, não um modelo de embeddings diferente. Habilite-o no escopo do banco somente em um ambiente em que você esteja fazendo testes:
+
+```sql
+ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
+GO
+
+CREATE TABLE dbo.DocumentEmbeddingsFloat16
+(
+    DocumentId INT PRIMARY KEY,
+    Embedding VECTOR(1536, float16) NULL
+);
+```
+
+A troca é a precisão: `float16` representa os números com menos precisão que `float32`. Ele pode ser útil para busca semântica aproximada quando armazenamento e memória são importantes, mas meça o recall e a qualidade do ranking com consultas representativas antes de adotá-lo. Mantenha o mesmo tipo base e as mesmas dimensões nos vetores usados em um cálculo de distância; operações que misturam vetores `float32`/`float16` e conversão implícita entre esses tipos base não são suportadas na visualização atual. A visualização ainda pode sofrer alterações antes do uso em produção; portanto, valide a versão e o nível de atualização do SQL Server de destino e não trate o recurso como um contrato estável sem essa validação.
 
 ---
 
@@ -395,7 +420,7 @@ WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
 
 > [!tip] Dicas para o Exame
 >
-> - Modelos de embedding têm um **limite de tokens** — divida o texto em chunks antes do embedding; ~4 chars por token para inglês
+> - Modelos de embedding têm um **limite de tokens específico do provedor** — divida o texto em chunks e valide a quantidade de tokens
 > - **Chunks com overlap** melhoram o recall nas fronteiras — use quando a qualidade de recuperação importa mais que o custo
 > - `VECTOR(1536)` armazena 1536 floats × 4 bytes = 6KB por linha — planeje o armazenamento adequadamente
 > - Sempre armazene o `ChunkText` junto ao embedding — é necessário para montar o contexto para o LLM
@@ -405,10 +430,10 @@ WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
 
 ## Principais Conclusões
 
-- Escolha colunas para embeder com base no valor de busca semântica — textos livres, descrições, avaliações são bons candidatos
+- Escolha colunas para Embedar com base no valor de busca semântica — textos livres, descrições, avaliações são bons candidatos
 - Divida documentos longos em chunks antes do embedding — tamanho fixo com overlap é um padrão seguro
 - Armazene chunks em uma tabela separada com colunas `ChunkText`, `DocumentId`, `ChunkNumber` e `Embedding`
-- Gere embeddings com `PREDICT` (external model) ou `sp_invoke_external_rest_endpoint` (chamada REST)
+- Gere embeddings com `AI_GENERATE_EMBEDDINGS` (external model) ou `sp_invoke_external_rest_endpoint` (chamada REST)
 
 ---
 
@@ -424,7 +449,10 @@ WHERE TokenCount > 7500;  -- Deixe margem abaixo do limite de 8191
 ## Documentação Oficial
 
 - [VECTOR Data Type](https://learn.microsoft.com/en-us/sql/t-sql/data-types/vector-data-type)
-- [PREDICT Function](https://learn.microsoft.com/en-us/sql/t-sql/queries/predict-transact-sql)
+- [AI_GENERATE_CHUNKS](https://learn.microsoft.com/en-us/sql/t-sql/functions/ai-generate-chunks-transact-sql)
+- [AI_GENERATE_EMBEDDINGS](https://learn.microsoft.com/en-us/sql/t-sql/functions/ai-generate-embeddings-transact-sql)
+- [Vector Search and Vector Indexes](https://learn.microsoft.com/en-us/sql/sql-server/ai/vectors)
+- [sp_invoke_external_rest_endpoint](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-invoke-external-rest-endpoint-transact-sql)
 - [Azure OpenAI Embeddings](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/embeddings)
 
 ---

@@ -6,6 +6,9 @@
 -- to restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
+-- SAFETY: Run only in a disposable lab database. This script creates/drops lab
+-- objects and uses synthetic document text. Configure an external model and test
+-- credential before enabling any external request.
 -- This script demonstrates preparing large documents for semantic search (RAG):
 --   1. Structuring the Documents Table and DocumentChunks
 --   2. Fixed-Size Chunking with Overlap (Overlapping Chunking via Recursive CTE)
@@ -57,7 +60,7 @@ GO
 -- PART 1: OVERLAPPING CHUNKING STRATEGY
 -- =================================================================================
 -- KEY CONCEPTS AND DEFINITIONS:
---   - CHUNKING: Split large documents to avoid exceeding the model input limit (8191 tokens for text-embedding-3-small).
+--   - CHUNKING: Split large documents to avoid exceeding the model input limit (8192 tokens per input).
 --   - OVERLAP: Keeps the last N words/characters at the start of the next chunk to preserve context.
 
 -- -- [DP-800 KEY POINT]
@@ -195,7 +198,7 @@ EXEC sp_invoke_external_rest_endpoint
 */
 GO
 
--- Verify chunks that are close to the 8191-token input limit.
+-- Verify chunks that are close to the 8192-token per-input limit.
 SELECT ChunkID, EstimatedTokens, ChunkText
 FROM lab.DocumentChunks
 WHERE EstimatedTokens > 7500;

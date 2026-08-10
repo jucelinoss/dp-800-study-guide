@@ -6,6 +6,9 @@
 -- restore the AdventureWorks database backup (OLTP version) available at:
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
+-- SAFETY: Run only in a disposable lab database. The script drops/recreates the lab
+-- table and trigger and uses synthetic product data. External API calls remain
+-- commented until a test external model is configured.
 -- This script demonstrates preventive maintenance and embedding vector update patterns:
 --   1. Dirty Tracking Pattern (`IsEmbeddingStale BIT`) to identify stale vectors
 --   2. Change Tracking, CDC, and event-driven integration options

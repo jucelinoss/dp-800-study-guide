@@ -23,6 +23,9 @@
 --   - VECTOR Data Type:
 --     https://learn.microsoft.com/en-us/sql/t-sql/data-types/vector-data-type
 -- =================================================================================
+-- SEGURANÇA: Execute somente em um banco descartável. Este script cria/remove
+-- metadados de external model, credencial com escopo no banco e tabelas de lab.
+-- Substitua segredo e endpoint por valores de teste; nunca use uma chave de produção.
 -- REFERÊNCIA TEÓRICA: ../../../certification/09-models-embeddings/01-external-models.md
 --    Abra o guia teórico junto com este laboratório para contexto conceitual.
 -- =================================================================================
@@ -38,7 +41,8 @@ DROP PROCEDURE IF EXISTS lab.usp_EmbedAdventureWorksProducts;
 DROP TABLE IF EXISTS lab.EmbeddedProducts;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 IF EXISTS (SELECT * FROM sys.external_models WHERE name = N'AzureOpenAI_Embedding3Small')
@@ -47,8 +51,8 @@ IF EXISTS (SELECT * FROM sys.external_models WHERE name = N'AzureOpenAI_Embeddin
 IF EXISTS (SELECT * FROM sys.external_models WHERE name = N'AzureOpenAI_Embedding3Large')
     DROP EXTERNAL MODEL [AzureOpenAI_Embedding3Large];
 
-IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = N'AzureOpenAIApiCred')
-    DROP DATABASE SCOPED CREDENTIAL [AzureOpenAIApiCred];
+IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = N'https://SEURECURSO.openai.azure.com/')
+    DROP DATABASE SCOPED CREDENTIAL [https://SEURECURSO.openai.azure.com/];
 GO
 
 PRINT '=========================================================';
@@ -102,35 +106,35 @@ GO
 SELECT
     N'Multimodal'                 AS DimensaoDeCapacidade,
     N'Processa imagens/audios/videos alem de texto'  AS Consideracoes,
-    N'GPT-4o, GPT-4o Vision (OCR em foto de etiqueta)' AS Exemplos
+    N'Consulte o catalogo atual; confirme modalidade e suporte a entrada de imagem' AS Exemplos
 UNION ALL SELECT N'Multilingue',
     N'Qualidade em outros idiomas (portugues, espanhol, etc.)',
-    N'GPT-4o, text-embedding-3-large (melhor semantica em PT-BR)'
+    N'Compare modelos com um conjunto de testes em PT-BR'
 UNION ALL SELECT N'Saida estruturada (JSON / function calling)',
     N'Saida JSON confiavel, schema definido, chamadas de funcao',
-    N'GPT-4o, GPT-4o-mini (response_format=json_object -> 100% JSON valido)'
+    N'Use somente modelos/APIs que documentem saida estruturada; valide o JSON'
 UNION ALL SELECT N'Dimensao do vetor (embeddings)',
     N'Maior = mais discriminacao semantica; porem mais storage e custo',
     N'1536 (3-small), 3072 (3-large). Default recomendado = 1536.'
 UNION ALL SELECT N'Janela de contexto',
     N'Maximo tokens in+out; afeta tamanho de chunk e conversas',
-    N'8k (gpt-35 legado), 128k (4o-mini / 4o), 200k+ (o1-series)'
+    N'Consulte o limite documentado do modelo e deployment escolhido'
 UNION ALL SELECT N'Latencia',
     N'Tempo por request; modelos menores = mais rapidos',
-    N'gpt-4o-mini < gpt-4o < o1 (4o-mini ~ 90% mais barato e + rapido que 4o)'
+    N'Meça latencia com dados representativos; nao fixe uma ordem universal'
 UNION ALL SELECT N'Custo',
     N'Por mil tokens de input/output; use custo-beneficio',
-    N'4o-mini << 4o; 3-small custo 0.5x ada-002 com qualidade melhor.';
+    N'Compare o preço vigente do modelo, deployment e regiao.';
 GO
 
 -- --- 2.2 Tabela Oficial: 7 modelos + Tipo + Melhor Para ---
--- OBSERVACAO DP-800: gpt-35-turbo = OBSOLETO / descontinuado. Substituto = gpt-4o-mini.
+-- Os nomes, preços e ciclos de vida dos modelos mudam. Confirme o catálogo vigente.
 SELECT
     N'text-embedding-3-small'              AS Modelo,
     N'Embedding'                            AS Tipo,
     N'Equilibrio perfeito / custo-beneficio. 1536 dims. MODELO PADRAO.' AS MelhorPara,
     1536                                    AS Dimensao_Embedding,
-    N'0.5x o preco do ada-002, qualidade MELHOR. Substitui ada-002 HOJE.' AS Observacao
+    N'Qualidade melhor que ada-002; compare o pricing vigente antes de migrar.' AS Observacao
 UNION ALL SELECT
     N'text-embedding-3-large', N'Embedding',
     N'Maxima qualidade semantica, busca em documentos longos.',
@@ -140,21 +144,21 @@ UNION ALL SELECT
     N'Somente se voce ja tem milhoes de vetores existentes e nao pode re-embedar.',
     1536, N'LEGADO. MS recomenda migrar para 3-small imediatamente.'
 UNION ALL SELECT
-    N'gpt-4o', N'Chat Completion',
-    N'Raciocinio complexo RAG, multimodal (fotos), JSON estruturado.',
-    NULL, N'Quando a QUALIDADE da resposta importa mais que custo.'
+    N'Modelo de chat atualmente suportado', N'Chat Completion',
+    N'Escolha por qualidade, contexto, modalidade, custo e latencia medidos.',
+    NULL, N'Confirme suporte no catalogo atual.'
 UNION ALL SELECT
-    N'gpt-4o-mini', N'Chat Completion',
-    N'90% dos fluxos RAG de producao. Substituto direto do gpt-35-turbo.',
-    NULL, N'RECOMENDADO PADRAO. Menor custo, maior velocidade, otimo para PT-BR.'
+    N'Modelo menor atualmente suportado', N'Chat Completion',
+    N'Pode atender workloads sensiveis a custo, se o benchmark validar.',
+    NULL, N'Nao trate como substituto fixo; confirme o catalogo vigente.'
 UNION ALL SELECT
-    N'o1', N'Reasoning Model',
-    N'Problemas de logica, matematica, puzzles de multiplos passos.',
-    NULL, N'Alta latencia, alto custo. NAO use para tarefas simples de RAG.'
+    N'Modelo de raciocinio atualmente suportado', N'Reasoning Model',
+    N'Problemas de logica, matematica e tarefas de multiplos passos.',
+    NULL, N'Compare latencia e custo com um modelo de chat.'
 UNION ALL SELECT
-    N'o3-mini', N'Reasoning Model',
-    N'Matematica / codigo com varios passos, menor custo que o1.',
-    NULL, N'Bom para tarefas tecnicas (codigo SQL) que precisam de raciocinio.';
+    N'Outro modelo de raciocinio suportado', N'Reasoning Model',
+    N'Avalie tarefas tecnicas com dados representativos.',
+    NULL, N'Nao presuma custo ou latencia sem consultar o catalogo.';
 GO
 
 -- --- 2.3 Trade-offs tamanho vs precisao ---
@@ -166,7 +170,7 @@ SELECT
     N'Precisao base (legado)'  AS Precisao,
     N'Migrado para 3-small'    AS Recomendacao
 UNION ALL SELECT N'text-embedding-3-small', 1536,
-    N'Custo 0.5x (mais BARATO que ada-002!)',
+    N'Compare com o pricing vigente (não fixe um multiplicador)',
     N'Superior ao ada-002',
     N'>>> PADRAO RECOMENDADO para todos os novos projetos'
 UNION ALL SELECT N'text-embedding-3-large', 3072,
@@ -194,33 +198,35 @@ PRINT '-------------------------------------------------------------------';
 PRINT '';
 PRINT '/*';
 PRINT '  -- 3.1. DATABASE SCOPED CREDENTIAL (API key injetada via HEADERS)';
-PRINT '  CREATE DATABASE SCOPED CREDENTIAL [AzureOpenAIApiCred]';
+PRINT '  CREATE DATABASE SCOPED CREDENTIAL [https://SEURECURSO.openai.azure.com/]';
 PRINT '  WITH IDENTITY = N''HTTPEndpointHeaders'',';
 PRINT '       SECRET   = N''{"api-key": "sua-chave-real-aqui-xxxxxxxxxxx"}'';';
 PRINT '';
 PRINT '  -- 3.2 External Model 1: text-embedding-3-small (PADRAO = 1536 dims)';
 PRINT '  CREATE EXTERNAL MODEL [AzureOpenAI_Embedding3Small]';
 PRINT '  WITH (';
-PRINT '      LOCATION   = N''https://SEURECURSO.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings'',';
+PRINT '      LOCATION   = N''https://SEURECURSO.openai.azure.com/openai/deployments/SEU_DEPLOYMENT/embeddings?api-version=2024-02-01'',';
 PRINT '      API_FORMAT = N''Azure OpenAI'',    -- <- sem underscore, valor documentado';
 PRINT '      MODEL_TYPE = EMBEDDINGS,';
 PRINT '      MODEL      = N''text-embedding-3-small'',';
-PRINT '      CREDENTIAL = [AzureOpenAIApiCred]';
+PRINT '      CREDENTIAL = [https://SEURECURSO.openai.azure.com/],';
+PRINT '      PARAMETERS = N''{"dimensions":1536}''';
 PRINT '  );';
 PRINT '';
 PRINT '  -- 3.3 External Model 2: text-embedding-3-large (3072 dims - qualidade max)';
 PRINT '  CREATE EXTERNAL MODEL [AzureOpenAI_Embedding3Large]';
 PRINT '  WITH (';
-PRINT '      LOCATION   = N''https://SEURECURSO.openai.azure.com/openai/deployments/text-embedding-3-large/embeddings'',';
+PRINT '      LOCATION   = N''https://SEURECURSO.openai.azure.com/openai/deployments/SEU_DEPLOYMENT_LARGE/embeddings?api-version=2024-02-01'',';
 PRINT '      API_FORMAT = N''Azure OpenAI'',';
 PRINT '      MODEL_TYPE = EMBEDDINGS,';
 PRINT '      MODEL      = N''text-embedding-3-large'',';
-PRINT '      CREDENTIAL = [AzureOpenAIApiCred]';
+PRINT '      CREDENTIAL = [https://SEURECURSO.openai.azure.com/],';
+PRINT '      PARAMETERS = N''{"dimensions":3072}''';
 PRINT '  );';
 PRINT '*/';
 PRINT '';
 PRINT N'>>> IMPORTANTE sobre cada parametro do CREATE EXTERNAL MODEL:';
-PRINT N'    LOCATION     = URL COMPLETA do endpoint do deployment (ate /embeddings)';
+PRINT N'    LOCATION     = URL COMPLETA do endpoint, incluindo api-version';
 PRINT N'    API_FORMAT   = Azure OpenAI | OpenAI | Ollama | ONNX Runtime';
 PRINT N'    MODEL_TYPE   = EMBEDDINGS  (obrigatorio para AI_GENERATE_EMBEDDINGS)';
 PRINT N'    MODEL        = nome do modelo hospedado';
@@ -230,27 +236,59 @@ PRINT N'>>> Regra de seguranca: coloque os modelos em schema [ai] ou [lab], nao 
 PRINT N'    Facilita o gerenciamento de permissao sem dar db_owner.';
 GO
 
+-- =================================================================================
+-- BLOCO EXECUTAVEL: configure seu endpoint antes de continuar
+-- =================================================================================
+-- Substitua SEURECURSO, SEU_DEPLOYMENT e a chave abaixo pelos valores de teste.
+-- No SQL Server 2025, habilite antes: sp_configure 'external rest endpoint enabled'.
+CREATE DATABASE SCOPED CREDENTIAL [https://SEURECURSO.openai.azure.com/]
+WITH IDENTITY = 'HTTPEndpointHeaders',
+SECRET = '{"api-key":"SUA_CHAVE_AZURE_OPENAI"}';
+GO
+
+CREATE EXTERNAL MODEL [AzureOpenAI_Embedding3Small]
+WITH
+(
+    LOCATION = 'https://SEURECURSO.openai.azure.com/openai/deployments/SEU_DEPLOYMENT/embeddings?api-version=2024-02-01',
+    API_FORMAT = 'Azure OpenAI',
+    MODEL_TYPE = EMBEDDINGS,
+    MODEL = 'text-embedding-3-small',
+    CREDENTIAL = [https://SEURECURSO.openai.azure.com/],
+    PARAMETERS = '{"dimensions":1536}'
+);
+GO
+
+CREATE ROLE [lab_embedding_executor];
+GRANT EXECUTE ON EXTERNAL MODEL::[AzureOpenAI_Embedding3Small]
+    TO [lab_embedding_executor];
+GO
+
+SELECT name, model_type_desc, location, create_time, modify_time
+FROM sys.external_models
+WHERE name = N'AzureOpenAI_Embedding3Small';
+GO
+
 -- --- 3.4 Consultar catalogo sys.external_models ---
 PRINT CHAR(13)+CHAR(10) + N'--- Catalog view sys.external_models (sempre havera linhas reais se voce descomentar o bloco acima) ---';
 SELECT
     name,
     model_type_desc,
     location,
-    CAST(NULL AS SYSNAME) AS credential_name,
-    CAST(NULL AS DATE)    AS create_date,
-    CAST(NULL AS DATE)    AS modify_date
+    CAST(NULL AS INT)     AS credential_id,
+    CAST(NULL AS DATETIME2) AS create_time,
+    CAST(NULL AS DATETIME2) AS modify_time
 WHERE 1 = 2       -- zero linhas enquanto nao houver external model real
 UNION ALL
 SELECT 'AzureOpenAI_Embedding3Small' AS name,
        N'EMBEDDINGS'                 AS model_type_desc,
        N'https://SEURECURSO.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings',
-       N'AzureOpenAIApiCred',
-       CAST(GETDATE() AS DATE), CAST(GETDATE() AS DATE);
+        CAST(NULL AS INT),
+        CAST(GETDATE() AS DATETIME2), CAST(GETDATE() AS DATETIME2);
 GO
 
 PRINT CHAR(13)+CHAR(10) + N'--- ALTER e DROP didaticos ---';
 PRINT N'-- Trocar a credencial (ex: rotacao de API key):';
-PRINT N'  ALTER EXTERNAL MODEL [AzureOpenAI_Embedding3Small] WITH (CREDENTIAL = [NovaCredencial]);';
+PRINT N'  ALTER EXTERNAL MODEL [AzureOpenAI_Embedding3Small] SET (CREDENTIAL = [https://SEURECURSO.openai.azure.com/]);';
 PRINT N'';
 PRINT N'-- Remover modelo obsoleto (ex: migrando de ada-002):';
 PRINT N'  DROP EXTERNAL MODEL [OldAda002Model];';
@@ -288,7 +326,7 @@ GO
 
 PRINT CHAR(13)+CHAR(10) + N'--- Sintaxe exemplos GRANT ---';
 PRINT N'-- Certo: permitir que o time de analise use um modelo ESPECIFICO:';
-PRINT N'  GRANT EXECUTE ON EXTERNAL MODEL [lab].[AzureOpenAI_Embedding3Small] TO DataAnalystRole;';
+PRINT N'  GRANT EXECUTE ON EXTERNAL MODEL::[AzureOpenAI_Embedding3Small] TO DataAnalystRole;';
 PRINT N'';
 PRINT N'-- Errado (excesso de privilegio): nao faca isso para usuarios comuns!';
 PRINT N'  GRANT ALTER ANY EXTERNAL MODEL TO DataAnalystRole;   -- errado: permissao de admin';
@@ -357,7 +395,7 @@ PRINT N'/*';
 PRINT N'  -- Linha unica (teste / POC):';
 PRINT N'  SELECT AI_GENERATE_EMBEDDINGS(';
 PRINT N'      N''Capacete de ciclismo leve com ventilacao extra''';
-PRINT N'      USE MODEL [lab].[AzureOpenAI_Embedding3Small]';
+PRINT N'      USE MODEL [AzureOpenAI_Embedding3Small]';
 PRINT N'  ) AS SingleEmbeddingJSON;';
 PRINT N'';
 PRINT N'  -- Lote: atualizar apenas produtos sem embedding (WHERE Embedding IS NULL)';
@@ -365,13 +403,153 @@ PRINT N'  -- BOA PRATICA: UPDATE em lote > row-by-row cursor. Menos round-trips 
 PRINT N'  UPDATE ep';
 PRINT N'  SET';
 PRINT N'      Embedding3Small = AI_GENERATE_EMBEDDINGS( ep.TextToEmbed';
-PRINT N'                                      USE MODEL [lab].[AzureOpenAI_Embedding3Small] ),';
+PRINT N'                                      USE MODEL [AzureOpenAI_Embedding3Small] ),';
 PRINT N'      EmbeddedModelID  = N''text-embedding-3-small'',';
 PRINT N'      EmbeddedAt       = SYSUTCDATETIME()';
 PRINT N'  FROM lab.EmbeddedProducts ep';
 PRINT N'  WHERE ep.Embedding3Small IS NULL;   -- <- SEMPRE processe apenas pendentes';
 PRINT N'*/';
 GO
+
+-- 5.2 EXECUCAO REAL: teste uma chamada e depois processe o lote pendente.
+SELECT AI_GENERATE_EMBEDDINGS(
+    N'Capacete de ciclismo leve com ventilacao extra'
+    USE MODEL [AzureOpenAI_Embedding3Small]
+) AS SingleEmbeddingJSON;
+GO
+
+UPDATE ep
+SET Embedding3Small = AI_GENERATE_EMBEDDINGS(
+        ep.TextToEmbed USE MODEL [AzureOpenAI_Embedding3Small]
+    ),
+    EmbeddedModelID = N'text-embedding-3-small',
+    EmbeddedAt = SYSUTCDATETIME()
+FROM lab.EmbeddedProducts AS ep
+WHERE ep.Embedding3Small IS NULL;
+GO
+
+-- =================================================================================
+-- OPCAO B: OLLAMA LOCAL (SEM CHAVE DE API / SEM CUSTO POR CHAMADA)
+-- =================================================================================
+-- Esta alternativa esta comentada de proposito. Para usa-la em vez do Azure:
+--   1. Instale o Ollama e baixe um modelo de embedding: ollama pull all-minilm
+--   2. Exponha um endpoint Ollama HTTPS acessivel pelo SQL Server.
+--      O exemplo do Microsoft Learn usa https://localhost:11435/api/embed.
+--      O listener HTTP padrao do Ollama (geralmente a porta 11434) nao basta
+--      quando o endpoint do SQL Server exige HTTPS; use TLS ou um proxy HTTPS local.
+--   3. Remova os comentarios desta secao e execute-a separadamente do bloco Azure.
+-- No setup padrao, all-minilm retorna embeddings com 384 dimensoes.
+/*
+IF EXISTS (SELECT 1 FROM sys.external_models WHERE name = N'LocalOllamaEmbedding')
+    DROP EXTERNAL MODEL [LocalOllamaEmbedding];
+
+DROP TABLE IF EXISTS lab.ProductEmbeddings_Ollama;
+GO
+
+CREATE EXTERNAL MODEL [LocalOllamaEmbedding]
+WITH
+(
+    LOCATION = 'https://localhost:11435/api/embed',
+    API_FORMAT = 'Ollama',
+    MODEL_TYPE = EMBEDDINGS,
+    MODEL = 'all-minilm'
+);
+GO
+
+CREATE TABLE lab.ProductEmbeddings_Ollama
+(
+    ProductID INT NOT NULL PRIMARY KEY,
+    ProductDescription NVARCHAR(MAX) NOT NULL,
+    EmbeddingVector VECTOR(384) NULL
+);
+
+INSERT INTO lab.ProductEmbeddings_Ollama (ProductID, ProductDescription)
+VALUES
+    (1, N'Embedding local com Ollama e SQL Server'),
+    (2, N'Busca semantica offline sem API de nuvem');
+GO
+
+GRANT EXECUTE ON EXTERNAL MODEL::[LocalOllamaEmbedding]
+    TO [lab_embedding_executor];
+GO
+
+UPDATE p
+SET EmbeddingVector = AI_GENERATE_EMBEDDINGS(
+    p.ProductDescription USE MODEL [LocalOllamaEmbedding]
+)
+FROM lab.ProductEmbeddings_Ollama AS p
+WHERE p.EmbeddingVector IS NULL;
+GO
+
+SELECT ProductID,
+       VECTORPROPERTY(EmbeddingVector, 'Dimensions') AS Dimensions,
+       VECTORPROPERTY(EmbeddingVector, 'BaseType') AS BaseType
+FROM lab.ProductEmbeddings_Ollama;
+GO
+*/
+
+-- =================================================================================
+-- OPCAO C: ONNX RUNTIME LOCAL (TOTALMENTE OFFLINE)
+-- =================================================================================
+-- Esta alternativa esta comentada de proposito. Requer SQL Server 2025,
+-- SQL Server Machine Learning Services, ONNX Runtime e a DLL tokenizers-cpp.
+-- Siga o Microsoft Learn para colocar model.onnx e tokenizer.json em
+-- C:\onnx_runtime\model\all-MiniLM-L6-v2-onnx e as DLLs em C:\onnx_runtime.
+-- Conceda ao servico SQL Server Launchpad acesso a essa pasta.
+-- Antes de executar, habilite os recursos:
+--   ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;
+--   EXEC sp_configure 'external AI runtimes enabled', 1;
+--   RECONFIGURE WITH OVERRIDE;
+/*
+IF EXISTS (SELECT 1 FROM sys.external_models WHERE name = N'LocalOnnxEmbedding')
+    DROP EXTERNAL MODEL [LocalOnnxEmbedding];
+
+DROP TABLE IF EXISTS lab.ProductEmbeddings_Onnx;
+GO
+
+CREATE EXTERNAL MODEL [LocalOnnxEmbedding]
+WITH
+(
+    LOCATION = 'C:\onnx_runtime\model\all-MiniLM-L6-v2-onnx',
+    API_FORMAT = 'ONNX Runtime',
+    MODEL_TYPE = EMBEDDINGS,
+    MODEL = 'allMiniLM',
+    PARAMETERS = '{"valid":"JSON"}',
+    LOCAL_RUNTIME_PATH = 'C:\onnx_runtime\'
+);
+GO
+
+CREATE TABLE lab.ProductEmbeddings_Onnx
+(
+    ProductID INT NOT NULL PRIMARY KEY,
+    ProductDescription NVARCHAR(MAX) NOT NULL,
+    EmbeddingVector VECTOR(384) NULL
+);
+
+INSERT INTO lab.ProductEmbeddings_Onnx (ProductID, ProductDescription)
+VALUES
+    (1, N'Embedding local ONNX com SQL Server'),
+    (2, N'Vetorizaçao offline sem endpoint de nuvem');
+GO
+
+GRANT EXECUTE ON EXTERNAL MODEL::[LocalOnnxEmbedding]
+    TO [lab_embedding_executor];
+GO
+
+UPDATE p
+SET EmbeddingVector = AI_GENERATE_EMBEDDINGS(
+    p.ProductDescription USE MODEL [LocalOnnxEmbedding]
+)
+FROM lab.ProductEmbeddings_Onnx AS p
+WHERE p.EmbeddingVector IS NULL;
+GO
+
+SELECT ProductID,
+       VECTORPROPERTY(EmbeddingVector, 'Dimensions') AS Dimensions,
+       VECTORPROPERTY(EmbeddingVector, 'BaseType') AS BaseType
+FROM lab.ProductEmbeddings_Onnx;
+GO
+*/
 
 -- 5.3 VECTORPROPERTY: verificar dimensoes do vetor depois de gerar
 PRINT CHAR(13)+CHAR(10) + N'--- 5.3 VECTORPROPERTY: Verificar Dimensoes e BaseType apos gerar ---';
@@ -393,13 +571,13 @@ GO
 SELECT
     N'Exemplo apos rodar AI_GENERATE_EMBEDDINGS com 3-small' AS Produto,
     CAST(1536 AS INT)               AS [Dimensoes (Esperado)],
-    N'real'                         AS [BaseType (Esperado)],
+    N'float32'                      AS [BaseType (Esperado)],
     N'Corresponde a coluna VECTOR(1536). Tudo ok!' AS Validacao
 UNION ALL SELECT
     N'Cenario de erro: usou 3-large na coluna de 1536',
     CAST(3072 AS INT),
     N'real',
-    N'ERRO! Dimension mismatch. VECTOR_SEARCH vai retornar lixo. Re-gerar TUDOS com modelo correto.';
+    N'ERRO! Dimension mismatch. Nao compare esse vetor com uma coluna VECTOR(1536); re- gere o corpus com o modelo correto.';
 GO
 
 -- =================================================================================
@@ -426,24 +604,24 @@ UNION ALL SELECT
     N'Mesma dimensao 1536 (muda so a coluna nao!); re-embedar TUDOS.'
 UNION ALL SELECT
     N'Chat RAG complexo (documentos juridicos/financeiros, raciocinio)',
-    N'gpt-4o',
-    N'Multimodal, JSON, alta qualidade para perguntas longas.'
+    N'Modelo de chat atualmente suportado',
+    N'Escolha por qualidade, contexto, modalidade, latencia e custo medidos.'
 UNION ALL SELECT
     N'Chatbot de FAQ / Suporte alto volume (custo sensivel)',
-    N'gpt-4o-mini',
-    N'~90% mais barato que gpt-4o. Substituto oficial do obsoleto gpt-35-turbo.'
+    N'Modelo menor atualmente suportado',
+    N'Faça benchmark de custo, latencia e qualidade no catalogo vigente.'
 UNION ALL SELECT
     N'Corretor de exercicios de SQL / Matematica / codificacao',
-    N'o1 ou o3-mini',
-    N'Modelos de raciocinio com chains-of-thought nativas.'
+    N'Modelo de raciocinio atualmente suportado',
+    N'Verifique suporte, custo e latencia no catalogo vigente.'
 UNION ALL SELECT
     N'Geracao de codigo T-SQL + explicacao didatica',
-    N'gpt-4o',
+    N'Modelo atualmente suportado para codigo',
     N'Excelente em T-SQL moderno, FOR JSON, VECTOR, window functions.'
 UNION ALL SELECT
     N'Classificacao binaria ou multiclasse simples (sentimento, rotulacao)',
-    N'gpt-4o-mini',
-    N'Inferencia ultra rapida + barata. Suficiente para a maioria das classificacoes.';
+    N'Modelo menor atualmente suportado',
+    N'Valide precisao e suporte a saida estruturada.';
 GO
 
 --- 6.2 Fluxograma de decisao texto
@@ -455,28 +633,28 @@ PRINT N'  |- Senao (equilibrio custo-beneficio PADRAO) ->     text-embedding-3-s
 PRINT N'  |- Apenas sistema legado sem migracao? ->          text-embedding-ada-002 (sair!)';
 PRINT N'';
 PRINT N'Preciso de um MODELO DE CHAT (RAG / completion)?';
-PRINT N'  |- Precisa de imagem/ocr/multimodal ou RACIOCINIO COMPLEXO? -> gpt-4o';
-PRINT N'  |- Custo sensivel, alto volume, substituindo gpt-35? ->          gpt-4o-mini';
-PRINT N'  |- Matematica, puzzles logicos, codificacao multi-etapa? ->      o1 / o3-mini';
+PRINT N'  |- Precisa de imagem/ocr/multimodal? -> modelo que documente essa modalidade';
+PRINT N'  |- Custo sensivel, alto volume? -> modelo menor suportado + benchmark';
+PRINT N'  |- Matematica ou codificacao multi-etapa? -> modelo de raciocinio suportado';
 PRINT N'';
-PRINT N'>>> Observacao: gpt-35-turbo = OBSOLETO. Sempre que aparecer uma alternativa 4o-mini,';
-PRINT N'    marque a resposta alternativa 4o-mini como correta no exame.';
+PRINT N'>>> Observacao: nomes, substituicoes e ciclo de vida dos modelos mudam.';
+PRINT N'    Confirme sempre o catalogo atual do provedor.';
 GO
 
 --- 6.3 Gerenciamento de Deployments no Azure
 PRINT CHAR(13)+CHAR(10) + N'--- Gerenciamento Deployments (Azure OpenAI Studio / Portal) ---';
 SELECT
     N'Criacao do Deployment'            AS Topico,
-    N'No Azure OpenAI Studio: Deployments -> Create -> escolher modelo + versao -> NOMEAR (ex: gpt-4o-mini).' AS Detalhe,
+    N'No Azure AI Foundry/Azure Portal: criar deployment, escolher modelo e versao, e definir um nome.' AS Detalhe,
     N'O NOME do deployment entra no path da LOCATION do EXTERNAL MODEL.' AS ObservacaoDP800
 UNION ALL SELECT
     N'Versionamento de modelo',
-    N'Usa Default (auto-update para ultimo patch) ou fixa versao ex: gpt-4o-mini@2024-07-18.',
-    N'PRODUCAO: fixe versao (reprodutibilidade). LAB/homolog: use auto-update.'
+    N'Escolha a politica de atualizacao disponivel ou fixe a versao quando houver essa opcao.',
+    N'PRODUCAO: planeje migracoes e aposentadorias; valide mudancas antes do rollout.'
 UNION ALL SELECT
     N'Quota de TPM (Tokens Per Minute)',
-    N'Cada deployment tem limite de tokens/min. Padrao ~10k a 120k TPM.',
-    N'Excedeu TPM -> 429 Too Many Requests. Aumentar via quota request portal + batching.'
+    N'Quota e limites variam por modelo, tipo de deployment, assinatura e regiao.',
+    N'Excedeu limite -> 429 Too Many Requests. Use batching, retry com backoff e a quota vigente.'
 UNION ALL SELECT
     N'Throughput Provisionado (PTU)',
     N'Garante latencia e capacidade por hora. Custo fixo por unidade PTU.',
@@ -512,15 +690,15 @@ UNION ALL SELECT
 UNION ALL SELECT
     N'Rate limit exceeded / 429',
     N'Muitas chamadas/segundo ou TPM excedido.',
-    N'Batching (UPDATE ... WHERE NULL em lote). Aumentar quota no Portal. Usar @retry_count do sp_invoke_external_rest_endpoint.'
+    N'Batching (UPDATE ... WHERE NULL em lote). Aumentar quota conforme a orientacao vigente. Para AI_GENERATE_EMBEDDINGS, use PARAMETERS com sql_rest_options.retry_count.'
 UNION ALL SELECT
     N'Erro em AI_GENERATE_EMBEDDINGS sempre retorna NULL',
     N'MODEL_TYPE do external model nao e EMBEDDINGS, ou texto entrada null/too long.',
-    N'Verifique sys.external_models.model_type_desc = EMBEDDINGS. Teste 1 texto curto primeiro. Limite do 3-small = 8191 tokens.'
+    N'Verifique sys.external_models.model_type_desc = EMBEDDINGS, texto nao nulo, endpoint, api-version e limites documentados pelo modelo.'
 UNION ALL SELECT
     N'Permission denied (usuario ao gerar embedding)',
     N'Faltou GRANT EXECUTE ON EXTERNAL MODEL para o usuario/role.',
-    N'  GRANT EXECUTE ON EXTERNAL MODEL [modelo] TO ReportRole;   (NAO use ALTER ANY!)';
+    N'  GRANT EXECUTE ON EXTERNAL MODEL::[modelo] TO ReportRole;   (NAO use ALTER ANY!)';
 GO
 
 --- 7.2 5 Boas Praticas Oficiais ---

@@ -9,7 +9,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral](#visão-geral)
 > - 📍 [2. Avaliando Modelos](#avaliando-modelos)
 >   - 🔹 [Dimensões de Capacidade do Modelo](#dimensões-de-capacidade-do-modelo)
@@ -38,7 +38,7 @@ tags:
 
 ## Visão Geral
 
-O SQL Database no Microsoft Fabric, o Azure SQL Database e plataformas SQL compatíveis suportam a geração de embeddings por meio de definições de **External Models**. Um **external model** referencia um endpoint de inferência registrado no banco e é chamado pela função T-SQL `AI_GENERATE_EMBEDDINGS`.
+O SQL Server 2025 (17.x), o Azure SQL Database, o Azure SQL Managed Instance (com a política Always-up-to-date) e o SQL database no Microsoft Fabric suportam a geração de embeddings por meio de definições de **External Models**. Um **external model** é um objeto do banco que registra localização, autenticação e finalidade de um endpoint de inferência e é chamado pela função T-SQL `AI_GENERATE_EMBEDDINGS`.
 
 > [!abstract]
 >
@@ -49,8 +49,8 @@ O SQL Database no Microsoft Fabric, o Azure SQL Database e plataformas SQL compa
 > [!tip] O Que o Exame Testa
 >
 > - `sp_invoke_external_rest_endpoint` recebe os parâmetros `@url`, `@method`, `@headers`, `@payload`, `@credential`
-> - A chave de API é armazenada em uma `DATABASE SCOPED CREDENTIAL` com `SECRET` = o bearer token — **nunca** hard-coded
-> - `AI_GENERATE_EMBEDDINGS` retorna uma tabela de vetores de embedding em JSON
+> - A chave de API é armazenada em uma `DATABASE SCOPED CREDENTIAL`; o nome da credencial deve ser um prefixo de URL compatível com o endpoint
+> - `AI_GENERATE_EMBEDDINGS` retorna uma tabela de uma coluna, cujas linhas contêm arrays de embedding em JSON
 
 ---
 
@@ -74,45 +74,41 @@ Escolher o modelo correto para uma tarefa depende de várias dimensões:
 
 | Dimensão | Considerações | Exemplos |
 | :--- | :--- | :--- |
-| **Multimodal** | Processa imagens, áudio ou vídeo além de texto | GPT-4o, GPT-4 Vision |
-| **Multilíngue** | Qualidade de compreensão e geração em outros idiomas | GPT-4o, text-embedding-3-large |
-| **Saída estruturada** | Saída JSON/schema confiável (function calling) | GPT-4o, GPT-4o-mini |
+| **Multimodal** | Processa imagens, áudio ou vídeo além de texto | Use um modelo que documente a modalidade necessária |
+| **Multilíngue** | Qualidade de compreensão e geração em outros idiomas | Faça benchmark com dados representativos do idioma |
+| **Saída estruturada** | Saída JSON/schema confiável (function calling) | Use um modelo/API que documente esse recurso |
 | **Dimensão do embedding** | Maior = mais precisão semântica; mais armazenamento | 1536 (3-small), 3072 (3-large) |
-| **Janela de contexto** | Máximo de tokens in/out; afeta tamanho do chunk e comprimento da conversa | 8k, 128k tokens |
-| **Latência** | Tempo por requisição; modelos menores são mais rápidos | GPT-4o-mini < GPT-4o < o1 |
-| **Custo** | Precificação por token; modelos menores/antigos são mais baratos | GPT-4o-mini << GPT-4o |
+| **Janela de contexto** | Máximo de tokens de entrada/saída; afeta o tamanho dos chunks e da conversa | Consulte o catálogo atual do provedor |
+| **Latência** | Depende do modelo, região, carga e quota | Meça com requisições representativas |
+| **Custo** | Depende do modelo, deployment e região | Consulte o preço atual antes de escolher |
 
 ### Modelos Atuais e Seus Casos de Uso
 
-> **Nota:** `gpt-35-turbo` está obsoleto e sendo descontinuado. Use `gpt-4o-mini` como substituto recomendado para cargas de trabalho sensíveis ao custo e de alto volume.
+> **Nota:** disponibilidade, aposentadoria, limites de contexto e preço mudam. Os nomes abaixo são exemplos; confirme o catálogo atual do Azure AI Foundry e use o nome exato de modelo/deployment suportado pelo recurso.
 
 | Modelo | Tipo | Melhor Para |
 | :--- | :--- | :--- |
 | `text-embedding-3-small` | Embedding | Equilíbrio entre precisão e custo; 1536 dims |
 | `text-embedding-3-large` | Embedding | Embeddings de maior qualidade; 3072 dims |
 | `text-embedding-ada-002` | Embedding | Apenas legado; superado pelo 3-small |
-| `gpt-4o` | Chat completion | Raciocínio complexo, multimodal, saída estruturada |
-| `gpt-4o-mini` | Chat completion | Custo-efetivo, rápido; substitui gpt-35-turbo |
-| `o1` | Raciocínio | Raciocínio em múltiplas etapas, análise complexa |
-| `o3-mini` | Raciocínio | Raciocínio rápido; problemas de matemática e código |
+| Um modelo de chat/raciocínio atualmente suportado | Chat ou raciocínio | Selecione por qualidade, latência, modalidade e quota |
 
 ### Tradeoffs de Tamanho vs. Precisão
 
 ```text
 Modelos de embedding:
 text-embedding-ada-002   → 1536 dims, custo 1x, precisão base (legado)
-text-embedding-3-small   → 1536 dims, custo 0.5x, maior precisão
+text-embedding-3-small   → 1536 dims, custo menor que 3-large, precisão maior que ada-002
 text-embedding-3-large   → 3072 dims, custo 2x, melhor precisão
 
 Tradeoff: modelos de embedding maiores produzem vetores mais discriminativos
 ao custo de armazenamento (3072 floats × 4 bytes = 12KB por linha) e
 latência de API ligeiramente maior.
 
-Modelos de chat (início de 2026):
-gpt-4o-mini → mais rápido, menor custo, suficiente para a maioria dos RAG
-gpt-4o      → melhor qualidade, suporta imagens, maior custo e latência
-o1/o3-mini  → modelos de raciocínio, melhores para problemas de lógica em múltiplos passos
-gpt-35-turbo → DESCONTINUADO — migre para gpt-4o-mini
+Modelos de chat/raciocínio:
+Use o catálogo atual do provedor para comparar modelos suportados, modalidades,
+limites de contexto, latência, preço e datas de aposentadoria. Não fixe uma classificação
+permanente na lógica da aplicação.
 ```
 
 ---
@@ -123,29 +119,30 @@ No SQL Database no Fabric, registre um external model para habilitar chamadas T-
 
 ```sql
 -- Criar uma DATABASE SCOPED CREDENTIAL para o endpoint do Azure OpenAI
-CREATE DATABASE SCOPED CREDENTIAL [MyAzureOpenAICredential]
+CREATE DATABASE SCOPED CREDENTIAL [https://myopenai.openai.azure.com/]
 WITH IDENTITY = 'HTTPEndpointHeaders',
-SECRET = '{"api-key": "your-azure-openai-api-key"}';
+SECRET = '{"api-key":"your-azure-openai-api-key"}';
 
 -- Criar o external model (modelo de embedding)
 CREATE EXTERNAL MODEL [MyEmbeddingModel]
 WITH (
-    LOCATION = 'https://myopenai.openai.azure.com/openai/deployments/text-embedding-3-small/embeddings',
+    LOCATION = 'https://myopenai.openai.azure.com/openai/deployments/my-embedding-deployment/embeddings?api-version=2024-02-01',
     API_FORMAT = 'Azure OpenAI',
     MODEL_TYPE = EMBEDDINGS,
     MODEL = 'text-embedding-3-small',
-    CREDENTIAL = [MyAzureOpenAICredential]
+    CREDENTIAL = [https://myopenai.openai.azure.com/],
+    PARAMETERS = '{"dimensions":1536}'
 );
 
 ```
 
 Parâmetros principais:
 
-- `LOCATION`: A URL completa do endpoint REST do deployment do modelo
+- `LOCATION`: A URL completa do endpoint REST, incluindo a versão da API exigida pelo provedor
 - `API_FORMAT`: `Azure OpenAI`, `OpenAI`, `Ollama` ou `ONNX Runtime`, conforme o provedor
 - `MODEL_TYPE`: `EMBEDDINGS`
 - `MODEL`: o nome do modelo de embeddings hospedado pelo provedor
-- `CREDENTIAL`: Referencia a credencial que contém a chave de API
+- `CREDENTIAL`: Referencia uma credencial nomeada com URL compatível com `LOCATION` e que contém a chave de API
 
 > [!note] Separação Lógica por Schema
 >
@@ -161,8 +158,8 @@ SELECT
     name,
     model_type_desc,
     location,
-    create_date,
-    modify_date
+    create_time,
+    modify_time
 FROM sys.external_models;
 
 -- Verificar detalhes de um modelo
@@ -173,8 +170,8 @@ DROP EXTERNAL MODEL [MyEmbeddingModel];
 
 -- Alterar um external model (mudar credencial ou localização)
 ALTER EXTERNAL MODEL [MyEmbeddingModel]
-WITH (
-    CREDENTIAL = [UpdatedCredential]
+SET (
+    CREDENTIAL = [https://myopenai.openai.azure.com/]
 );
 ```
 
@@ -184,19 +181,19 @@ WITH (
 
 As permissões seguem um modelo baseado em objetos, semelhante a stored procedures.
 
-- **CREATE EXTERNAL MODEL**: requer permissão `ALTER ANY EXTERNAL MODEL` ou membership em `db_owner`
+- **Criar ou alterar**: requer `CREATE EXTERNAL MODEL` ou `ALTER ANY EXTERNAL MODEL` (ou uma permissão superior equivalente)
 - **Gerar embeddings**: requer permissão `EXECUTE` no objeto de external model específico
 - **Separação por schema**: crie external models em um schema dedicado (ex: `ai`) para simplificar o gerenciamento de permissões
 
 ```sql
 -- Conceder permissão para usar um external model específico
-GRANT EXECUTE ON EXTERNAL MODEL ai.EmbeddingModel TO DataAnalystRole;
+GRANT EXECUTE ON EXTERNAL MODEL::[MyEmbeddingModel] TO DataAnalystRole;
 
 -- Conceder permissão para criar external models
 GRANT ALTER ANY EXTERNAL MODEL TO DatabaseDeveloper;
 
 -- Verificar quais modelos existem e seus endpoints
-SELECT name, location, credential_name, created_date
+SELECT name, location, credential_id, create_time, modify_time
 FROM sys.external_models;
 ```
 
@@ -212,6 +209,29 @@ FROM sys.external_models;
 ## Gerando Embeddings com External Model
 
 Use `AI_GENERATE_EMBEDDINGS` com um external model cujo `MODEL_TYPE` seja `EMBEDDINGS`. A função recebe uma expressão de texto e retorna o vetor gerado como JSON; o SQL pode atribuí-lo diretamente a uma coluna `VECTOR(n)` compatível. `PREDICT` não é a interface atual para esses external models.
+
+No SQL Server 2025, habilite a configuração de endpoint REST externo antes de usar a função. No Azure SQL Database e no SQL database no Fabric essa opção vem habilitada por padrão:
+
+```sql
+EXECUTE sp_configure 'external rest endpoint enabled', 1;
+RECONFIGURE WITH OVERRIDE;
+```
+
+O chamador também precisa de `EXECUTE` no external model. O `PARAMETERS` do modelo e o `PARAMETERS` opcional da função podem enviar configurações específicas do provedor, como `dimensions` ou `sql_rest_options.retry_count` (de 0 a 10).
+
+### Request Direta à API vs. `AI_GENERATE_EMBEDDINGS`
+
+As duas abordagens podem chamar o mesmo provedor e o mesmo modelo de embedding. A diferença está na camada de integração:
+
+| Aspecto | Request direta à API | `AI_GENERATE_EMBEDDINGS` |
+| :--- | :--- | :--- |
+| Invocação | Aplicação, script ou `sp_invoke_external_rest_endpoint` | Função T-SQL |
+| Configuração | Você monta URL, payload, headers e parsing da resposta | `CREATE EXTERNAL MODEL` armazena metadados do endpoint e do modelo |
+| Autenticação | Você gerencia a chamada e a credencial | `DATABASE SCOPED CREDENTIAL` é associada ao external model |
+| Resultado | Resposta do provedor, normalmente um documento JSON | Tabela de uma coluna contendo arrays de embedding em JSON |
+| Integração com SQL | Você interpreta a resposta e persiste o vetor | Pode ser usada diretamente em `SELECT` ou `UPDATE` baseado em conjunto |
+
+Use `AI_GENERATE_EMBEDDINGS` quando os dados e o fluxo de persistência estiverem no SQL. Use uma request direta quando precisar de controle total do payload, tiver de chamar um endpoint incompatível com `CREATE EXTERNAL MODEL` ou precisar chamar um endpoint de chat. Nos dois casos, os pesos do modelo permanecem no servidor do provedor; apenas a entrada e o vetor retornado atravessam o limite do serviço.
 
 ```sql
 -- Gerar embedding para um único texto
@@ -229,7 +249,7 @@ WHERE Embedding IS NULL;
 
 ## Chamando Endpoints de Chat
 
-`AI_GENERATE_EMBEDDINGS` cria vetores; ela não gera respostas de chat. Para um endpoint de chat completion neste material, chame a API REST por `sp_invoke_external_rest_endpoint` e interprete o JSON conforme o contrato documentado do endpoint. Mantenha a credencial fora da procedure e não presuma um envelope de resposta de `PREDICT`.
+`AI_GENERATE_EMBEDDINGS` cria vetores; ela não gera respostas de chat. A função retorna uma tabela de uma coluna, com arrays de embedding em JSON, e o SQL Server pode atribuir o resultado a uma coluna `VECTOR(n)` compatível. Para chat, chame a API REST por `sp_invoke_external_rest_endpoint` e interprete o contrato documentado da resposta.
 
 ## Armazenando Embeddings Gerados
 
@@ -249,7 +269,7 @@ WHERE p.DescriptionEmbedding IS NULL;
 
 > [!caution] Nunca misture embeddings de modelos diferentes
 >
-> Vetores de modelos diferentes vivem em espaços dimensionais diferentes e **não podem ser comparados**. Se você trocar o modelo de embedding (ex: de `ada-002` para `3-small`), deve **regenerar TODOS os embeddings** existentes. Misturar vetores de modelos distintos produzirá resultados de busca completamente errados.
+> Vetores de modelos diferentes, ou gerados com dimensões/parâmetros incompatíveis, não devem ser comparados no mesmo índice. Se trocar o modelo ou suas dimensões, regenere o corpus afetado e mantenha metadados do modelo e da métrica junto aos vetores.
 
 ---
 
@@ -261,11 +281,10 @@ Use esta tabela para escolher rapidamente o modelo certo para uma carga de traba
 | :--- | :--- | :--- |
 | Geração de embedding (equilibrado) | `text-embedding-3-small` | Otimizado para similaridade vetorial; baixo custo |
 | Geração de embedding (maior qualidade) | `text-embedding-3-large` | Melhor precisão; saída de 3072 dimensões |
-| Raciocínio complexo / respostas RAG | `gpt-4o` | Alta qualidade, multimodal, JSON estruturado |
-| Chat de alto volume sensível a custo | `gpt-4o-mini` | ~90% mais barato que GPT-4o; rápido |
-| Raciocínio em múltiplas etapas / matemática | `o1` / `o3-mini` | Modelos de raciocínio construídos para problemas lógicos |
-| Geração de código | `gpt-4o` | Excelente qualidade de código e explicação |
-| Classificação de baixa latência | `gpt-4o-mini` | Inferência mais rápida; suficiente para tarefas simples |
+| Geração de respostas de chat ou RAG | Um modelo de chat atualmente suportado | Escolha por qualidade, contexto, latência, modalidade e custo medidos |
+| Raciocínio em múltiplas etapas / matemática | Um modelo de raciocínio atualmente suportado | Verifique suporte e latência no catálogo atual |
+| Geração de código | Um modelo atualmente suportado para código | Avalie com tarefas de código representativas |
+| Classificação de baixa latência | Um modelo menor atualmente suportado | Valide precisão e suporte a saída estruturada |
 
 Framework de decisão:
 
@@ -276,14 +295,14 @@ Para geração de embedding:
 └── Sistemas legados apenas → text-embedding-ada-002 (1536 dims)
 
 Para geração de texto (RAG):
-├── Mais rápido, mais barato, boa qualidade? → gpt-4o-mini
-├── Melhor qualidade, saída JSON estruturada? → gpt-4o
-├── Precisa analisar imagens? → gpt-4o (multimodal)
-└── Raciocínio complexo em múltiplas etapas? → o1 ou o3-mini
+├── Precisa de baixa latência/custo? → escolha um modelo menor suportado e faça benchmark
+├── Precisa de entrada multimodal? → escolha um modelo que documente essa modalidade
+├── Precisa de saída estruturada? → verifique o suporte do modelo e da API
+└── Precisa de raciocínio complexo? → escolha um modelo suportado e faça benchmark
 
 Para classificação ou extração:
-├── Saída JSON estruturada necessária? → gpt-4o ou gpt-4o-mini (modo JSON)
-└── Binária/multiclasse simples? → gpt-4o-mini (rápido e barato)
+├── Saída JSON estruturada necessária? → escolha um modelo/API que documente esse recurso
+└── Binária/multiclasse simples? → faça benchmark com um modelo menor suportado
 ```
 
 ---
@@ -294,9 +313,31 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 
 - **Deployar modelos**: crie um deployment nomeado (ex: `my-gpt4o`) que mapeia para uma versão específica do modelo; o nome do deployment aparece na URL de `LOCATION`
 - **Versionamento de modelos**: escolha atualização automática (sempre o último patch) ou fixe uma versão específica para reprodutibilidade
-- **Gerenciamento de quota**: cada deployment tem um limite de tokens por minuto (TPM); aumentar a quota requer uma solicitação de suporte ou uso de throughput provisionado
-- **Limites de tokens**: defina TPM máximo por deployment para controlar custos e evitar uso excessivo em workloads de produção
+- **Gerenciamento de quota**: quota e limites dependem do modelo, tipo de deployment, assinatura e região; confirme a orientação atual do Azure
+- **Limites de tokens**: configure limites no aplicativo/provedor e monitore o consumo para controlar custo e throttling
 - **Monitoramento via Azure Monitor**: acompanhe consumo de tokens, latência de requisições, taxas de erro (4xx/5xx) e eventos de throttling usando métricas integradas e Log Analytics
+
+### Erros de Throttling
+
+Throttling ocorre quando o provedor limita temporariamente as requisições porque um deployment excedeu uma quota disponível, como tokens por minuto (TPM), requisições por minuto ou conexões simultâneas. O endpoint normalmente retorna HTTP `429 Too Many Requests`. Isso indica controle de capacidade ou taxa de chamadas, não um erro de autenticação.
+
+Trate throttling agrupando o trabalho em lotes, limitando a concorrência, respeitando o cabeçalho de resposta `Retry-After` e repetindo a chamada com backoff exponencial. Monitore as requisições limitadas e verifique a quota atual do deployment antes de aumentar a carga. Para `AI_GENERATE_EMBEDDINGS`, o comportamento de retry pode ser configurado em `PARAMETERS` com `sql_rest_options.retry_count` (de 0 a 10).
+
+### Fixando uma Versão de Modelo em Produção
+
+Fixar uma versão significa selecionar uma versão específica do modelo para o deployment, em vez de permitir que o Azure o mova automaticamente para uma nova versão padrão. No Azure AI Foundry ou no Portal do Azure, abra as configurações do deployment, escolha a versão específica do modelo e selecione `NoAutoUpgrade` quando for necessário impedir atualizações automáticas. Teste uma nova versão em um deployment separado antes de alterar a produção.
+
+`NoAutoUpgrade` não prolonga a vida útil do modelo: quando a versão selecionada for aposentada, o deployment poderá deixar de aceitar requisições e precisará ser migrado manualmente. Mantenha a versão do modelo e a data de aposentadoria no inventário de deployments. Essa versão do modelo é diferente da `api-version` REST usada pelo endpoint.
+
+Depois de validar uma nova versão, atualize o external model registrado se o identificador do modelo ou o endpoint mudar:
+
+```sql
+ALTER EXTERNAL MODEL [MyEmbeddingModel]
+SET
+(
+    MODEL = 'nova-versao-do-modelo'
+);
+```
 
 ---
 
@@ -318,7 +359,7 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 | `Dimension mismatch` | Modelo de embedding retorna dimensões diferentes da coluna VECTOR | Faça o VECTOR(n) corresponder às dimensões reais do modelo |
 | `Rate limit exceeded` | Muitas chamadas de API/minuto | Implemente batching; aumente a quota do Azure OpenAI |
 | Erro de `AI_GENERATE_EMBEDDINGS` | Texto ou external model incompatível | Verifique `MODEL_TYPE = EMBEDDINGS`, o texto de entrada e a dimensão da coluna `VECTOR(n)` |
-| Permissão negada ao gerar embeddings | Usuário sem EXECUTE no external model | `GRANT EXECUTE ON EXTERNAL MODEL model_name TO role` |
+| Permissão negada ao gerar embeddings | Usuário sem EXECUTE no external model | `GRANT EXECUTE ON EXTERNAL MODEL::[model_name] TO role` |
 
 ---
 
@@ -326,7 +367,7 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 
 - Armazene definições de external model em um schema dedicado (ex: `ai`) e conceda `EXECUTE` apenas para roles que precisam — nunca dependa de `db_owner` para acesso rotineiro
 - Use `text-embedding-3-small` como modelo de embedding padrão; só faça upgrade para `text-embedding-3-large` quando a qualidade de recuperação for mensuravelmente insuficiente
-- Evite chamar `AI_GENERATE_EMBEDDINGS` linha por linha em um cursor; faça updates em lote com `WHERE Embedding IS NULL` para minimizar round-trips de API e permanecer dentro dos limites de TPM
+- Evite chamar `AI_GENERATE_EMBEDDINGS` linha por linha em um cursor; faça updates em lote com `WHERE Embedding IS NULL` para minimizar round-trips de API (cada ida e volta entre o banco e o endpoint externo) e permanecer dentro dos limites de TPM
 - Fixe versões de modelos em deployments de produção para evitar mudanças de comportamento inesperadas de atualizações automáticas
 - Monitore o uso de tokens e a latência do Azure OpenAI via Azure Monitor; configure alertas em erros de throttling antes que impactem a performance das queries
 
@@ -336,13 +377,13 @@ Os deployments de modelos são gerenciados através do Azure OpenAI Studio (ou P
 
 > [!tip] Dicas para o Exame
 >
-> - `CREATE EXTERNAL MODEL` requer uma `DATABASE SCOPED CREDENTIAL` — a chave de API é armazenada na credencial, não na definição do modelo
+> - `CREATE EXTERNAL MODEL` registra metadados do endpoint; a autenticação remota usa uma `DATABASE SCOPED CREDENTIAL` compatível
 > - `MODEL_TYPE = EMBEDDINGS` identifica o external model usado para geração de vetores
 > - `AI_GENERATE_EMBEDDINGS(text USE MODEL ...)` é a interface T-SQL atual para gerar embeddings com external models
 > - A dimensão do embedding deve corresponder ao tamanho da coluna `VECTOR(n)` — `text-embedding-3-small` = 1536, `text-embedding-3-large` = 3072
 > - External models são objetos de escopo de banco de dados — visíveis em `sys.external_models`
 > - Permissão `EXECUTE` no objeto de external model é necessária para gerar embeddings — `ALTER ANY EXTERNAL MODEL` é para criar/modificar, não para chamar
-> - `gpt-35-turbo` está obsoleto — questões do exame podem referenciar `gpt-4o-mini` como seu substituto
+> - Nomes e ciclo de vida dos modelos do provedor mudam; consulte o catálogo atual em vez de memorizar um substituto fixo
 
 ---
 
@@ -396,6 +437,10 @@ falhas de geração, recall/precision, latência e validação de resposta.
 
 - [External Models in Fabric SQL](https://learn.microsoft.com/en-us/fabric/database/sql/ai-external-model)
 - [CREATE EXTERNAL MODEL](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-external-model-transact-sql)
+- [ALTER EXTERNAL MODEL](https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-external-model-transact-sql)
+- [AI_GENERATE_EMBEDDINGS](https://learn.microsoft.com/en-us/sql/t-sql/functions/ai-generate-embeddings-transact-sql)
+- [sys.external_models](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-external-models-transact-sql)
+- [sp_invoke_external_rest_endpoint](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-invoke-external-rest-endpoint-transact-sql)
 - [Azure OpenAI Models](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models)
 
 ---

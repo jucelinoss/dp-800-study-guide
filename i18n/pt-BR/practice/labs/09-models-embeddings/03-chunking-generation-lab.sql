@@ -2,6 +2,9 @@
 -- DP-800 - LAB PRATICO COMPLETO: CHUNKING E GERACAO DE EMBEDDINGS
 -- Banco de Dados: AdventureWorks2025 (ou LT - Light)
 -- =================================================================================
+-- SEGURANÇA: Execute somente em um banco descartável. O script cria/remove objetos
+-- de lab e usa textos sintéticos. Configure um external model e uma credencial de
+-- teste antes de habilitar qualquer requisição externa.
 -- OBJETIVOS DP-800 DOMINIO 3:
 --   1. Tabela: quais colunas embedar? (Sim / Nao / As Vezes)
 --   2. Combinar multiplas colunas com PREFIXO semanticos (JOIN AdventureWorks Prod/Cat)
@@ -11,7 +14,7 @@
 --   5. Tabela DocumentChunks ESTRUTURA IDEAL (constraints, indice filtrado, colunas)
 --   6. Geracao: External Model + sp_invoke_external_rest_endpoint (codigo didatico)
 --   7. JSON Batching (build payload + PARSE com OPENJSON em array data[i].embedding)
---   8. Estimativa de tokens + query de seguranca > 7500 / limite 8191
+--   8. Estimativa de tokens + query de segurança > 7500 / limite 8192 por entrada
 --   9. Calculo de Storage por coluna VECTOR(n) em milhoes de linhas
 --  10. Tabela Problemas Comuns (6) + 5 Dicas Exame
 -- =================================================================================
@@ -39,7 +42,8 @@ DROP TABLE IF EXISTS lab.DocumentChunks;
 DROP TABLE IF EXISTS lab.SourceDocuments;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 PRINT '=========================================================';
@@ -631,7 +635,7 @@ PRINT CHAR(13)+CHAR(10) + N'--- 8.1 Verificacao: chunks potencialmente longos (>
 SELECT ChunkId, DocumentId, ChunkStrategy, EstimatedTokens, LEN(ChunkText) AS Caracteres,
        N'>>> Precisa ser re-chunkado antes de chamar a API!' AS Acao
 FROM lab.DocumentChunks
-WHERE EstimatedTokens > 7500;    -- Limite 8191 do 3-small, margem 691 segura
+WHERE EstimatedTokens > 7500;    -- Limite 8192 por entrada; mantenha margem operacional
 GO
 
 -- --- 8.2 Calculo de STORAGE: custo por milhao de linhas ---
@@ -659,7 +663,7 @@ GO
 PRINT CHAR(13)+CHAR(10) + N'--- 8.3 Problemas Comuns x Causa x Correcao (MS Learn oficial) ---';
 SELECT
     N'Token limit exceeded (HTTP 400)' AS Problema,
-    N'Chunk muito grande. Input > 8191 tokens do text-embedding-3-small.' AS Causa,
+    N'Chunk muito grande. Input > 8192 tokens por entrada.' AS Causa,
     N'Reduza chunk size, adicione validacao LEN/4 antes da chamada, verifique tamanho maximo.' AS Correcao
 UNION ALL SELECT
     N'Embeddings retornam NULL apos UPDATE',
@@ -686,7 +690,7 @@ GO
 -- --- 8.4 Dicas Finais para o Exame DP-800 ---
 PRINT CHAR(13)+CHAR(10) + N'--- 5 DICAS FINAIS DP-800 (chunking e geracao!) ---';
 PRINT N'';
-PRINT N'  1. Limite de tokens do modelo! text-embedding-3-small = 8191 inputs. Textos grandes = CHUNKING.';
+PRINT N'  1. Limite de tokens do modelo! Embeddings = 8192 tokens por entrada. Textos grandes = CHUNKING.';
 PRINT N'     Regra de bolso: 4 chars ~ 1 token.';
 PRINT N'';
 PRINT N'  2. Overlap 15-25% na questao = resposta mais correta. Por que? Evita perda de contexto nas';

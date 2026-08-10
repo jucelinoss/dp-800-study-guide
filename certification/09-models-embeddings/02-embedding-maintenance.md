@@ -45,7 +45,7 @@ A reliable lifecycle detects inserts, updates, and deletes; identifies affected 
 | Table Triggers | Near real-time | Low | `None (in-DB)` | Small tables, low write volume |
 | Change Tracking | Low (polling) | Medium | SQL Agent or scheduler | Moderate volume, batch-friendly |
 | CDC | Medium (polling) | Medium | SQL Agent (on-prem) | Audit trail needed with embeddings |
-| CES | Near real-time | Medium | Azure Event Hubs / Eventstream | SQL Server 2025 or Azure SQL Database (preview) |
+| CES | Near real-time | Medium | Azure Event Hubs / Eventstream | SQL Server 2025, Azure SQL Database, or Azure SQL Managed Instance (preview) |
 | Azure Functions SQL Trigger | Near real-time | Medium | Azure Functions + Change Tracking | Decoupled processing through polling |
 | Azure Logic Apps | Minutes | Low | Logic Apps | Low-code, low-volume |
 | Microsoft Foundry | Configurable | Low | Fabric/Foundry | Declarative AI pipeline |
@@ -219,10 +219,10 @@ public static async Task Run(
 
 ## Method 5: CES (Change Event Streaming)
 
-In SQL Server 2025 and Azure SQL Database (preview), CES streams changes to Azure Event Hubs and can feed a Fabric Eventstream. A downstream pipeline or notebook can then re-generate embeddings.
+In SQL Server 2025, Azure SQL Database, and Azure SQL Managed Instance (preview), CES streams changes to Azure Event Hubs and can feed a Fabric Eventstream. A downstream pipeline or notebook can then re-generate embeddings.
 
 ```text
-SQL Server 2025 or Azure SQL Database (Products table)
+SQL Server 2025, Azure SQL Database, or Azure SQL Managed Instance (Products table)
     → CES (Change Event Streaming)
         → Fabric Eventstream
             → Fabric Notebook (Python)
@@ -289,9 +289,9 @@ END;
 
 ## Method 7: Microsoft Foundry
 
-**Microsoft Foundry** (formerly Azure AI Foundry; rebranded late 2025) is the declarative, **most-managed** option on the DP-800 blueprint. You design an embedding pipeline visually or in YAML, point it at a SQL source, deploy, and Foundry handles **chunking, batching, retries, throttling, monitoring, and write-back** — no T-SQL, no Python, no Logic App glue.
+**Microsoft Foundry** can be used as an external orchestration layer for embedding workflows. Depending on the selected Foundry service and pipeline components, you can configure a SQL source, model call, batching, retries, monitoring, and write-back. These capabilities are not a new SQL Database `AI_*` function and the exact steps depend on the selected service.
 
-It shows up on the 2026-03-12 blueprint as one of the named embedding-maintenance methods, so expect at least one DP-800 question that asks you to **pick Foundry vs CES vs CDC vs triggers** for a given scenario.
+Treat this as an architecture option to compare with Change Tracking, CDC, CES, and triggers; verify the current DP-800 skills measured and the current Foundry documentation before relying on a specific feature.
 
 ### Architecture
 
@@ -320,10 +320,10 @@ Foundry Project
 
 1. **Create a Foundry project** in the Microsoft Foundry portal (<https://ai.azure.com/>). Pick a region close to your SQL endpoint to minimise embedding-call latency.
 2. **Deploy the embedding model** — `text-embedding-3-small` (1 536 dims) is the standard choice; `text-embedding-3-large` (3 072 dims) for higher recall at higher cost; `ada-002` is legacy and rarely the right pick today.
-3. **Add a SQL connection** under the project's **Connections** pane. For passwordless, attach a Managed Identity to the Foundry project and grant `db_datareader` + `db_datawriter` (or a more scoped role) on the target database. **Do not** store SQL passwords in Foundry connection strings — Managed Identity is the GA pattern Microsoft expects on DP-800.
+3. **Add and authenticate a SQL connection** using the connection method supported by the selected Foundry service. Prefer managed identity or another secret-management mechanism where supported, and grant only the required database permissions.
 4. **Author the pipeline** either via the visual editor or via a YAML flow definition. The minimum shape is the four steps above (source → chunk → embed → sink).
 5. **Attach a trigger** — scheduled recurrence for batch-style refresh, or event-driven (via a Fabric Eventstream subscribed to CES from the source DB) for near-real-time.
-6. **Deploy the pipeline.** Foundry handles retry/back-off on transient model-deployment errors automatically.
+6. **Deploy the pipeline** and configure retry/back-off, batching, and idempotent write-back according to the selected service.
 7. **Monitor** via the Foundry project's built-in run-history pane — every run records source rows processed, tokens consumed, sink rows updated, and any per-row failures.
 
 ### When to choose Foundry
@@ -354,18 +354,18 @@ Both Foundry and CES (Change Event Streaming) appear on the blueprint as named m
 
 | Aspect | Microsoft Foundry | CES (Change Event Streaming) |
 | :--- | :--- | :--- |
-| **Source platform** | SQL Server, Azure SQL DB, SQL DB in Fabric, on-prem (with SHIR) | SQL Server 2025 or Azure SQL Database (preview) |
-| **Code required** | None (declarative pipeline) | Notebook code (Python) or Pipeline activities |
+| **Source platform** | Depends on the selected Foundry connector and integration runtime | SQL Server 2025, Azure SQL Database, or Azure SQL Managed Instance (preview) |
+| **Code required** | Depends on the selected pipeline components | Notebook code (Python) or Pipeline activities |
 | **Trigger** | Schedule / event-driven / on-demand | Event-driven (push from CES) |
 | **Latency** | Seconds to minutes (depending on trigger) | Near-real-time (push-based) |
-| **Embedding logic** | Built-in `Embed` step | You write it in the Notebook |
+| **Embedding logic** | Depends on the selected model/pipeline component | You write it in the Notebook or pipeline |
 | **Monitoring** | Foundry run history (centralised) | Eventstream + Notebook job history (split) |
 | **Best for** | Multi-workflow AI projects, batch + scheduled refresh, no-code teams | Change streaming to Event Hubs/Eventstream with a downstream consumer |
 
 ### What the exam will ask
 
 > [!warning] Common Mistake
-> "Microsoft Foundry **requires** Fabric" — false. Foundry connects to Azure SQL Database and on-prem SQL Server (via Self-Hosted Integration Runtime) too. CES is a separate preview feature for SQL Server 2025 and Azure SQL Database; Fabric Eventstream can be one of its consumers.
+> "Microsoft Foundry **requires** Fabric" is an unsafe assumption. Check the connector and integration-runtime support of the selected Foundry service. CES is a separate preview feature for SQL Server 2025, Azure SQL Database, and Azure SQL Managed Instance; Fabric Eventstream can be one of its consumers.
 
 > [!note] Mental model — Foundry vs the others
 > **Foundry is the "credit card" option** — pay (in service cost + lock-in) for ergonomics. **CES is the "tap to pay"** — a push-based preview path through Event Hubs or Eventstream. **CDC/Change Tracking are "bank transfers"** — they work everywhere but you write the plumbing. **Triggers are "cash"** — immediate, but they add write latency.
@@ -381,7 +381,7 @@ embedding = requests.post(
     json={"input": description}
 ).json()["data"][0]["embedding"]
 
-# Foundry then writes back to SQL via the connection it manages — no T-SQL
+# A configured Foundry pipeline can write back to SQL through its configured connection;
 # required from you. The whole pipeline declaration is YAML or visual.
 ```
 
@@ -419,7 +419,7 @@ flowchart TD
 | Trigger causes timeouts on bulk loads | Trigger fires per-row for large imports | Disable trigger during bulk load; use batch re-embedding afterward |
 | Change Tracking min version exceeded | Sync version older than retention period | Do a full re-embed of all rows; reset watermark |
 | Embedding drift undetected | Source text updated without regenerating embedding | Add `EmbeddingGeneratedAt` column and compare to `UpdatedAt` |
-| Azure Functions not firing | Change Tracking not enabled on table | SQL trigger binding auto-enables CT; verify `db_owner` permission |
+| Azure Functions not firing | Change Tracking not enabled or retention is too short | Enable Change Tracking on the database and table, configure retention, and grant the trigger's documented permissions |
 
 ---
 
@@ -430,7 +430,7 @@ flowchart TD
 > - **Triggers**: Simplest but synchronous — adds AI API latency to every write; risky if endpoint is down
 > - **Change Tracking**: Best for batch scenarios — decouple embedding from write path
 > - **Azure Functions SQL trigger**: uses Change Tracking and polls for changes; it decouples processing but is not a push trigger
-> - **CES**: preview push-based change streaming from SQL Server 2025 or Azure SQL Database to Event Hubs/Eventstream
+> - **CES**: preview push-based change streaming from SQL Server 2025, Azure SQL Database, or Azure SQL Managed Instance to Azure Event Hubs; a downstream Eventstream is optional
 > - Always maintain a watermark (version or timestamp) to know which rows have been embedded
 
 ---
@@ -456,7 +456,7 @@ flowchart TD
 
 - [Azure Functions SQL Trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-azure-sql-trigger)
 - [Change Tracking](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-tracking-sql-server)
-- [Fabric Change Event Streaming](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/change-event-streaming/overview)
+- [Change Event Streaming](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/change-event-streaming/overview)
 
 ---
 

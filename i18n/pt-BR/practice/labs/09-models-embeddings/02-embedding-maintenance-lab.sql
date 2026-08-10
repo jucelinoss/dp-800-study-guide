@@ -3,6 +3,9 @@
 -- (Dirty Tracking, Triggers, Change Tracking, CDC, CES, Foundry, Azure Functions)
 -- Banco de Dados: AdventureWorks2025 (ou versao LT - Light)
 -- =================================================================================
+-- SEGURANÇA: Execute somente em um banco descartável. O script remove/recria a
+-- tabela e o trigger do lab e usa dados sintéticos. As chamadas à API externa ficam
+-- comentadas até que um external model de teste seja configurado.
 -- OBJETIVOS DE APRENDIZADO (alinhados DP-800 Dominio 3):
 --   1. Conceito de EMBEDDING DRIFT e por que manutencao nao e opcional
 --   2. Dirty tracking: coluna BIT flag + watermarks timestamps
@@ -46,7 +49,8 @@ DROP TABLE IF EXISTS lab.EmbeddingOutbox;
 DROP TABLE IF EXISTS lab.ProductVectorCatalog;
 GO
 
-CREATE SCHEMA IF NOT EXISTS lab AUTHORIZATION dbo;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'lab')
+    EXEC(N'CREATE SCHEMA lab AUTHORIZATION dbo;');
 GO
 
 PRINT '=========================================================';
@@ -127,7 +131,7 @@ UNION ALL SELECT
     N'Zero latencia na escrita (assincrono)',
     N'Baixa',
     N'SQL Agent (ou Automation Runbook)',
-    N'PADRAO para 90% dos bancos on-prem e Azure SQL com volume medio.',
+    N'Padrão para bancos on-premises e Azure SQL com volume médio; valide o volume real.',
     N'Vetor fica "velho" ate a proxima execucao do job (1 minuto a varias horas).'
 UNION ALL SELECT
     N'Change Tracking (CHANGETABLE polling)',
@@ -523,7 +527,7 @@ PRINT N'    [1] Source (SQL) : SELECT ProductId, Description, LastUpdated';
 PRINT N'                     FROM lab.ProductVectorCatalog';
 PRINT N'                     WHERE IsEmbeddingStale = 1 OR EmbeddingGeneratedAt IS NULL;';
 PRINT N'';
-PRINT N'    [2] Chunk (opcional) : dividir Description se > 8191 tokens do modelo';
+PRINT N'    [2] Chunk (opcional): dividir Description se > 8192 tokens por entrada';
 PRINT N'';
 PRINT N'    [3] Embed (step integrado) : chamar Azure OpenAI em lote (2048 input max)';
 PRINT N'';
