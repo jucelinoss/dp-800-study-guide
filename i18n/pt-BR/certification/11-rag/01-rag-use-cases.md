@@ -74,6 +74,8 @@ Um desenho seguro separa responsabilidades: a busca recupera somente documentos 
 
 ## Fluxo RAG em Um Relance
 
+### Diagrama 1 — Fluxo de consulta em tempo de execução
+
 ```mermaid
 sequenceDiagram
     participant U as Usuário
@@ -93,6 +95,21 @@ sequenceDiagram
     App-->>U: resposta
 ```
 
+Este diagrama mostra o caminho de uma pergunta já feita pelo usuário. A
+aplicação coordena o fluxo: pede ao modelo de embeddings um vetor para a
+pergunta, consulta o SQL Database Engine e recebe os chunks mais relevantes.
+Em seguida, monta o prompt com instruções, contexto e pergunta, chama o modelo
+de chat e devolve a resposta ao usuário.
+
+O SQL Database Engine aparece entre a aplicação e o modelo de chat porque é a
+camada de recuperação. Ele armazena os chunks, embeddings e metadados, executa
+a busca vetorial/full-text e aplica filtros como tenant, categoria e
+permissões. A ordem horizontal dos participantes é apenas uma forma de ler a
+sequência; ela não representa uma hierarquia de camadas. O banco é a base de
+dados do RAG, mas, nessa arquitetura, a aplicação é quem orquestra as chamadas.
+
+### Diagrama 2 — Ingestão, armazenamento e consulta
+
 ```mermaid
 flowchart LR
     I[Documentos e dados] --> P[Ingestao e chunking]
@@ -105,6 +122,23 @@ flowchart LR
     Q --> G
     G --> A[Resposta com citacoes]
 ```
+
+Este diagrama amplia a visão anterior e inclui o fluxo de preparação dos dados:
+
+- **Ingestão**: documentos e dados são extraídos, divididos em chunks e
+  enriquecidos com embeddings e metadados.
+- **Armazenamento**: os chunks, vetores e metadados são gravados em tabelas ou
+  em um índice de busca.
+- **Consulta**: a pergunta do usuário é transformada em uma query, a
+  recuperação aplica filtros e retorna um contexto com suas fontes.
+- **Geração**: o contexto recuperado e a pergunta são enviados ao LLM, que
+  produz a resposta e pode incluir citações.
+
+Assim, o primeiro diagrama enfatiza a ordem das chamadas durante uma pergunta;
+o segundo mostra o ciclo completo, incluindo o trabalho que acontece antes da
+consulta. A geração e a persistência dos embeddings dos documentos ocorrem
+normalmente na ingestão, enquanto o embedding da pergunta é gerado novamente
+em cada consulta usando o mesmo modelo e as mesmas dimensões.
 
 > **Modelo Mental**: RAG é uma **prova com consulta** — o modelo lê as anotações que você entregou a ele para esta questão específica; seus pesos não mudam. Fine-tuning é **estudar** — muda o que o aluno sabe.
 
@@ -415,6 +449,21 @@ Vantagens: Serviço de busca gerenciado com RRF integrado; escala independenteme
 As metas dependem do tamanho dos dados, modelo, região, concorrência, cache,
 quantidade de candidatos e limites do provedor. Meça separadamente geração de
 embedding, recuperação, montagem do prompt e geração da resposta.
+
+> [!note] O que é SLO?
+>
+> **SLO** (*Service Level Objective*, ou Objetivo de Nível de Serviço) é uma
+> meta técnica mensurável para o comportamento do serviço. Por exemplo: “em
+> 95% das consultas de FAQ, a resposta deve ser concluída em até 3 segundos”.
+>
+> Um SLO define a métrica, o alvo, a janela de avaliação e o escopo das
+> consultas. Em RAG, a latência pode ser dividida entre geração do embedding,
+> recuperação no banco, montagem do prompt e chamada ao LLM. `p95 <= 3 s`
+> significa que 95% das requisições devem terminar em até 3 segundos; não é uma
+> promessa de que todas terminarão nesse tempo.
+>
+> **SLO não é SLA**: SLO é uma meta técnica interna; SLA é um compromisso formal
+> com o cliente, normalmente associado a consequências quando não é cumprido.
 
 ---
 

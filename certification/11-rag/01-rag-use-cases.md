@@ -13,46 +13,93 @@ tags:
 
 ## Overview
 
-Retrieval-Augmented Generation (RAG) grounds large language model (LLM) responses in data from a database, preventing **hallucinations** and providing up-to-date, accurate answers. Rather than relying on what the model "knows" from training, RAG retrieves relevant context from a trusted data source and includes it in the prompt. SQL Database in Fabric and Azure SQL are natural RAG backends because they store both structured data and embeddings in one place.
+Retrieval-Augmented Generation (RAG) grounds large language model (LLM) responses in data retrieved from a trusted source, reducing the risk of ungrounded answers and providing more relevant, current context. Rather than relying only on what the model "knows" from training, RAG retrieves relevant context and includes it in the prompt. SQL Server 2025, Azure SQL Database, Azure SQL Managed Instance with a compatible update policy, and SQL database in Microsoft Fabric can serve as backends when structured data, text, and embeddings are colocated; Azure AI Search and other systems can also perform retrieval.
 
 > [!abstract]
 >
-> - Covers the RAG pattern (Retrieve-Augment-Generate), use cases, and Azure SQL as a RAG backend
-> - RAG grounds LLM responses in real data, preventing hallucinations and using current information
+> - Covers the RAG pattern (Retrieve-Augment-Generate), use cases, and SQL Database Engine backends
+> - RAG grounds LLM responses in retrieved evidence, reducing but not eliminating ungrounded answers
 > - Key exam topics: RAG pattern steps, grounding vs fine-tuning distinction, combined vector+FTS retrieval
 
 > [!tip] What the Exam Tests
 >
 > - RAG pattern: (1) embed user query → (2) search DB with VECTOR_SEARCH + CONTAINS → (3) retrieve top-K chunks → (4) build prompt → (5) call LLM → (6) return grounded response
 > - **Grounding ≠ fine-tuning** — RAG injects context at inference time; the model's weights are not changed
-> - Azure SQL is a natural RAG backend: stores both structured data AND vector embeddings in one database
+> - The SQL Database Engine can store structured data, text, and vector embeddings together; retrieval and model providers can remain separate
+
+RAG does not guarantee that every answer is correct: retrieve relevant sources, apply authorization filters before building the context, instruct the model to declare when evidence is insufficient, and return citations for the chunks used when appropriate.
+
+> [!note] Vector feature availability
+>
+> `VECTOR_DISTANCE` performs exact search. `VECTOR_SEARCH` and approximate vector indexes are preview features on the platforms documented by Learn; on SQL Server 2025, enable `PREVIEW_FEATURES = ON`. Confirm platform availability and limitations before using ANN in production.
 
 ---
 
 ## RAG Flow at a Glance
 
+### Diagram 1 — Query-time execution flow
+
 ```mermaid
 sequenceDiagram
     participant U as User
     participant App as Application
-    participant DB as Azure SQL Database
-    participant E as Azure OpenAI (embeddings)
-    participant L as Azure OpenAI (chat)
+    participant DB as SQL Database Engine
+    participant E as Embedding model or API
+    participant L as Chat model or API
 
     U->>App: question
-    App->>DB: pass question
-    DB->>E: PREDICT — embed question
-    E-->>DB: query VECTOR(1536)
-    DB->>DB: VECTOR_DISTANCE + WITH APPROXIMATE (top-K chunks)
-    DB->>DB: build prompt (system + context + user)
-    DB->>L: sp_invoke_external_rest_endpoint
-    L-->>DB: JSON in $.result envelope
-    DB->>DB: JSON_VALUE(@resp, $.result.choices[0].message.content)
-    DB-->>App: grounded answer
+    App->>E: generate question embedding
+    E-->>App: query vector
+    App->>DB: vector/full-text search (top-K chunks)
+    DB-->>App: relevant chunks
+    App->>App: build prompt (system + context + user)
+    App->>L: call chat model
+    L-->>App: response with citations
     App-->>U: response
 ```
 
-![RAG End-to-End Architecture in SQL Server](../../../dist/images/rag_architecture_sql_server.png)
+This diagram shows the path of a user question at runtime. The application
+coordinates the flow: it asks an embedding model for a vector, queries the SQL
+Database Engine, receives the most relevant chunks, builds the prompt, calls the
+chat model, and returns the response.
+
+The SQL Database Engine appears between the application and the chat model
+because it is the retrieval layer. It stores chunks, embeddings, and metadata,
+performs vector/full-text search, and applies filters such as tenant, category,
+and permissions. The horizontal order of participants is only a way to read the
+sequence; it is not a layer hierarchy. The database is the RAG data foundation,
+while the application orchestrates the calls in this architecture.
+
+### Diagram 2 — Ingestion, storage, and query
+
+```mermaid
+flowchart LR
+    I[Documents and data] --> P[Ingestion and chunking]
+    P --> V[Embeddings and metadata]
+    V --> S[Search index or tables]
+    Q[User query] --> R[Retrieval with filters]
+    S --> R
+    R --> C[Context with sources]
+    C --> G[LLM generates response]
+    Q --> G
+    G --> A[Response with citations]
+```
+
+This diagram expands the previous view to include data preparation:
+
+- **Ingestion**: documents and data are extracted, split into chunks, and
+  enriched with embeddings and metadata.
+- **Storage**: chunks, vectors, and metadata are stored in tables or a search
+  index.
+- **Query**: the user question is converted into a query, retrieval applies
+  authorization and business filters, and a sourced context is returned.
+- **Generation**: the retrieved context and question are sent to the LLM, which
+  produces a response and may include citations.
+
+The first diagram emphasizes the order of calls during a question; the second
+shows the complete lifecycle, including work that happens before query time.
+Document embeddings are normally generated during ingestion, while the query
+embedding is generated again for each query using the same model and dimensions.
 
 > **Mental model**: RAG is **open-book exam** — the model reads the notes you handed it for this one question; its weights do not change. Fine-tuning is **studying** — it changes what the student knows.
 
@@ -323,13 +370,30 @@ Advantages: Managed search service with built-in RRF; scales independently of da
 
 ## Use Cases
 
-| Use Case | Data Type | Search Type | Latency Target |
+| Use Case | Data Type | Search Type | Latency Target (example) |
 | :--- | :--- | :--- | :--- |
-| Policy/FAQ chat | Documents | Hybrid (FTS + vector) | < 3 seconds |
-| Product advisor | Catalog | Vector + structured filter | < 2 seconds |
-| Document Q&A | Unstructured | Vector | < 3 seconds |
-| Analytics summary | Structured tables | SQL query only | < 5 seconds |
-| Customer history | Structured | SQL (exact match on IDs) | < 1 second |
+| Policy/FAQ chat | Documents | Hybrid (FTS + vector) | Define and measure an SLO |
+| Product advisor | Catalog | Vector + structured filter | Define and measure an SLO |
+| Document Q&A | Unstructured | Vector or hybrid | Define and measure an SLO |
+| Analytics summary | Structured tables | SQL query only | Define and measure an SLO |
+| Customer history | Structured | SQL (exact match on IDs) | Define and measure an SLO |
+
+The targets depend on data size, model, region, concurrency, caching, candidate
+count, and provider limits. Measure embedding generation, retrieval, prompt
+construction, and response generation separately.
+
+> [!note] What is an SLO?
+>
+> **SLO** (*Service Level Objective*) is a measurable technical target for a
+> service. For example: “95% of FAQ queries must complete within 3 seconds.”
+>
+> An SLO defines the metric, target, evaluation window, and query scope. In RAG,
+> latency can be split across embedding generation, database retrieval, prompt
+> construction, and the LLM call. `p95 <= 3 s` means that 95% of requests must
+> finish within 3 seconds; it does not promise that every request will do so.
+>
+> **SLO is not SLA**: an SLO is an internal technical target; an SLA is a formal
+> customer commitment, usually with consequences when it is not met.
 
 ---
 

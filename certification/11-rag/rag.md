@@ -56,6 +56,7 @@ flowchart TD
 | :--- | :--- | :--- |
 | [01-rag-use-cases.md](01-rag-use-cases.md) | RAG use cases and architecture patterns | High |
 | [02-prompts-and-responses.md](02-prompts-and-responses.md) | sp_invoke_external_rest_endpoint, JSON conversion, LLM responses | High |
+| [03-rag-prompt-injection-end-to-end-lab.sql](../../practice/labs/11-rag/03-rag-prompt-injection-end-to-end-lab.sql) | End-to-end prompt-injection detection, quarantine, notification, and response validation lab | High |
 
 ## Key Concepts
 
