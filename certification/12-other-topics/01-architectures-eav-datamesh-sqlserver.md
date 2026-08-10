@@ -56,6 +56,7 @@ erDiagram
 ```
 
 #### Problems and Bottlenecks of Classic EAV:
+
 1. **Join Explosion**: To reconstruct a single object with 10 attributes, the SQL query requires 10 `LEFT JOIN`s on the `AttributeValues` table.
 2. **Type Loss**: All values are typically stored as `VARCHAR`/`TEXT`, requiring explicit conversions (`CAST`/`CONVERT`) at runtime.
 3. **Optimization Inability**: The Query Optimizer loses column statistics, generating disastrous cardinality estimates.
@@ -90,6 +91,7 @@ graph TD
 ## 2. Data Mesh Pattern and SQL Server as a "Data Product"
 
 **Data Mesh** is a decentralized architectural paradigm based on 4 fundamental pillars:
+
 1. **Domain-Driven Ownership**
 2. **Data as a Product**
 3. **Self-serve Data Platform**
@@ -122,11 +124,11 @@ graph LR
 In a Data Mesh architecture, each domain team (e.g., Sales, Inventory, HR) owns its own data product. SQL Server fits as the persistence engine and operational repository of the domain through the following resources:
 
 1. **Schema-Driven Data Products via JSON Metadata**:
-   - As demonstrated in the labs, metadata tables generate dynamic T-SQL queries via `sp_executesql`, allowing the Data Product to expose new JSON properties without breaking contracts or requiring database redeployments.
+   * As demonstrated in the labs, metadata tables generate dynamic T-SQL queries via `sp_executesql`, allowing the Data Product to expose new JSON properties without breaking contracts or requiring database redeployments.
 2. **Data API Builder (DAB)**:
-   - A native Microsoft tool that encapsulates SQL Server and automatically exposes secure **REST and GraphQL** endpoints with JWT/Azure AD support, without needing to write intermediary API code.
+   * A native Microsoft tool that encapsulates SQL Server and automatically exposes secure **REST and GraphQL** endpoints with JWT/Azure AD support, without needing to write intermediary API code.
 3. **Event-Driven Data Mesh (CDC + Change Tracking)**:
-   - Through **Change Data Capture (CDC)** or **Change Tracking**, SQL Server publishes change events directly to Event Grid or Azure Functions, feeding other data domains in real time.
+   * Through **Change Data Capture (CDC)** or **Change Tracking**, SQL Server publishes change events directly to Event Grid or Azure Functions, feeding other data domains in real time.
 
 ---
 
@@ -192,6 +194,7 @@ sequenceDiagram
 ```
 
 #### Pillars of Hybrid SQL Server with Azure Arc:
+
 1. **Unified Governance and Patching**: Centralized management of licenses, backups, and vulnerabilities through the Azure portal, even for instances running in the local datacenter.
 2. **Microsoft Purview Integration**: Automatic data mapping and lineage covering both local tables and cloud databases.
 3. **Hybrid Disaster Recovery**: Use of Managed Instances in the cloud as read replicas/disaster recovery (*Managed Instance Link*) for local databases.

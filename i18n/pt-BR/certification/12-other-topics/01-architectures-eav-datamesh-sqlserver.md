@@ -49,6 +49,7 @@ erDiagram
 ```
 
 #### ⚠️ Problemas e Gargalos do EAV Clássico:
+
 1. **Join Explosion**: Para reconstruir um único objeto com 10 atributos, a consulta SQL exige 10 `LEFT JOIN`s na tabela `AttributeValues`.
 2. **Perda de Tipagem**: Todos os valores geralmente acabam salvos como `VARCHAR`/`TEXT`, exigindo conversões explícitas (`CAST`/`CONVERT`) em tempo de execução.
 3. **Incapacidade de Otimização**: O otimizador de consultas (Query Optimizer) perde as estatísticas de coluna, gerando estimativas de cardinalidade desastrosas.
@@ -83,6 +84,7 @@ graph TD
 ## 2. Padrão Data Mesh e o SQL Server como "Data Product"
 
 O **Data Mesh** é um paradigma arquitetural descentralizado baseado em 4 pilares fundamentais:
+
 1. **Propriedade Orientada ao Domínio (Domain-Driven Ownership)**
 2. **Dados como Produto (Data as a Product)**
 3. **Plataforma de Dados de Auto-serviço (Self-serve Data Platform)**
@@ -115,11 +117,11 @@ graph LR
 Em uma arquitetura Data Mesh, cada equipe de domínio (ex: Vendas, Estoque, RH) é proprietária do seu próprio produto de dados. O SQL Server se encaixa como a engine de persistência e repositório operacional do domínio através dos seguintes recursos:
 
 1. **Schema-Driven Data Products via JSON Metadados**:
-   - Conforme demonstrado nos laboratórios, tabelas de metadados geram consultas dinâmicas T-SQL via `sp_executesql`, permitindo que o Produto de Dados exponha novas propriedades do JSON sem precisar quebrar contratos ou exigir redesplegues do banco.
+   * Conforme demonstrado nos laboratórios, tabelas de metadados geram consultas dinâmicas T-SQL via `sp_executesql`, permitindo que o Produto de Dados exponha novas propriedades do JSON sem precisar quebrar contratos ou exigir redesplegues do banco.
 2. **Data API Builder (DAB)**:
-   - Ferramenta nativa da Microsoft que encapsula o SQL Server e expõe automaticamente endpoints **REST e GraphQL** seguros com suporte a JWT/Azure AD, sem necessidade de escrever código de API intermediário.
+   * Ferramenta nativa da Microsoft que encapsula o SQL Server e expõe automaticamente endpoints **REST e GraphQL** seguros com suporte a JWT/Azure AD, sem necessidade de escrever código de API intermediário.
 3. **Event-Driven Data Mesh (CDC + Change Tracking)**:
-   - Através do **Change Data Capture (CDC)** ou **Change Tracking**, o SQL Server publica eventos de alteração diretamente para o Event Grid ou Azure Functions, alimentando outros domínios de dados em tempo real.
+   * Através do **Change Data Capture (CDC)** ou **Change Tracking**, o SQL Server publica eventos de alteração diretamente para o Event Grid ou Azure Functions, alimentando outros domínios de dados em tempo real.
 
 ---
 
@@ -185,6 +187,7 @@ sequenceDiagram
 ```
 
 #### 🛡️ Pilares do SQL Server Híbrido com Azure Arc:
+
 1. **Governança e Patching Unificado**: Gerenciamento centralizado de licenças, backups e vulnerabilidades pelo portal do Azure, mesmo para instâncias rodando no datacenter local.
 2. **Microsoft Purview Integration**: Mapeamento e linhagem automática de dados (Data Lineage) cobrindo tanto tabelas locais quanto bancos na nuvem.
 3. **Disaster Recovery Híbrido**: Uso de Managed Instances na nuvem como réplicas de leitura/disaster recovery (*Managed Instance Link*) de bancos locais.
