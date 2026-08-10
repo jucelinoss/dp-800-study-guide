@@ -133,6 +133,32 @@ WHERE ShipCountry = N'UK';
 
 ---
 
+## EAV versus JSON híbrido
+
+O padrão **EAV (Entity-Attribute-Value)** armazena cada atributo em uma linha,
+normalmente distribuída entre tabelas de entidades, atributos e valores. Ele é
+flexível, mas pode exigir várias junções ou agregações para reconstruir uma
+entidade, além de tornar tipagem, integridade, estatísticas e indexação mais
+difíceis.
+
+Uma alternativa comum é o **modelo híbrido**: manter identificadores,
+relacionamentos, medidas e atributos frequentemente filtrados em colunas
+relacionais e armazenar no JSON apenas propriedades opcionais ou de evolução
+rápida. Os caminhos JSON usados com frequência podem ser projetados em colunas
+computadas e indexados.
+
+| Situação | Escolha inicial |
+| --- | --- |
+| Atributo participa de chave, relacionamento, filtro frequente ou regra de integridade | Coluna relacional |
+| Atributo opcional e de evolução rápida | JSON híbrido |
+| Atributos definidos livremente pelo usuário e altamente variáveis | EAV, com parcimônia e governança |
+
+EAV não é automaticamente um antipadrão: pode ser adequado quando os atributos
+são realmente imprevisíveis. O custo aparece quando o modelo precisa sustentar
+consultas relacionais frequentes, tipagem forte e regras de negócio complexas.
+Para escolher entre as alternativas, meça o padrão de acesso e o custo de
+escrita, armazenamento e manutenção dos índices.
+
 ## Casos de uso
 
 - **Catálogos de produtos:** atributos variáveis por tipo de produto.

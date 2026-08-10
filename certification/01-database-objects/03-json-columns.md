@@ -123,6 +123,30 @@ WHERE ShipCountry = 'UK';
 
 ---
 
+## EAV versus Hybrid JSON
+
+The **EAV (Entity-Attribute-Value)** pattern stores each attribute as a row,
+usually across entity, attribute, and value tables. It is flexible, but it can
+require several joins or aggregations to reconstruct an entity and can make
+typing, integrity, statistics, and indexing harder.
+
+A common alternative is a **hybrid model**: keep identifiers, relationships,
+measures, and frequently filtered attributes in relational columns, and store
+only optional or rapidly evolving properties in JSON. Frequently queried JSON
+paths can be projected into computed columns and indexed.
+
+| Situation | Initial choice |
+| --- | --- |
+| Attribute participates in a key, relationship, frequent filter, or integrity rule | Relational column |
+| Optional attribute that evolves quickly | Hybrid JSON |
+| User-defined and highly variable attributes | EAV, with restraint and governance |
+
+EAV is not automatically an anti-pattern; it can be appropriate when attributes
+are genuinely unpredictable. The cost appears when the model must support
+frequent relational queries, strong typing, and complex business rules. Measure
+access patterns and the write, storage, and index-maintenance costs before
+choosing among the alternatives.
+
 ## Use Cases
 
 - **Product catalogs**: Variable attribute sets per product type stored as JSON
