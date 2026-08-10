@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Limpeza preventiva
+-- ATENÇÃO: este lab é específico do Azure SQL Database. Ele altera uma regra
+-- de firewall e cria uma credencial de escopo; use uma base descartável.
 IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = 'AzureOpenAIManagedIdentity')
     DROP DATABASE SCOPED CREDENTIAL [AzureOpenAIManagedIdentity];
 
@@ -38,11 +40,36 @@ GO
 --   - sys.database_firewall_rules: Visão de catálogo para listar todas as regras ativas no banco.
 
 -- -- [PONTO DE ATENÇÃO DP-800]
--- 1. Criar regra de firewall permitindo um IP de desenvolvimento específico
+-- 1. Criar regra de firewall permitindo um IP de desenvolvimento específico.
+-- Substitua o placeholder pelo IP temporário real e remova os comentários.
+/*
 EXEC sp_set_database_firewall_rule
     @name = N'LabDevMachineRule',
-    @start_ip_address = '203.0.113.10',
-    @end_ip_address = '203.0.113.10';
+    @start_ip_address = '<SEU_IP_PUBLICO>',
+    @end_ip_address = '<SEU_IP_PUBLICO>';
+*/
+GO
+
+-- =================================================================================
+-- PARTE 4: CHECKLIST DE SEGURANÇA DAB / GRAPHQL / MCP
+-- =================================================================================
+-- Estes controles ficam fora do mecanismo do banco. Valide-os no serviço publicado
+-- e confirme que a identidade possui somente as permissões necessárias.
+
+-- Baseline do DAB (configuração ilustrativa; adapte à versão implantada):
+-- {
+--   "host": { "mode": "production", "authentication": { "provider": "StaticWebApps" } },
+--   "graphql": { "enabled": true, "allow-introspection": false, "depth-limit": 4 }
+-- }
+
+-- Revisão da identidade MCP: confirme que tabelas sensíveis não são expostas à role.
+SELECT dp.name AS PrincipalName, p.permission_name, p.state_desc,
+       OBJECT_SCHEMA_NAME(p.major_id) AS SchemaName,
+       OBJECT_NAME(p.major_id) AS ObjectName
+FROM sys.database_permissions AS p
+JOIN sys.database_principals AS dp ON dp.principal_id = p.grantee_principal_id
+WHERE dp.name IN (N'McpReadOnly', N'DabAppRole')
+ORDER BY dp.name, SchemaName, ObjectName;
 GO
 
 -- 2. Consultar regras ativas no banco de dados

@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Limpeza preventiva
+-- ATENÇÃO: este lab cria chaves e objetos criptografados no banco selecionado.
+-- Use uma base descartável. Nunca reutilize senha ou certificado de produção.
 IF EXISTS (SELECT * FROM sys.symmetric_keys WHERE name = 'LabSymKey')
     CLOSE SYMMETRIC KEY LabSymKey;
 
@@ -55,7 +57,8 @@ GO
 -- 1. Criar Master Key do Banco de Dados (se não existir)
 IF NOT EXISTS (SELECT * FROM sys.symmetric_keys WHERE name = '##DatabaseMasterKey##')
 BEGIN
-    CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'StrongP@ssword123!';
+    -- Substitua o placeholder antes de executar; não versione a senha real.
+    CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_LAB>';
 END
 GO
 

@@ -22,6 +22,8 @@ USE AdventureWorks2025;
 GO
 
 -- Limpeza preventiva
+-- ATENÇÃO: este lab cria usuários, roles e uma procedure com personificação.
+-- Execute em uma base descartável e revise as permissões antes de reutilizar o padrão.
 IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'usp_GetSalaryReport' AND schema_id = SCHEMA_ID('lab'))
     DROP PROCEDURE lab.usp_GetSalaryReport;
 
@@ -61,6 +63,15 @@ GRANT SELECT ON lab.SalaryData TO FinancialRole;
 
 CREATE USER JuniorAnalyst WITHOUT LOGIN;
 ALTER ROLE FinancialRole ADD MEMBER JuniorAnalyst;
+GO
+
+-- Exercício opcional de usuário contido (SQL Server com autenticação contida habilitada):
+-- CREATE USER LabContainedUser WITH PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_LAB>';
+-- ALTER ROLE FinancialRole ADD MEMBER LabContainedUser;
+
+-- Exercício de Managed Identity no Azure SQL (execute como administrador do Microsoft Entra):
+-- CREATE USER [my-app-service] FROM EXTERNAL PROVIDER;
+-- ALTER ROLE FinancialRole ADD MEMBER [my-app-service];
 GO
 
 -- -- [PONTO DE ATENÇÃO DP-800]
@@ -114,7 +125,9 @@ REVOKE SELECT ON lab.SalaryData FROM JuniorAnalyst;
 GO
 
 -- -- [PONTO DE ATENÇÃO DP-800]
--- Procedimento com EXECUTE AS OWNER para encapsular o acesso à tabela restrita
+-- Procedimento com EXECUTE AS OWNER para encapsular o acesso à tabela restrita.
+-- ATENÇÃO: OWNER pode ter privilégios amplos; prefira contexto de execução
+-- restrito ou ownership chaining quando isso atender ao requisito.
 CREATE PROCEDURE lab.usp_GetSalaryReport
 WITH EXECUTE AS OWNER
 AS

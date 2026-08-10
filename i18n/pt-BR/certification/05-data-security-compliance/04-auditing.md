@@ -9,7 +9,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Arquitetura do SQL Server Audit](#arquitetura-do-sql-server-audit)
 >   - 🔹 [Comportamento da Fila de Auditoria (Audit Queue)](#comportamento-da-fila-de-auditoria-audit-queue)
@@ -23,7 +23,7 @@ tags:
 >   - 🔹 [Habilitando via PowerShell](#habilitando-via-powershell)
 > - 📍 [5. Principais Grupos de Ações de Auditoria (Audit Action Groups)](#principais-grupos-de-ações-de-auditoria-audit-action-groups)
 > - 📍 [6. Consultando Logs de Auditoria](#consultando-logs-de-auditoria)
->   - 🔹 [Lendo Arquivos de Staging com fn_get_audit_file](#lendo-arquivos-de-staging-com-fn-get-audit-file)
+>   - 🔹 [Lendo Arquivos de Staging com fn_get_audit_file](#lendo-arquivos-de-staging-com-fn_get_audit_file)
 >   - 🔹 [Consultando Logs via KQL no Log Analytics](#consultando-logs-via-kql-no-log-analytics)
 > - 📍 [7. Tabelas Temporais como Trilhas de Auditoria (Temporal Tables)](#tabelas-temporais-como-trilhas-de-auditoria-temporal-tables)
 > - 📍 [8. Melhores Práticas de Auditoria](#melhores-práticas-de-auditoria)

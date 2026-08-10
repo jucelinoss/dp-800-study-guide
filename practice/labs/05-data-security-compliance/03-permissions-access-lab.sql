@@ -22,6 +22,8 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup
+-- WARNING: this lab creates users, roles, and a procedure with impersonation.
+-- Run in a disposable database and review the permissions before reusing the pattern.
 IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'usp_GetSalaryReport' AND schema_id = SCHEMA_ID('lab'))
     DROP PROCEDURE lab.usp_GetSalaryReport;
 
@@ -61,6 +63,15 @@ GRANT SELECT ON lab.SalaryData TO FinancialRole;
 
 CREATE USER JuniorAnalyst WITHOUT LOGIN;
 ALTER ROLE FinancialRole ADD MEMBER JuniorAnalyst;
+GO
+
+-- Optional contained-user exercise (SQL Server with contained authentication enabled):
+-- CREATE USER LabContainedUser WITH PASSWORD = '<REPLACE_WITH_UNIQUE_LAB_PASSWORD>';
+-- ALTER ROLE FinancialRole ADD MEMBER LabContainedUser;
+
+-- Azure SQL Managed Identity exercise (run as Microsoft Entra administrator):
+-- CREATE USER [my-app-service] FROM EXTERNAL PROVIDER;
+-- ALTER ROLE FinancialRole ADD MEMBER [my-app-service];
 GO
 
 -- -- [DP-800 EXAM TIP]
@@ -114,7 +125,9 @@ REVOKE SELECT ON lab.SalaryData FROM JuniorAnalyst;
 GO
 
 -- -- [DP-800 EXAM TIP]
--- Procedure with EXECUTE AS OWNER to encapsulate access to the restricted table
+-- Procedure with EXECUTE AS OWNER to encapsulate access to the restricted table.
+-- WARNING: OWNER can be highly privileged; prefer a narrowly scoped execution
+-- context or ownership chaining when it satisfies the requirement.
 CREATE PROCEDURE lab.usp_GetSalaryReport
 WITH EXECUTE AS OWNER
 AS

@@ -10,7 +10,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Máscaras Dinâmicas de Dados (DDM)](#máscaras-dinâmicas-de-dados-ddm)
 >   - 🔹 [Funções de Mascaramento (Masking Functions)](#funções-de-mascaramento-masking-functions)
@@ -20,7 +20,7 @@ tags:
 >   - 🔹 [Arquitetura de Execução](#arquitetura-de-execução)
 >   - 🔹 [Implementando Filtro de RLS (Filter Predicate)](#implementando-filtro-de-rls-filter-predicate)
 >   - 🔹 [Predicados de Bloqueio (Block Predicates)](#predicados-de-bloqueio-block-predicates)
->   - 🔹 [Padrão Multi-Tenant Utilizando SESSION_CONTEXT](#padrão-multi-tenant-utilizando-session-context)
+>   - 🔹 [Padrão Multi-Tenant Utilizando SESSION_CONTEXT](#padrão-multi-tenant-utilizando-session_context)
 >   - 🔹 [Gestão das Políticas de RLS](#gestão-das-políticas-de-rls)
 > - 📍 [4. Quadro Comparativo: DDM vs RLS](#quadro-comparativo-ddm-vs-rls)
 > - 📍 [5. Casos de Uso (Use Cases)](#casos-de-uso-use-cases)

@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup
+-- WARNING: this lab is Azure SQL Database-specific. It changes a database
+-- firewall rule and creates a scoped credential; use a disposable database.
 IF EXISTS (SELECT * FROM sys.database_scoped_credentials WHERE name = 'AzureOpenAIManagedIdentity')
     DROP DATABASE SCOPED CREDENTIAL [AzureOpenAIManagedIdentity];
 
@@ -38,11 +40,14 @@ GO
 --   - sys.database_firewall_rules: Catalog view listing all active rules in the database.
 
 -- -- [DP-800 EXAM TIP]
--- 1. Create a firewall rule allowing a specific development IP
+-- 1. Create a firewall rule allowing a specific development IP.
+-- Replace the TEST-NET placeholder with the real temporary lab IP, then uncomment.
+/*
 EXEC sp_set_database_firewall_rule
     @name = N'LabDevMachineRule',
-    @start_ip_address = '203.0.113.10',
-    @end_ip_address = '203.0.113.10';
+    @start_ip_address = '<YOUR_PUBLIC_IP>',
+    @end_ip_address = '<YOUR_PUBLIC_IP>';
+*/
 GO
 
 -- 2. Query active rules in the database
@@ -118,6 +123,29 @@ SELECT
     'Otimiza tráfego no backbone da Azure',
     'NÃO (Endpoint Público continua ativo)',
     'Abordagem legada; reduz latência mas exige regras de firewall';
+GO
+
+-- =================================================================================
+-- PART 4: DAB / GRAPHQL / MCP SECURITY CHECKLIST
+-- =================================================================================
+-- These endpoint controls are configured outside the database engine. Validate them
+-- in the deployed service, then verify that the service identity has only the
+-- database permissions it needs.
+
+-- DAB baseline (illustrative configuration; adapt to the deployed DAB version):
+-- {
+--   "host": { "mode": "production", "authentication": { "provider": "StaticWebApps" } },
+--   "graphql": { "enabled": true, "allow-introspection": false, "depth-limit": 4 }
+-- }
+
+-- MCP identity review: confirm that sensitive tables are not exposed to the service role.
+SELECT dp.name AS PrincipalName, p.permission_name, p.state_desc,
+       OBJECT_SCHEMA_NAME(p.major_id) AS SchemaName,
+       OBJECT_NAME(p.major_id) AS ObjectName
+FROM sys.database_permissions AS p
+JOIN sys.database_principals AS dp ON dp.principal_id = p.grantee_principal_id
+WHERE dp.name IN (N'McpReadOnly', N'DabAppRole')
+ORDER BY dp.name, SchemaName, ObjectName;
 GO
 
 -- =================================================================================================

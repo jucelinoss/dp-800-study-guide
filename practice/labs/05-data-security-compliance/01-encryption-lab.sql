@@ -22,6 +22,8 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup
+-- WARNING: this lab creates keys and encrypted objects in the selected database.
+-- Use a disposable database. Never reuse a production password or certificate.
 IF EXISTS (SELECT * FROM sys.symmetric_keys WHERE name = 'LabSymKey')
     CLOSE SYMMETRIC KEY LabSymKey;
 
@@ -96,7 +98,8 @@ GO
 -- 1. Create Database Master Key (if it doesn't exist)
 IF NOT EXISTS (SELECT * FROM sys.symmetric_keys WHERE name = '##DatabaseMasterKey##')
 BEGIN
-    CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'StrongP@ssword123!';
+    -- Replace the placeholder before execution; do not commit the real password.
+    CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<REPLACE_WITH_UNIQUE_LAB_PASSWORD>';
 END
 GO
 

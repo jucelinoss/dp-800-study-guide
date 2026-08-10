@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Preventive cleanup
+-- WARNING: this lab creates and drops server/database audit objects.
+-- Run only with administrative approval in a disposable environment.
 IF EXISTS (SELECT * FROM sys.database_audit_specifications WHERE name = 'LabDatabaseAuditSpec')
     ALTER DATABASE AUDIT SPECIFICATION LabDatabaseAuditSpec WITH (STATE = OFF);
 
@@ -53,7 +55,8 @@ GO
 --   - BATCH_COMPLETED_GROUP: The critical action group for capturing the full text of SQL statements (including SELECTs).
 
 -- -- [DP-800 EXAM TIP]
--- 1. Create Server Audit writing to a directory (or using Application Log)
+-- 1. Create Server Audit writing to a directory (or using Application Log).
+-- The directory must already exist and be writable by the SQL Server service account.
 CREATE SERVER AUDIT LabServerAudit
 TO APPLICATION_LOG -- Using Application Log for portability in lab tests
 WITH (QUEUE_DELAY = 1000, ON_FAILURE = CONTINUE);
@@ -97,7 +100,10 @@ GO
 --   - sys.fn_get_audit_file: Table function used to read `.sqlaudit` log files.
 --   - In Azure SQL environments writing to Storage Account or Log Analytics, queries use KQL (Kusto Query Language).
 
--- Conceptual example of reading logs from disk
+-- Replace the path with the actual audit directory before executing.
+-- This query applies to file-based SQL Server Audit, not Azure SQL Database
+-- auditing configured for Blob Storage, Log Analytics, or Event Hub.
+/*
 SELECT 
     event_time,
     action_id,
@@ -108,7 +114,16 @@ SELECT
     statement AS TextoConsultaSQL
 FROM sys.fn_get_audit_file('C:\AuditLogs\*.sqlaudit', DEFAULT, DEFAULT)
 ORDER BY event_time DESC;
+*/
 GO
+
+-- Azure SQL Database variant (run in PowerShell, not in the SQL window):
+-- Set-AzSqlDatabaseAudit -ResourceGroupName '<resource-group>' -ServerName '<server>' `
+--   -DatabaseName '<database>' -WorkspaceResourceId '<workspace-resource-id>' `
+--   -LogAnalyticsTargetState Enabled
+-- Example KQL in Log Analytics:
+-- AzureDiagnostics | where Category == 'SQLSecurityAuditEvents'
+-- | project TimeGenerated, statement_s, succeeded_s, server_principal_name_s
 
 
 -- =================================================================================

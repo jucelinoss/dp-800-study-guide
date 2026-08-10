@@ -79,6 +79,7 @@ flowchart TD
 - [04-AI-Assisted Tools](../04-ai-assisted-tools/ai-assisted-tools.md)
 - [06-Performance Optimization](../06-performance-optimization/performance-optimization.md)
 - [Official: Always Encrypted](https://learn.microsoft.com/en-us/sql/relational-databases/security/encryption/always-encrypted-database-engine)
+- [Official: SQL Data Discovery & Classification](https://learn.microsoft.com/en-us/sql/relational-databases/security/sql-data-discovery-and-classification)
 
 ## Next Steps
 

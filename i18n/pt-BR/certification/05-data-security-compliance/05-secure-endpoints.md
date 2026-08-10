@@ -11,7 +11,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Protegendo Endpoints de Modelos de IA (Securing AI Model Endpoints)](#protegendo-endpoints-de-modelos-de-ia-securing-ai-model-endpoints)
 >   - 🔹 [Chamando o Azure OpenAI com Identidade Gerenciada](#chamando-o-azure-openai-com-identidade-gerenciada)

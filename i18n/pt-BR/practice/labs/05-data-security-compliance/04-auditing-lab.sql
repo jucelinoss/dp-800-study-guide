@@ -21,6 +21,8 @@ USE AdventureWorks2025;
 GO
 
 -- Limpeza preventiva
+-- ATENÇÃO: este lab cria e remove objetos de auditoria no servidor/banco.
+-- Execute somente com aprovação administrativa em um ambiente descartável.
 IF EXISTS (SELECT * FROM sys.database_audit_specifications WHERE name = 'LabDatabaseAuditSpec')
     ALTER DATABASE AUDIT SPECIFICATION LabDatabaseAuditSpec WITH (STATE = OFF);
 
@@ -53,7 +55,8 @@ GO
 --   - BATCH_COMPLETED_GROUP: O grupo de ação crítico para capturar o texto completo das instruções SQL (inclusive SELECTs).
 
 -- -- [PONTO DE ATENÇÃO DP-800]
--- 1. Criar Server Audit gravando em diretório (ou usando Application Log)
+-- 1. Criar Server Audit gravando em diretório (ou usando Application Log).
+-- O diretório deve existir e ser gravável pela conta do serviço SQL Server.
 CREATE SERVER AUDIT LabServerAudit
 TO APPLICATION_LOG -- Usando Application Log para portabilidade nos testes de lab
 WITH (QUEUE_DELAY = 1000, ON_FAILURE = CONTINUE);
@@ -97,7 +100,10 @@ GO
 --   - sys.fn_get_audit_file: Função de tabela utilizada para ler arquivos de log `.sqlaudit`.
 --   - Em ambientes Azure SQL gravando em Storage Account ou Log Analytics, as consultas utilizam KQL (Kusto Query Language).
 
--- Exemplo conceitual de leitura de logs em disco
+-- Substitua o caminho pelo diretório real antes de executar.
+-- Este trecho vale para SQL Server Audit em arquivo, não para Azure SQL Database
+-- configurado com Blob Storage, Log Analytics ou Event Hub.
+/*
 SELECT 
     event_time,
     action_id,
@@ -108,7 +114,16 @@ SELECT
     statement AS TextoConsultaSQL
 FROM sys.fn_get_audit_file('C:\AuditLogs\*.sqlaudit', DEFAULT, DEFAULT)
 ORDER BY event_time DESC;
+*/
 GO
+
+-- Variante Azure SQL Database (execute no PowerShell, não na janela SQL):
+-- Set-AzSqlDatabaseAudit -ResourceGroupName '<resource-group>' -ServerName '<server>' `
+--   -DatabaseName '<database>' -WorkspaceResourceId '<workspace-resource-id>' `
+--   -LogAnalyticsTargetState Enabled
+-- Exemplo de KQL no Log Analytics:
+-- AzureDiagnostics | where Category == 'SQLSecurityAuditEvents'
+-- | project TimeGenerated, statement_s, succeeded_s, server_principal_name_s
 
 
 -- =================================================================================

@@ -12,13 +12,14 @@ status: complete
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Mapa Mental de Recapitulação Rápida (Quick Recall)](#mapa-mental-de-recapitulação-rápida-quick-recall)
 > - 📍 [2. Visão Geral dos Tópicos (Topics Overview)](#visão-geral-dos-tópicos-topics-overview)
 > - 📍 [3. Conteúdo da Seção (Section Contents)](#conteúdo-da-seção-section-contents)
 > - 📍 [4. Conceitos Chave (Key Concepts)](#conceitos-chave-key-concepts)
 > - 📍 [5. Recursos Relacionados (Related Resources)](#recursos-relacionados-related-resources)
 > - 📍 [6. Próximos Passos (Next Steps)](#próximos-passos-next-steps)
+>
 ---
 
 # Implementar Segurança de Dados e Conformidade (Domínio 2 — 35–40%)
@@ -72,6 +73,7 @@ flowchart TD
 | [03-permissions-access.md](03-permissions-access.md) | Permissões de objeto, acessos sem senha (passwordless) | Alta |
 | [04-auditing.md](04-auditing.md) | Auditoria de banco de dados e servidores | Média |
 | [05-secure-endpoints.md](05-secure-endpoints.md) | Managed Identity, segurança de endpoints GraphQL/REST/MCP | Média |
+| [Lab: Classificação de Sensibilidade](../../practice/labs/05-data-security-compliance/06-sensitivity-classification-lab.sql) | `ADD SENSITIVITY CLASSIFICATION`, `sys.sensitivity_classifications` | Média |
 
 ## Conceitos Chave (Key Concepts)
 
@@ -81,12 +83,14 @@ flowchart TD
 - **Segurança em Nível de Linha (RLS)**: Isolamento lógico de registros sob tabelas aplicando predicados de filtragem e de bloqueio.
 - **Identidade Gerenciada (Managed Identity)**: Autenticação de serviços sem necessidade de gerenciar senhas.
 - **Logs de Auditoria**: Rastreamento de atividades salvando logs no Storage Account, Event Hub ou Log Analytics.
+- **Classificação de Sensibilidade**: Metadados que identificam colunas sensíveis; sozinha não mascara nem criptografa os valores.
 
 ## Recursos Relacionados (Related Resources)
 
 - [04-AI-Assisted Tools](../04-ai-assisted-tools/ai-assisted-tools.md)
 - [06-Performance Optimization](../06-performance-optimization/performance-optimization.md) *(Inglês apenas)*
 - [Documentação Oficial: Always Encrypted](https://learn.microsoft.com/en-us/sql/relational-databases/security/encryption/always-encrypted-database-engine)
+- [Classificação e Descoberta de Dados](https://learn.microsoft.com/pt-br/sql/relational-databases/security/sql-data-discovery-and-classification)
 
 ## Próximos Passos (Next Steps)
 

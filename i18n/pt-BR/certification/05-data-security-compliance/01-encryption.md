@@ -10,7 +10,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Criptografia de Dados Transparente (TDE)](#criptografia-de-dados-transparente-tde)
 > - 📍 [3. Always Encrypted](#always-encrypted)
@@ -75,7 +75,7 @@ O TDE criptografa fisicamente os arquivos do banco de dados no disco rígido —
 ```sql
 -- Ativar TDE localmente (O Azure SQL já possui o TDE ativo por padrão)
 USE master;
-CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'StrongP@ssword123!';
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA>'; -- nunca versione a senha real
 
 CREATE CERTIFICATE TDECert
 WITH SUBJECT = 'TDE Certificate';
@@ -132,13 +132,16 @@ Column Master Key (CMK)
 A **CMK (Column Master Key)** é uma **chave mestra de proteção** (Key-Protecting Key) mantida em um cofre externo confiável (como **Azure Key Vault** ou **Windows Certificate Store**).
 
 #### 🎯 Qual é o papel da CMK?
+
 - A CMK **NÃO criptografa os dados das linhas da tabela diretamente**.
 - A única função da CMK é **criptografar e proteger a CEK (Column Encryption Key)**.
 
 #### 💡 Por que o Always Encrypted usa 2 chaves (CMK + CEK)?
+
 Se a aplicação tivesse que chamar o Azure Key Vault para criptografar/descriptografar cada registro de uma tabela, uma consulta de 10.000 linhas causaria 10.000 requisições de rede ao Key Vault, tornando a aplicação extremamente lenta.
 
 Para resolver isso, o Always Encrypted divide as responsabilidades em duas chaves:
+
 1. **CEK (Column Encryption Key):** É uma chave simétrica rápida (AES-256) usada para cifrar os dados reais das colunas. A CEK é armazenada dentro do banco de dados, porém em formato criptografado.
 2. **CMK (Column Master Key):** É a chave mestra que protege a CEK. O driver da aplicação acessa o repositório da CMK quando precisa obter ou usar a chave, normalmente aproveitando cache da CEK para evitar uma chamada por registro. A partir daí, o driver usa a CEK local para cifrar/decifrar os dados.
 
@@ -244,9 +247,10 @@ SELECT * FROM dbo.Patients WHERE SSN = '123-45-6789'; -- Funciona apenas com DET
 ### Limitações do Always Encrypted Padrão
 
 O Always Encrypted padrão (apenas no lado do cliente) limita consideravelmente a flexibilidade de desenvolvimento:
-* Colunas criptografadas suportam apenas filtros de igualdade (`=`, `IN`) se configuradas com o tipo **DETERMINISTIC**.
-* Colunas configuradas com criptografia **RANDOMIZED** não suportam nenhum tipo de filtro ou pesquisa T-SQL.
-* Consultas de intervalo (`<`, `>`, `BETWEEN`), ordenação (`ORDER BY`), pesquisas textuais parciais (`LIKE`) e alterações de esquema *in-place* falham, pois o motor do banco de dados não possui acesso aos dados em texto plano.
+
+- Colunas criptografadas suportam apenas filtros de igualdade (`=`, `IN`) se configuradas com o tipo **DETERMINISTIC**.
+- Colunas configuradas com criptografia **RANDOMIZED** não suportam nenhum tipo de filtro ou pesquisa T-SQL.
+- Consultas de intervalo (`<`, `>`, `BETWEEN`), ordenação (`ORDER BY`), pesquisas textuais parciais (`LIKE`) e alterações de esquema *in-place* falham, pois o motor do banco de dados não possui acesso aos dados em texto plano.
 
 ---
 
@@ -292,11 +296,11 @@ flowchart LR
 ### Tecnologias de Enclave Suportadas
 
 1. **VBS (Virtualization-based Security Enclaves):**
-   * **Implementação:** Isolamento de memória baseado em software e hipervisor (Hyper-V). Suportado no SQL Server 2019+ (Windows Server 2019+ / Windows 10/11) e no **Azure SQL Database**.
-   * **Vantagem:** Dispensam hardware especial na CPU. Facilidade de implantação e menor custo de infraestrutura.
+   - **Implementação:** Isolamento de memória baseado em software e hipervisor (Hyper-V). Suportado no SQL Server 2019+ (Windows Server 2019+ / Windows 10/11) e no **Azure SQL Database**.
+   - **Vantagem:** Dispensam hardware especial na CPU. Facilidade de implantação e menor custo de infraestrutura.
 2. **Intel SGX (Software Guard Extensions):**
-   * **Implementação:** Enclave baseado em instruções dedicadas de hardware da CPU Intel.
-   * **Vantagem:** Nível máximo de isolamento garantido por hardware. Suportado no SQL Server 2019+ e configurações de hardware específicas.
+   - **Implementação:** Enclave baseado em instruções dedicadas de hardware da CPU Intel.
+   - **Vantagem:** Nível máximo de isolamento garantido por hardware. Suportado no SQL Server 2019+ e configurações de hardware específicas.
 
 ---
 
@@ -304,17 +308,17 @@ flowchart LR
 
 Antes de enviar a chave de criptografia de coluna (CEK) para o enclave, o driver da aplicação cliente executa o protocolo de **Atestação (Attestation)** para verificar cryptographicamente a integridade do enclave e garantir que ele é autêntico e não foi modificado:
 
-* **Host Guardian Service (HGS):** Utilizado em ambientes *on-premises* ou VMs IaaS com SQL Server.
-* **Microsoft Azure Attestation (MAA):** Utilizado nativamente no **Azure SQL Database** e serviços PaaS da Microsoft.
+- **Host Guardian Service (HGS):** Utilizado em ambientes *on-premises* ou VMs IaaS com SQL Server.
+- **Microsoft Azure Attestation (MAA):** Utilizado nativamente no **Azure SQL Database** e serviços PaaS da Microsoft.
 
 ---
 
 ### Operações Suportadas por Enclaves Seguros
 
-* **Consultas de Intervalo:** `<`, `>`, `<=`, `>=`, `BETWEEN`.
-* **Filtros por Padrão de Texto:** `LIKE`, `IN`.
-* **Ordenação e Agrupamentos:** `ORDER BY`, `GROUP BY` em colunas criptografadas de forma randômica (`RANDOMIZED`).
-* **Criptografia In-Place (Online):** Permite alterar tipos de criptografia ou adicionar chaves via `ALTER TABLE ... ALTER COLUMN ... ENCRYPTED WITH (...)` diretamente no servidor, sem necessidade de baixar terabytes de dados para o cliente.
+- **Consultas de Intervalo:** `<`, `>`, `<=`, `>=`, `BETWEEN`.
+- **Filtros por Padrão de Texto:** `LIKE`, `IN`.
+- **Ordenação e Agrupamentos:** `ORDER BY`, `GROUP BY` em colunas criptografadas de forma randômica (`RANDOMIZED`).
+- **Criptografia In-Place (Online):** Permite alterar tipos de criptografia ou adicionar chaves via `ALTER TABLE ... ALTER COLUMN ... ENCRYPTED WITH (...)` diretamente no servidor, sem necessidade de baixar terabytes de dados para o cliente.
 
 ---
 
@@ -325,6 +329,7 @@ O driver cliente (.NET, JDBC, ODBC, etc.) precisa especificar que deseja utiliza
 ```text
 Column Encryption Setting=Enabled; Attestation Protocol=HGS; Enclave Attestation Url=https://hgs.domain.com/Attestation;
 ```
+
 *(Nota: No Azure SQL Database com VBS, o provedor de atestação do Azure gerencia os parâmetros de URL e protocolo de forma transparente).*
 
 ---
@@ -439,7 +444,7 @@ BACKUP CERTIFICATE TDECert
 TO FILE = 'C:\Backup\TDECert.cer'
 WITH PRIVATE KEY (
     FILE = 'C:\Backup\TDECert_pk.pvk',
-    ENCRYPTION BY PASSWORD = 'StrongBk*pPassword1!'
+    ENCRYPTION BY PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_BACKUP>'
 );
 ```
 

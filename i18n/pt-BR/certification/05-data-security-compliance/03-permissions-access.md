@@ -11,7 +11,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Hierarquia de Permissões (Permission Hierarchy)](#hierarquia-de-permissões-permission-hierarchy)
 > - 📍 [3. Principais de Servidor e Banco (Server and Database Principals)](#principais-de-servidor-e-banco-server-and-database-principals)
@@ -83,7 +83,7 @@ Nível Servidor (Login) → Nível Banco (User/Role) → Nível Schema → Níve
 
 ```sql
 -- Login de SQL Server comum (Não recomendado para nuvem; use autenticação Entra ID)
-CREATE LOGIN AppLogin WITH PASSWORD = 'P@ssword123!';
+CREATE LOGIN AppLogin WITH PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_LOGIN>';
 
 -- Login baseado no Azure AD / Entra ID (Azure SQL)
 CREATE LOGIN [user@contoso.com] FROM EXTERNAL PROVIDER;
@@ -95,7 +95,7 @@ CREATE USER AppUser FOR LOGIN AppLogin;
 CREATE USER [app-service-identity] FROM EXTERNAL PROVIDER;
 
 -- Usuário sem Login de servidor (Contained Database User)
-CREATE USER ReportUser WITH PASSWORD = 'Report#2025!';
+CREATE USER ReportUser WITH PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_USUARIO_CONTIDO>';
 ```
 
 ---
@@ -173,7 +173,7 @@ flowchart TD
     subgraph TRAD["❌ Modelo Tradicional"]
         direction TB
         App1["Azure App Service"]
-        Conf["appsettings.json<br/><i>User=dbuser; Password=P@ssword123!</i>"]
+        Conf["appsettings.json<br/><i>User=dbuser; Password=&lt;secret-from-vault&gt;</i>"]
         DB1[("Azure SQL Database")]
         App1 -->|"Lê senha exposta"| Conf
         App1 -->|"Envia User + Password"| DB1
@@ -204,6 +204,7 @@ O Azure disponibiliza dois tipos de Identidades Gerenciadas no Microsoft Entra I
 | **Caso de Uso Recomendado** | Cargas de trabalho isoladas e aplicações com ciclo de vida único. | Microsserviços e conjuntos de instâncias (ex.: clusters AKS ou VM Scale Sets). |
 
 > [!tip] Identidades Gerenciadas no Azure: System-Assigned vs User-Assigned
+>
 > - **System-assigned**: Ideal quando a identidade precisa pertencer unicamente àquele serviço específico. Ao deletar o serviço, o Azure limpa o Service Principal no Entra ID automaticamente.
 > - **User-assigned**: Ideal quando múltiplos serviços (ex: 3 Azure Functions distintas) precisam reutilizar a mesma identidade lógica de banco de dados para simplificar a concessão de permissões SQL.
 
@@ -306,6 +307,7 @@ O driver `Microsoft.Data.SqlClient` suporta diversos modos de autenticação no 
 ### Dicas para o Exame DP-800
 
 > [!important] Cenários Frequentes sobre Passwordless e Managed Identity
+>
 > 1. **Eliminação Total de Credenciais:** Se o requisito for conectar uma aplicação Azure PaaS ao Azure SQL **sem armazenar credenciais ou segredos em nenhum lugar**, a resposta correta é **Managed Identity + Contained Database User (`FROM EXTERNAL PROVIDER`)**.
 > 2. **Autenticação de Desenvolvimento vs Produção:** Usar `Authentication=Active Directory Default` ou `DefaultAzureCredential` permite que o código use Azure CLI/VS Code localmente no dev e a **Managed Identity** nativamente quando implantado no Azure sem mudar o código.
 
@@ -332,6 +334,7 @@ GRANT INSERT ON dbo.OrderItems TO AppUser;
 ### Visão Geral da Arquitetura
 
 Historicamente no SQL Server, a segurança é estruturada em dois níveis distintos:
+
 1. **Instância / Servidor (`master`):** Onde reside o **Login** (identidade e credencial de autenticação).
 2. **Banco de Dados:** Onde reside o **User** (mapeado para o Login para receber permissões e papéis).
 
@@ -362,14 +365,14 @@ flowchart TD
 No modelo de banco contido, existem três tipos principais de usuários:
 
 1. **Usuário Contido com Senha (*Contained User with Password*):**
-   * Criado diretamente no banco de dados com `CREATE USER ReportUser WITH PASSWORD = '...'`.
-   * A hash da senha é armazenada diretamente na tabela de sistema do banco do usuário (`sys.database_principals`), dispensando qualquer registro no banco `master`.
+   - Criado diretamente no banco de dados com `CREATE USER ReportUser WITH PASSWORD = '...'`.
+   - A hash da senha é armazenada diretamente na tabela de sistema do banco do usuário (`sys.database_principals`), dispensando qualquer registro no banco `master`.
 2. **Usuário do Microsoft Entra ID / Azure AD (*External Provider User*):**
-   * Criado no Azure SQL Database ou Azure SQL Managed Instance via `CREATE USER [user@domain.com] FROM EXTERNAL PROVIDER`.
-   * A autenticação é delegada ao Microsoft Entra ID (nuvem) e o mapeamento de acesso ocorre diretamente dentro do banco de dados.
+   - Criado no Azure SQL Database ou Azure SQL Managed Instance via `CREATE USER [user@domain.com] FROM EXTERNAL PROVIDER`.
+   - A autenticação é delegada ao Microsoft Entra ID (nuvem) e o mapeamento de acesso ocorre diretamente dentro do banco de dados.
 3. **Usuário Contido sem Senha (*Contained User Without Login/Password*):**
-   * Criado via `CREATE USER AppInternalUser WITHOUT LOGIN`.
-   * Utilizado para personificação de segurança (`EXECUTE AS USER`) ou para conceder permissões a objetos internos sem permitir conexões diretas por clientes externos.
+   - Criado via `CREATE USER AppInternalUser WITHOUT LOGIN`.
+   - Utilizado para personificação de segurança (`EXECUTE AS USER`) ou para conceder permissões a objetos internos sem permitir conexões diretas por clientes externos.
 
 ---
 
@@ -406,10 +409,10 @@ Como o usuário contido não possui cadastro no banco `master`, o SQL Server nã
 
 ```text
 -- ✅ Conexão bem-sucedida (especifica o banco de dados contido):
-Server=meuservidor.database.windows.net; Database=MeuBancoDados; User Id=ReportUser; Password=Report#2025!;
+Server=meuservidor.database.windows.net; Database=MeuBancoDados; User Id=ReportUser; Password=<segredo-do-cofre>;
 
 -- ❌ Falha de Autenticação (Erro 18456 - Tenta autenticar no 'master', onde o usuário não existe):
-Server=meuservidor.database.windows.net; User Id=ReportUser; Password=Report#2025!;
+Server=meuservidor.database.windows.net; User Id=ReportUser; Password=<segredo-do-cofre>;
 ```
 
 ---
@@ -432,7 +435,7 @@ GO
 
 -- Passo 3: Criar o Usuário Contido com Senha direto no banco de dados do usuário
 USE SalesDB;
-CREATE USER ReportUser WITH PASSWORD = 'Report#2025!';
+CREATE USER ReportUser WITH PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_USUARIO_CONTIDO>';
 ALTER ROLE db_datareader ADD MEMBER ReportUser;
 GO
 ```
@@ -446,7 +449,7 @@ No Azure SQL Database, a infraestrutura PaaS é contida por padrão. Você pode 
 USE SalesDB;
 
 -- Criar usuário contido com senha local
-CREATE USER AppUser WITH PASSWORD = 'StrongP@ssword2026!';
+CREATE USER AppUser WITH PASSWORD = '<SUBSTITUA_POR_SENHA_UNICA_DO_USUARIO_CONTIDO>';
 ALTER ROLE db_datareader ADD MEMBER AppUser;
 ALTER ROLE db_datawriter ADD MEMBER AppUser;
 
