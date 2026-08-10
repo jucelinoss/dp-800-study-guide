@@ -265,6 +265,10 @@ as cargas, a cardinalidade, o desempenho medido e a capacidade de manutenção.
 - O desenho preserva histórico quando o negócio precisa analisar o passado?
 - O modelo foi validado com consultas representativas e totais de reconciliação?
 
+## Laboratório
+
+O [laboratório de modelagem dimensional](../../practice/labs/12-other-topics/05-dimensional-modeling-lab.sql) implementa no SQL Server um star schema com grão explícito de item de pedido, dimensões de data, produto e cliente, chaves substitutas, membro desconhecido, papéis de data e medidas reconciliadas. Ele também cria uma variante Snowflake para comparar a hierarquia de produto e os joins adicionais.
+
 ## Documentação oficial
 
 - [Modelagem dimensional no Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/data-warehouse/dimensional-modeling-overview)
