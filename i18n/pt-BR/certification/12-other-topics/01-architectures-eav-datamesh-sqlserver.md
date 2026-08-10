@@ -11,7 +11,7 @@ status: complete
 
 Este guia explica como o SQL Server pode participar de uma arquitetura **Data Mesh**. O foco é a relação entre domínio, produto de dados, contrato, governança e plataforma.
 
-EAV e JSON são decisões de modelagem e estão documentados em [Colunas e Índices JSON](../01-database-objects/03-json-columns.md) e [Funções JSON](../03-advanced-tsql/02-json-functions.md). A comparação entre EAV e JSON continua disponível no [laboratório complementar](../../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql), mas não é mais o foco deste guia arquitetural.
+EAV e JSON são decisões de modelagem e estão documentados em [Colunas e Índices JSON](../01-database-objects/03-json-columns.md) e [Funções JSON](../03-advanced-tsql/02-json-functions.md). A comparação entre EAV e JSON continua disponível no [laboratório complementar](../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql), mas não é mais o foco deste guia arquitetural.
 
 O panorama de Data Fabric, Microsoft Fabric, Data Mesh e outras arquiteturas está em [Arquitetura Data Fabric e Microsoft Fabric](./04-fabric-architecture.md). Contratos, MDM e responsabilidades são aprofundados em [MDM, dados de referência e contratos](./14-mdm-data-contracts.md).
 
@@ -112,7 +112,7 @@ Data Mesh não elimina a necessidade de modelagem relacional, normalização, di
 
 ## Laboratório relacionado
 
-O [laboratório de arquiteturas, EAV e Data Mesh](../../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql) mantém uma demonstração integrada. A primeira parte compara EAV com JSON híbrido; a segunda simula metadados de um produto de dados; e a terceira demonstra isolamento por tenant. Use as seções de modelagem JSON para estudar a primeira parte e este guia para interpretar a parte arquitetural.
+O [laboratório de arquiteturas, EAV e Data Mesh](../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql) mantém uma demonstração integrada. A primeira parte compara EAV com JSON híbrido; a segunda simula metadados de um produto de dados; e a terceira demonstra isolamento por tenant. Use as seções de modelagem JSON para estudar a primeira parte e este guia para interpretar a parte arquitetural.
 
 ## Documentação oficial
 
