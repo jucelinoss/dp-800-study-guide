@@ -36,6 +36,15 @@ Os Projetos de Banco de Dados SQL (SQL Database Projects) permitem gerenciar a e
 
 O arquivo dacpac registra o estado desejado final do banco — o deploy computa e gera a diferença lógica (diff) de forma automatizada contra a base de destino.
 
+### Do SSDT clássico ao SDK-style
+
+O SDK-style mantém o conceito de projeto de banco e o DACPAC, mas usa o SDK
+`Microsoft.Build.Sql`, o comando `dotnet build` e inclusão automática de arquivos
+`.sql`. Ele é o caminho recomendado para projetos novos e funciona especialmente
+bem com o SQL Database Projects no VS Code. Projetos SSDT clássicos continuam
+válidos para manutenção; converta uma cópia em uma branch e valide o DACPAC antes
+de mudar o processo de deploy.
+
 > [!abstract]
 >
 > - Cobre projetos baseados em .sqlproj, compilação de artefatos dacpac, publicação e a lógica de scripts pré e pós-implantação.
@@ -56,7 +65,7 @@ O arquivo de definição de projeto moderno SDK-style é enxuto frente ao modelo
 
 ```xml
 <!-- MyDatabase.sqlproj -->
-<Project Sdk="Microsoft.Build.Sql/2.1.0">
+<Project Sdk="Microsoft.Build.Sql/2.2.0">
   <PropertyGroup>
     <Name>MyDatabase</Name>
     <DSP>Microsoft.Data.Tools.Schema.Sql.SqlAzureV12DatabaseSchemaProvider</DSP>

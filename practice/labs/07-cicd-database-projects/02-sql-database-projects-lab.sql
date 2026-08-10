@@ -6,6 +6,17 @@
 -- This lab is safe to repeat: all objects use the lab schema and the script
 -- removes only objects created by this exercise.
 --
+-- EXECUTABLE PROJECT FLOW:
+-- 1. Enter the 02-sql-database-project folder and run:
+--      dotnet build DatabaseProject.sqlproj -c Release
+-- 2. Generate a script without changing the database:
+--      sqlpackage /Action:Script /SourceFile:bin/Release/DatabaseProject.dacpac
+--        /TargetConnectionString:"<connection>" /OutputPath:planned.sql
+-- 3. Review planned.sql and publish to a disposable database:
+--      sqlpackage /Action:Publish /SourceFile:bin/Release/DatabaseProject.dacpac
+--        /TargetConnectionString:"<connection>" /p:BlockOnPossibleDataLoss=true
+-- The SQL below complements this flow with pre/post-deployment and SQLCMD exercises.
+--
 -- THEORY:
 -- ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
 --
@@ -264,7 +275,7 @@ SELECT ActionName, Purpose, ChangesTarget
 FROM
 (
     VALUES
-        (N'/Action:Build', N'Compile and validate the SQL project', N'No'),
+        (N'dotnet build', N'Compile and validate the SQL project', N'No'),
         (N'/Action:Script', N'Generate the deployment T-SQL for review', N'No'),
         (N'/Action:DeployReport', N'Generate the XML deployment report', N'No'),
         (N'/Action:Publish', N'Apply the DACPAC deployment', N'Yes')

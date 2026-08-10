@@ -1,0 +1,10 @@
+CREATE SCHEMA [lab];
+GO
+
+CREATE TABLE [lab].[Customers]
+(
+    [CustomerId] INT NOT NULL CONSTRAINT [PK_Customers] PRIMARY KEY,
+    [DisplayName] NVARCHAR(100) NOT NULL,
+    [CreatedAt] DATETIME2(0) NOT NULL CONSTRAINT [DF_Customers_CreatedAt] DEFAULT SYSUTCDATETIME()
+);
+GO

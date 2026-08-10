@@ -7,6 +7,17 @@
 -- remove somente os objetos criados por este exercício.
 -- Ao executar pelo sqlcmd no Windows, preserve os acentos com: -f 65001
 --
+-- FLUXO EXECUTÁVEL DO PROJETO:
+-- 1. Entre na pasta 02-sql-database-project e execute:
+--      dotnet build DatabaseProject.sqlproj -c Release
+-- 2. Gere o script sem alterar o banco:
+--      sqlpackage /Action:Script /SourceFile:bin/Release/DatabaseProject.dacpac
+--        /TargetConnectionString:"<conexao>" /OutputPath:planned.sql
+-- 3. Revise planned.sql e publique em uma base descartável:
+--      sqlpackage /Action:Publish /SourceFile:bin/Release/DatabaseProject.dacpac
+--        /TargetConnectionString:"<conexao>" /p:BlockOnPossibleDataLoss=true
+-- O script abaixo complementa esse fluxo com exercícios de pré/pós-deploy e SQLCMD.
+--
 -- TEORIA:
 -- ../../../certification/07-cicd-database-projects/02-sql-database-projects.md
 --
@@ -266,7 +277,7 @@ SELECT NomeDaAção, Objetivo, AlteraODestino
 FROM
 (
     VALUES
-        (N'/Action:Build', N'Compilar e validar o projeto SQL', N'Não'),
+        (N'dotnet build', N'Compilar e validar o projeto SQL', N'Não'),
         (N'/Action:Script', N'Gerar o T-SQL de implantação para revisão', N'Não'),
         (N'/Action:DeployReport', N'Gerar o relatório XML de implantação', N'Não'),
         (N'/Action:Publish', N'Aplicar a implantação da DACPAC', N'Sim')

@@ -7,9 +7,9 @@
 -- https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
 -- This script demonstrates unit testing strategies and reference data loading:
---   1. Environment Preparation for tSQLt (CLR and TRUSTWORTHY Configuration)
---   2. Test Class Structuring and Stored Procedure Unit Tests
---   3. Isolation with FakeTable, AssertEquals, and Expected Exceptions (ExpectException)
+--   1. Environment Preparation for tSQLt (CLR configuration)
+--   2. A real tSQLt test class
+--   3. Isolation with FakeTable, AssertEquals, and ExpectException
 --   4. Idempotent Reference Data Loading with the MERGE Statement
 --   5. Practical Project Scenarios (Domain Table Loading in Post-Deployment Scripts)
 -- =================================================================================
@@ -47,7 +47,8 @@ GO
 -- KEY CONCEPTS AND DEFINITIONS:
 --   - tSQLt: Native T-SQL unit testing framework.
 --   - ISOLATION: All tSQLt tests run inside transactions that are automatically rolled back at the end!
---   - PREREQUISITES: Requires enabling `clr enabled = 1` and `TRUSTWORTHY ON` on the database.
+--   - PREREQUISITES: Requires `clr enabled = 1` and installation/trust of the tSQLt
+--     assembly according to the official documentation. TRUSTWORTHY is not enabled here.
 
 -- -- [DP-800 KEY POINT]
 -- 1. Enable CLR execution in SQL Server
@@ -55,8 +56,10 @@ EXEC sp_configure 'clr enabled', 1;
 RECONFIGURE;
 GO
 
--- 2. Enable TRUSTWORTHY property in the database
-ALTER DATABASE AdventureWorks2025 SET TRUSTWORTHY ON;
+-- Install tSQLt before continuing:
+-- https://tsqlt.org/download/
+IF OBJECT_ID(N'tSQLt.Run') IS NULL
+    THROW 51010, 'tSQLt is not installed in this database. Install the framework and run again.', 1;
 GO
 
 
@@ -77,36 +80,45 @@ AS
 BEGIN
     SET NOCOUNT ON;
     IF @DiscountPercent > 50.00
-        THROW 50002, 'Desconto maximo permitido e de 50%.', 1;
+        THROW 50002, 'Maximum discount is 50%.', 1;
 
     SET @FinalAmount = @TotalAmount * (1.0 - (@DiscountPercent / 100.0));
 END;
 GO
 
--- Simulated Unit Test: Valid Discount Validation
-DECLARE @ResultadoCalculado DECIMAL(18,2);
-EXEC lab.usp_CalculateDiscountedTotal 
-    @TotalAmount = 100.00, 
-    @DiscountPercent = 10.00, 
-    @FinalAmount = @ResultadoCalculado OUTPUT;
-
-IF @ResultadoCalculado = 90.00
-    PRINT 'TESTE PASSOU: Desconto calculado corretamente (90.00).';
-ELSE
-    PRINT 'TESTE FALHOU: Valor incorreto retornado.';
+-- Create a tSQLt test class. The IF makes repeated runs safe.
+IF SCHEMA_ID(N'labDiscountTests') IS NULL
+    EXEC tSQLt.NewTestClass N'labDiscountTests';
 GO
 
--- -- [DP-800 KEY POINT]
--- Simulated Unit Test: Exception Validation When Exceeding Maximum Discount
-BEGIN TRY
-    EXEC lab.usp_CalculateDiscountedTotal 
-        @TotalAmount = 100.00, 
-        @DiscountPercent = 60.00, 
+CREATE OR ALTER PROCEDURE [labDiscountTests].[test valid discount returns 90]
+AS
+BEGIN
+    DECLARE @CalculatedResult DECIMAL(18,2);
+
+    EXEC lab.usp_CalculateDiscountedTotal
+        @TotalAmount = 100.00,
+        @DiscountPercent = 10.00,
+        @FinalAmount = @CalculatedResult OUTPUT;
+
+    EXEC tSQLt.AssertEquals 90.00, @CalculatedResult;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE [labDiscountTests].[test discount above limit raises exception]
+AS
+BEGIN
+    EXEC tSQLt.ExpectException @ExpectedMessagePattern = N'%Maximum discount%';
+
+    EXEC lab.usp_CalculateDiscountedTotal
+        @TotalAmount = 100.00,
+        @DiscountPercent = 60.00,
         @FinalAmount = NULL;
-END TRY
-BEGIN CATCH
-    PRINT 'TESTE PASSOU: Capturou excecao esperada -> ' + ERROR_MESSAGE();
-END CATCH;
+END;
+GO
+
+-- Run the real tests. tSQLt automatically rolls back each test case.
+EXEC tSQLt.Run N'labDiscountTests';
 GO
 
 

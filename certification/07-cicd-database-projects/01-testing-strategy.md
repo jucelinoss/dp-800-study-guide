@@ -35,12 +35,10 @@ A robust testing strategy for database projects combines unit tests (isolated, f
 ### Installing tSQLt
 
 ```sql
--- Download tSQLt.class.sql from tsqlt.org and run it
--- Then enable CLR and TRUSTWORTHY (required by tSQLt)
+-- Download and install tSQLt according to the framework documentation.
+-- Enable CLR; do not enable TRUSTWORTHY as a blanket prerequisite.
 EXEC sp_configure 'clr enabled', 1;
 RECONFIGURE;
-
-ALTER DATABASE MyDB SET TRUSTWORTHY ON;
 
 -- Verify installation
 EXEC tSQLt.Info;
@@ -303,7 +301,7 @@ PRINT 'Reference data load complete.';
 | Issue | Cause | Fix |
 | :--- | :--- | :--- |
 | `CLR not enabled` | tSQLt requires CLR | ``EXEC sp_configure 'clr enabled', 1; RECONFIGURE;`` |
-| `TRUSTWORTHY must be ON` | tSQLt assembly requirement | `ALTER DATABASE db SET TRUSTWORTHY ON` |
+| Assembly cannot be trusted | CLR strict security and assembly trust are not configured | Follow the tSQLt installation procedure for the exact SQL Server version; avoid enabling TRUSTWORTHY globally |
 | Test fails with FK violation | FakeTable not used | Add `EXEC tSQLt.FakeTable` for dependency tables |
 | MERGE deletes unexpected rows | `WHEN NOT MATCHED BY SOURCE THEN DELETE` | Remove the DELETE clause if partial updates are intended |
 | Test data leaks between tests | Missing ROLLBACK | Wrap integration tests in `BEGIN TRAN / ROLLBACK` |

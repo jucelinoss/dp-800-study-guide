@@ -15,6 +15,8 @@
 -- =================================================================================
 -- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/03-source-control-branching.md
 --    Abra o guia teorico junto com este laboratorio para contexto conceitual.
+-- ATENÇÃO: branches, PRs e CODEOWNERS são representados por cenários SQL/saídas
+-- didáticas. Pratique os comandos Git em um repositório descartável.
 
 USE AdventureWorks2025;
 GO

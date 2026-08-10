@@ -6,10 +6,10 @@
 -- restaurar o backup do banco de dados AdventureWorks (versão OLTP) disponível em:
 -- https://learn.microsoft.com/pt-br/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
 -- =================================================================================
--- Este script demonstra estratégias de testes unitários e carga de dados de referência:
---   1. Preparação do Ambiente para tSQLt (Configuração de CLR e TRUSTWORTHY)
---   2. Estruturação de Classes de Teste e Testes Unitários de Stored Procedures
---   3. Isolamento com FakeTable, AssertEquals e Exceções Esperadas (ExpectException)
+-- Este script demonstra estratégias de testes unitários e carga de dados de referência.
+--   1. Preparação do Ambiente para tSQLt (Configuração de CLR)
+--   2. Estruturação real de uma classe de testes tSQLt
+--   3. Isolamento com FakeTable, AssertEquals e ExpectException
 --   4. Carga Idempotente de Dados de Referência com a Instrução MERGE
 --   5. Cenários Práticos de Projeto (Carga de Tabelas de Domínio em Scripts Post-Deployment)
 -- =================================================================================
@@ -46,7 +46,8 @@ GO
 -- CONCEITOS E DEFINIÇÕES CHAVE:
 --   - tSQLt: Framework nativo de testes unitários em T-SQL.
 --   - ISOLAMENTO: Todos os testes do tSQLt executam dentro de transações que sofrem ROLLBACK automático ao final!
---   - PRÉ-REQUISITOS: Requer a ativação de `clr enabled = 1` e `TRUSTWORTHY ON` no banco de dados.
+--   - PRÉ-REQUISITOS: Requer `clr enabled = 1` e a instalação/confiabilidade da assembly
+--     do tSQLt conforme a documentação oficial. TRUSTWORTHY ON não é habilitado aqui.
 
 -- -- [PONTO DE ATENÇÃO DP-800]
 -- 1. Habilitar execução de CLR no SQL Server
@@ -54,8 +55,10 @@ EXEC sp_configure 'clr enabled', 1;
 RECONFIGURE;
 GO
 
--- 2. Ativar propriedade TRUSTWORTHY no banco de dados
-ALTER DATABASE AdventureWorks2025 SET TRUSTWORTHY ON;
+-- Instale o tSQLt antes de continuar:
+-- https://tsqlt.org/download/
+IF OBJECT_ID(N'tSQLt.Run') IS NULL
+    THROW 51010, 'tSQLt não está instalado neste banco. Instale o framework e execute novamente.', 1;
 GO
 
 
@@ -82,30 +85,39 @@ BEGIN
 END;
 GO
 
--- Teste Unitário Simulado: Validação de Desconto Válido
-DECLARE @ResultadoCalculado DECIMAL(18,2);
-EXEC lab.usp_CalculateDiscountedTotal 
-    @TotalAmount = 100.00, 
-    @DiscountPercent = 10.00, 
-    @FinalAmount = @ResultadoCalculado OUTPUT;
-
-IF @ResultadoCalculado = 90.00
-    PRINT 'TESTE PASSOU: Desconto calculado corretamente (90.00).';
-ELSE
-    PRINT 'TESTE FALHOU: Valor incorreto retornado.';
+-- Criar uma classe de testes tSQLt. O IF torna a execução repetível.
+IF SCHEMA_ID(N'labDiscountTests') IS NULL
+    EXEC tSQLt.NewTestClass N'labDiscountTests';
 GO
 
--- -- [PONTO DE ATENÇÃO DP-800]
--- Teste Unitário Simulado: Validação de Exceção ao Exceder Desconto Máximo
-BEGIN TRY
-    EXEC lab.usp_CalculateDiscountedTotal 
-        @TotalAmount = 100.00, 
-        @DiscountPercent = 60.00, 
+CREATE OR ALTER PROCEDURE [labDiscountTests].[test desconto valido retorna 90]
+AS
+BEGIN
+    DECLARE @ResultadoCalculado DECIMAL(18,2);
+
+    EXEC lab.usp_CalculateDiscountedTotal
+        @TotalAmount = 100.00,
+        @DiscountPercent = 10.00,
+        @FinalAmount = @ResultadoCalculado OUTPUT;
+
+    EXEC tSQLt.AssertEquals 90.00, @ResultadoCalculado;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE [labDiscountTests].[test desconto acima do limite gera excecao]
+AS
+BEGIN
+    EXEC tSQLt.ExpectException @ExpectedMessagePattern = N'%Desconto maximo%';
+
+    EXEC lab.usp_CalculateDiscountedTotal
+        @TotalAmount = 100.00,
+        @DiscountPercent = 60.00,
         @FinalAmount = NULL;
-END TRY
-BEGIN CATCH
-    PRINT 'TESTE PASSOU: Capturou excecao esperada -> ' + ERROR_MESSAGE();
-END CATCH;
+END;
+GO
+
+-- Execute os testes reais. O rollback automático do tSQLt isola cada caso.
+EXEC tSQLt.Run N'labDiscountTests';
 GO
 
 

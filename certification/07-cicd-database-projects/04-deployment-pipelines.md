@@ -23,7 +23,7 @@ CI/CD pipelines automate the build, validation, and deployment of SQL Database P
 > [!tip] What the Exam Tests
 >
 > - `SqlPackage.exe /Action:Publish` deploys a dacpac to a target; `/Action:Extract` creates dacpac from existing DB; `/Action:Export` creates bacpac
-> - **Publish profile** (`.publish.xml`) stores environment-specific connection strings and deployment options — keeps secrets out of pipeline YAML
+> - **Publish profile** (`.publish.xml`) stores reusable deployment settings such as options, target and SQLCMD values. It must not contain passwords; secrets belong in the CI/CD provider or Azure Key Vault.
 > - Pipeline order: Build → (optional) Test → Publish to staging → validate → Publish to production
 
 ---
@@ -373,7 +373,7 @@ one fixed pipeline layout. Keep reports and approvals as gates before production
 - CI pipelines build and test the dacpac; CD pipelines deploy it through environments with approval gates
 - Secrets belong in Azure Key Vault — pipelines reference them via variable groups or the AzureKeyVault task
 - Drift detection before deployment prevents unexpected changes from causing failures
-- `IncludeTransactionalScripts=true` wraps each deployment change in a transaction for safer production rollback
+- `IncludeTransactionalScripts=true` requests transactions during deployment when possible; it does not guarantee one transaction for every operation and pre/post-deployment script
 
 ---
 

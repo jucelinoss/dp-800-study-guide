@@ -34,7 +34,7 @@ The SDK-style project file is minimal compared to the legacy format:
 
 ```xml
 <!-- MyDatabase.sqlproj -->
-<Project Sdk="Microsoft.Build.Sql/0.1.18">
+<Project Sdk="Microsoft.Build.Sql/2.2.0">
   <PropertyGroup>
     <Name>MyDatabase</Name>
     <DSP>Microsoft.Data.Tools.Schema.Sql.SqlAzureV12DatabaseSchemaProvider</DSP>

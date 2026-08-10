@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.Build.Sql/2.2.0">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql150DatabaseSchemaProvider</DSP>
+    <Name>DatabaseProject</Name>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PreDeploy Include="Scripts\PreDeployment.sql" />
+    <PostDeploy Include="Scripts\PostDeployment.sql" />
+    <Build Remove="Scripts\PreDeployment.sql" />
+    <Build Remove="Scripts\PostDeployment.sql" />
+  </ItemGroup>
+</Project>

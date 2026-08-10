@@ -12,6 +12,8 @@
 --   3. Schema-drift diagnostics using SqlPackage XML reports
 --   4. Passwordless pipeline authentication using Managed Identity and Azure Key Vault
 --   5. Practical design scenarios (simulated pipeline execution with deployment transactions)
+-- NOTE: this is a SQL-oriented simulation. CLI commands and Key Vault access must
+-- run on a pipeline/runner, not inside SSMS.
 -- =================================================================================
 
 -- NOTE: Theory content for this chapter is available at:
@@ -54,7 +56,8 @@ GO
 --   - /Action:Extract: Creates a schema-only .dacpac file from an existing database.
 --   - /Action:Export: Creates a schema-and-data .bacpac file for migration or import.
 --   - /Action:DeployReport: Creates an XML change report without modifying the database (ideal for drift detection).
---   - /p:IncludeTransactionalScripts=true: Wraps the entire schema change in a T-SQL transaction with automatic rollback on error.
+--   - /p:IncludeTransactionalScripts=true: Requests transactions during deployment
+--     when possible; it does not guarantee one transaction for every operation/script.
 
 -- [DP-800 EXAM TIP]
 -- Simulate a post-publication record insertion by the pipeline

@@ -9,7 +9,7 @@ tags:
 ---
 
 > [!info] 🗺️ Índice de Navegação Rápida
-> 
+>
 > - 📍 [1. Visão Geral (Overview)](#visão-geral-overview)
 > - 📍 [2. Arquitetura de Pipelines de Banco de Dados](#arquitetura-de-pipelines-de-banco-de-dados)
 > - 📍 [3. Pipeline de Build (CI) - Compilação e Testes](#pipeline-de-build-ci---compilação-e-testes)
@@ -26,6 +26,7 @@ tags:
 > - 📍 [10. Questões de Prática (Practice Questions)](#questões-de-prática-practice-questions)
 > - 📍 [11. Tópicos Relacionados](#tópicos-relacionados)
 > - 📍 [12. Documentação Oficial](#documentação-oficial)
+>
 ---
 
 # Pipelines de Implantação para Projetos de Banco de Dados (Deployment Pipelines for Database Projects)
@@ -43,7 +44,7 @@ Pipelines de CI/CD automatizam o build, validação, execução de testes unitá
 > [!tip] O que o Exame Testa
 >
 > - O utilitário **`SqlPackage.exe /Action:Publish`** publica um dacpac no banco; `/Action:Extract` extrai a DDL do banco em dacpac; `/Action:Export` exporta schema+dados em bacpac.
-> - O arquivo **Publish Profile** (`.publish.xml`) armazena parametrizações de variáveis de deploy e segurança específicas do ambiente, impedindo commits de dados sigilosos no YAML da pipeline.
+> - O arquivo **Publish Profile** (`.publish.xml`) armazena configurações reutilizáveis de deploy, como opções, destino e valores de SQLCMD. Ele não deve conter senhas; segredos devem vir do provedor de CI/CD ou do Azure Key Vault.
 > - Ordem padrão de execução na pipeline: Compilar o dacpac (Build) → Rodar testes unitários (tSQLt) → Implantar em homologação (Staging) → Aguardar aprovação humana → Implantar em Produção.
 
 ---
@@ -238,7 +239,7 @@ steps:
 > [!tip] Segurança de Credenciais na Pipeline
 >
 > - **Nunca** grave strings de conexão com senhas diretamente no arquivo YAML da pipeline ou em arquivos XML do projeto.
-> - **Prática Recomendada**: Mapeie segredos dinamicamente a partir de um **Azure Key Vault** por meio de Grupos de Variáveis vinculados ou da task `AzureKeyVault@2`. Prefira conexões de serviço com federação de identidade de carga de trabalho; para publicar em um banco existente, o SqlPackage requer `db_owner`, portanto limite essa identidade ao banco-alvo e à pipeline autorizada.
+> - **Prática Recomendada**: Mapeie segredos dinamicamente a partir de um **Azure Key Vault** por meio de Grupos de Variáveis vinculados ou da task `AzureKeyVault@2`. Prefira conexões de serviço com federação de identidade de carga de trabalho e conceda somente as permissões necessárias ao banco-alvo.
 
 ---
 

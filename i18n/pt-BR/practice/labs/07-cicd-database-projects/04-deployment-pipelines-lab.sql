@@ -12,6 +12,8 @@
 --   3. Diagnóstico de Drift de Esquema usando Relatórios XML do SqlPackage
 --   4. Autenticação Passwordless em Pipelines usando Managed Identity e Azure Key Vault
 --   5. Cenários Práticos de Projeto (Simulação da Execução de Pipeline com Transações de Deploy)
+-- ATENÇÃO: este arquivo é uma simulação orientada a SQL. Os comandos da CLI e o
+-- acesso ao Key Vault precisam ser executados em um runner/pipeline, não no SSMS.
 -- =================================================================================
 -- REFERENCIA TEORICA: ../../../certification/07-cicd-database-projects/04-deployment-pipelines.md
 --    Abra o guia teorico junto com este laboratorio para contexto conceitual.
@@ -50,7 +52,8 @@ GO
 --   - /Action:Extract: Gera um arquivo .dacpac (somente esquema) a partir de um banco existente.
 --   - /Action:Export: Gera um arquivo .bacpac (esquema + dados) para migração/importação.
 --   - /Action:DeployReport: Gera um relatório de alterações em XML sem modificar a base (ideal para detecção de Drift).
---   - /p:IncludeTransactionalScripts=true: Envolve toda a alteração de esquema em uma transação T-SQL com ROLLBACK automático em caso de erro.
+--   - /p:IncludeTransactionalScripts=true: solicita transações durante o deploy quando
+--     possível; não garante uma única transação para todas as operações e scripts.
 
 -- -- [PONTO DE ATENÇÃO DP-800]
 -- Simular inserção de registro pós-publicação pelo pipeline

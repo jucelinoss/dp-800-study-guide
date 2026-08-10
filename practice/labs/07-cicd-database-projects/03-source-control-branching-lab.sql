@@ -16,6 +16,8 @@
 
 -- NOTE: Theory content for this chapter is available at:
 --       ../../../certification/07-cicd-database-projects/03-source-control-branching.md
+-- NOTE: branches, PRs and CODEOWNERS are represented by SQL scenarios/output here.
+-- Practice the Git commands in a disposable repository.
 
 USE AdventureWorks2025;
 GO
