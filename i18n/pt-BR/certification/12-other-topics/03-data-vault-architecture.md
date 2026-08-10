@@ -88,7 +88,8 @@ O Fabric não transforma um modelo em Data Vault apenas porque as tabelas estão
 
 - [Arquitetura Medallion](./02-medallion-architecture-fabric.md)
 - [Arquitetura do Fabric](./04-fabric-architecture.md)
-- [Data Mesh e SQL Server](./01-architectures-eav-datamesh-sqlserver.md)
+- [Data Fabric e Microsoft Fabric](./04-fabric-architecture.md)
+- [MDM, dados de referência e contratos](./14-mdm-data-contracts.md)
 
 ---
 

@@ -16,7 +16,7 @@ They are supplemental architecture material, not additional DP-800 exam domains.
 | [Data Vault Architecture](./03-data-vault-architecture.md) | Hubs, links, satellites, historization, Raw Vault, and Business Vault |
 | [Microsoft Fabric Architecture](./04-fabric-architecture.md) | OneLake, Lakehouse, Warehouse, workloads, Direct Lake, and governance |
 | [Medallion Architecture](./02-medallion-architecture-fabric.md) | Bronze, Silver, Gold, quality progression, and Fabric implementation |
-| [EAV, Data Mesh, and SQL Server](./01-architectures-eav-datamesh-sqlserver.md) | Dynamic modeling, Data Mesh, and SQL Server integration |
+| [Data Mesh and SQL Server](./01-architectures-eav-datamesh-sqlserver.md) | Data products, ownership, contracts, and SQL Server integration |
 
 ## Choosing a starting point
 
@@ -28,7 +28,7 @@ They are supplemental architecture material, not additional DP-800 exam domains.
 
 ## How to study
 
-Start with Fabric architecture for the platform view. Then study Medallion for data-quality layers and Data Vault for historized integration. Compare both with the existing EAV/Data Mesh guide before choosing a pattern for a workload.
+Start with Fabric architecture for the platform view. Then study Medallion for data-quality layers, Data Vault for historized integration, and Data Mesh for domain ownership. For dynamic modeling decisions, use the JSON guide in the database-objects chapter.
 
 ---
 

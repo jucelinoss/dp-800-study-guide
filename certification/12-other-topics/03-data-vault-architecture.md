@@ -88,7 +88,8 @@ The architecture should still define ownership, contracts, data quality, securit
 
 - [Medallion Architecture](./02-medallion-architecture-fabric.md)
 - [Fabric Architecture](./04-fabric-architecture.md)
-- [Data Mesh and SQL Server](./01-architectures-eav-datamesh-sqlserver.md)
+- [Data Fabric and Microsoft Fabric Architecture](./04-fabric-architecture.md)
+- [MDM, Reference Data, and Data Contracts](./14-mdm-data-contracts.md)
 
 ---
 

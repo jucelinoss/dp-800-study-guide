@@ -1,215 +1,126 @@
-# Guia de Arquitetura: JSON Metadados, Evolução do EAV, Data Mesh e SQL Server (On-Premises, Nuvem e Híbrido)
-
-## 📌 Sumário Executivo
-
-Este documento apresenta uma visão arquitetural de ponta a ponta sobre a evolução dos padrões de modelagem de dados dinâmicos, comparando o modelo tradicional **EAV (Entity-Attribute-Value)** com o padrão moderno de **Documentos JSON Híbridos no SQL Server**. Em seguida, detalha a integração do SQL Server nas arquiteturas contemporâneas de **Data Mesh** e ecossistemas **On-Premises, Nuvem (Azure / Fabric) e Híbridos**.
-
+---
+title: Data Mesh e SQL Server
+type: guide
+tags: [data-mesh, data-products, sql-server, arquitetura]
+status: complete
 ---
 
-## 📚 Glossário e Definição de Termos Téxicos
+# Data Mesh e SQL Server
 
-Para facilitar o entendimento desta arquitetura, consulte as definições abaixo:
+## Escopo
 
-* **Redesplegues (Re-deployments / Re-implantações)**: Ato de publicar novamente uma nova versão do código da aplicação, serviços ou scripts DDL no ambiente de produção. Em arquiteturas tradicionais, adicionar um novo atributo exigia alterar o banco de dados (DDL `ALTER TABLE`) e realizar o *redesplegue* (re-deploy) de toda a aplicação backend. Com o uso de **JSON Híbrido + Metadados Dinâmicos**, novas propriedades podem ser incluídas sem a necessidade de paradas ou *redesplegues* de código.
-* **EAV (Entity-Attribute-Value)**: Padrão de modelagem antigo que armazena dados dinâmicos divididos em 3 tabelas (`Entidade`, `Atributo` e `Valor`). Gera tabelas verticais profundas e exige dezenas de `JOIN`s para reconstruir uma linha.
-* **Data Mesh**: Arquitetura descentralizada onde cada equipe de domínio corporativo é responsável e proprietária dos seus próprios **Produtos de Dados** (Data Products), servindo-os através de APIs e governança federada.
-* **Produto de Dados (Data Product)**: Conjunto de dados curados, de alta qualidade e seguros disponibilizados por um domínio para consumo por outros times (via REST, GraphQL, SQL ou Eventos).
-* **Join Explosion**: Fenômeno de perda catastrófica de desempenho no SQL Server causado ao unir repetidamente uma tabela contra ela mesma dezenas de vezes (como no EAV), multiplicando o esforço de CPU e memória.
-* **Zero-ETL**: Arquitetura moderna onde dados gravados no banco relacional operacional são espelhados em tempo real para o Data Lake (ex: Fabric OneLake em formato Delta Parquet) sem que os engenheiros precisem escrever pipelines ETL manuais no Integration Services ou Data Factory.
-* **Azure Arc**: Serviço da Microsoft que estende o plano de controle, a segurança e a governança da nuvem Azure para bancos de dados SQL Server rodando *On-Premises* (no seu próprio datacenter) ou em outras nuvens (AWS/GCP).
-* **PERSISTED Computed Column**: Coluna virtual no SQL Server calculada por uma expressão (ex: `JSON_VALUE`) cujo resultado é salvo fisicamente no disco, permitindo a criação de índices B-Tree normais para acelerar buscas.
+Este guia explica como o SQL Server pode participar de uma arquitetura **Data Mesh**. O foco é a relação entre domínio, produto de dados, contrato, governança e plataforma.
 
----
+EAV e JSON são decisões de modelagem e estão documentados em [Colunas e Índices JSON](../01-database-objects/03-json-columns.md) e [Funções JSON](../03-advanced-tsql/02-json-functions.md). A comparação entre EAV e JSON continua disponível no [laboratório complementar](../../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql), mas não é mais o foco deste guia arquitetural.
 
-## 1. Evolução da Modelagem Dinâmica: EAV vs JSON Híbrido
+O panorama de Data Fabric, Microsoft Fabric, Data Mesh e outras arquiteturas está em [Arquitetura Data Fabric e Microsoft Fabric](./04-fabric-architecture.md). Contratos, MDM e responsabilidades são aprofundados em [MDM, dados de referência e contratos](./14-mdm-data-contracts.md).
 
-### 1.1 O Modelo Clássico EAV (Entity-Attribute-Value)
+## O que é Data Mesh
 
-Históricamente, quando um sistema precisava armazenar produtos ou entidades com atributos altamente variáveis e imprevisíveis (ex: e-commerce, prontuários médicos, sistemas cadastrais mutáveis), adotava-se o padrão **EAV**.
+**Data Mesh** é uma abordagem organizacional e arquitetural baseada em quatro ideias:
+
+1. propriedade dos dados orientada ao domínio;
+2. dados tratados como produto;
+3. plataforma de dados de autoatendimento;
+4. governança federada computacional.
+
+Data Mesh não é um tipo de banco de dados, um produto Microsoft nem uma configuração do SQL Server. Um domínio pode usar SQL Server, Azure SQL, um lakehouse ou outra tecnologia, desde que publique dados confiáveis, descobríveis e consumíveis.
 
 ```mermaid
-erDiagram
-    Entities ||--o{ AttributeValues : "possui"
-    Attributes ||--o{ AttributeValues : "define"
-    Entities {
-        int EntityID PK
-        string EntityName
-    }
-    Attributes {
-        int AttributeID PK
-        string AttributeName
-        string DataType
-    }
-    AttributeValues {
-        int ValueID PK
-        int EntityID FK
-        int AttributeID FK
-        string ValueText
-    }
+flowchart LR
+    SalesDB[SQL Server do domínio de vendas] --> SalesProduct[Produto de dados de vendas]
+    CustomerDB[SQL Server do domínio de clientes] --> CustomerProduct[Produto de dados de clientes]
+    SalesProduct --> Consumers[BI, aplicações, APIs e IA]
+    CustomerProduct --> Consumers
+    Federation[Governança federada] --> SalesProduct
+    Federation --> CustomerProduct
 ```
 
-#### ⚠️ Problemas e Gargalos do EAV Clássico:
+## Produto de dados
 
-1. **Join Explosion**: Para reconstruir um único objeto com 10 atributos, a consulta SQL exige 10 `LEFT JOIN`s na tabela `AttributeValues`.
-2. **Perda de Tipagem**: Todos os valores geralmente acabam salvos como `VARCHAR`/`TEXT`, exigindo conversões explícitas (`CAST`/`CONVERT`) em tempo de execução.
-3. **Incapacidade de Otimização**: O otimizador de consultas (Query Optimizer) perde as estatísticas de coluna, gerando estimativas de cardinalidade desastrosas.
+Um produto de dados não é simplesmente uma tabela publicada. Ele precisa ter uma interface compreensível, responsáveis e expectativas explícitas para os consumidores.
 
----
+| Elemento | Pergunta que deve ser respondida |
+| --- | --- |
+| Proprietário e steward | Quem decide o significado e cuida da qualidade? |
+| Contrato | Quais campos, tipos, semântica e regras de compatibilidade existem? |
+| Qualidade | Quais dimensões são medidas e qual é o tratamento de exceções? |
+| Acesso | O consumidor usa SQL, API, arquivo, evento ou modelo semântico? |
+| Segurança | Como são aplicados autorização, classificação, RLS e isolamento por tenant? |
+| Operação | Qual é a atualização, retenção, linhagem, disponibilidade e forma de suporte? |
 
-### 1.2 O Padrão Moderno: Relacional + Documento JSON (Hybrid Schema)
+O produto deve esconder detalhes internos do sistema operacional quando esses detalhes não fizerem parte do contrato. Views, tabelas curadas, procedures, APIs ou exportações controladas podem formar uma interface mais estável que as tabelas internas.
 
-Com o suporte nativo a JSON no SQL Server (funções `JSON_VALUE`, `JSON_QUERY`, `OPENJSON`, agregações `JSON_ARRAYAGG` e o tipo binário nativo no SQL 2025/Azure SQL), o padrão **EAV foi substituído pelo Esquema Híbrido Documental**.
+## Como o SQL Server participa
+
+- mantém o sistema operacional de registro do domínio;
+- aplica chaves, restrições, índices, permissões e Row-Level Security;
+- usa views, procedures ou tabelas curadas para formar a interface do produto;
+- fornece mudanças por CDC, Change Tracking, tabelas temporais ou watermark;
+- entrega dados a um lakehouse, warehouse ou modelo semântico;
+- publica APIs por meio de uma camada separada, como o Data API Builder, quando o contrato exigir REST ou GraphQL.
+
+O SQL Server não precisa expor todas as tabelas internas diretamente. A camada de publicação deve alinhar o contrato do produto às regras de segurança do banco e aos controles da plataforma analítica.
+
+O Data API Builder é uma camada separada que gera APIs REST e GraphQL para objetos de bancos compatíveis, incluindo SQL Server e Azure SQL. Ele pode ajudar na publicação, mas não cria sozinho um produto de dados, não define ownership e não substitui a autorização ou a governança.
+
+## Fluxo de publicação
 
 ```mermaid
-graph TD
-    A["Tabela Relacional (Estrutura Fixa)"] --> B["Colunas Núcleo (ID, Nome, Preço, CriadoEm)"]
-    A --> C["Coluna AttributesJson (NVARCHAR / JSON Nativo)"]
-    C --> D["Atributos Frequentes: Indexados via PERSISTED Computed Column"]
-    C --> E["Atributos Raros/Dinâmicos: Consultados via JSON_VALUE em tempo real"]
+flowchart LR
+    Domain[Domínio responsável] --> Source[SQL Server ou outra fonte]
+    Source --> Curate[Views, tabelas curadas ou pipeline]
+    Curate --> Contract[Contrato, qualidade e metadados]
+    Contract --> Publish[SQL, API, evento ou arquivo]
+    Publish --> Consumer[Consumidores autorizados]
+    Observe[Freshness, uso, falhas e linhagem] --> Publish
+    Govern[Políticas federadas] --> Contract
 ```
 
-#### 💡 Comparativo Arquitetural: EAV vs JSON Híbrido
+Um fluxo incremental típico é:
 
-| Critério | EAV Tradicional (Tabelas Triplas) | JSON Híbrido no SQL Server |
-| :--- | :--- | :--- |
-| **Modelagem** | 3 tabelas unidas por chaves primárias/estrangeiras | 1 tabela relacional com 1 coluna JSON |
-| **Complexidade da Query** | Múltiplos `JOIN`s pesados | Cláusula `SELECT` limpa com `JSON_VALUE` ou `OPENJSON` |
-| **Performance de Leitura** | Baixa (*Join Explosion* e perda de estatísticas) | Altíssima (Index Seek via *PERSISTED Computed Columns*) |
-| **Manutenibilidade** | Muito difícil; exige manutenção complexa de metadados | Altíssima; esquemas JSON são auto-descritivos |
-| **Necessidade de Redesplegue** | Exige alterações estruturais e redesplegue de código | Nenhuma; novas propriedades no JSON entram direto |
-| **Integração com APIs** | Exige serialização manual no backend | Direta via `FOR JSON PATH` ou Data API Builder (DAB) |
+1. identificar a origem e o proprietário do dado;
+2. capturar novas linhas e alterações;
+3. validar esquema, qualidade e autorização;
+4. produzir uma representação estável para consumo;
+5. publicar o contrato e a linhagem;
+6. monitorar atualização, uso, falhas e mudanças incompatíveis.
 
----
+CDC, Change Tracking e watermark resolvem mecanismos de captura; eles não definem, por si sós, o contrato ou a semântica do produto. Essa separação é importante para não confundir uma técnica de integração com uma arquitetura Data Mesh.
 
-## 2. Padrão Data Mesh e o SQL Server como "Data Product"
+## Relação com Data Fabric e Microsoft Fabric
 
-O **Data Mesh** é um paradigma arquitetural descentralizado baseado em 4 pilares fundamentais:
+Data Fabric trata da conexão transversal entre fontes, integração, metadados, governança e consumo. Data Mesh trata principalmente de propriedade por domínio e produtos de dados. Eles podem coexistir:
 
-1. **Propriedade Orientada ao Domínio (Domain-Driven Ownership)**
-2. **Dados como Produto (Data as a Product)**
-3. **Plataforma de Dados de Auto-serviço (Self-serve Data Platform)**
-4. **Governança Federada Computacional (Federated Computational Governance)**
+- Data Mesh define quem é responsável pelo produto e quais garantias oferece;
+- Data Fabric fornece capacidades compartilhadas de integração, catálogo, segurança e observabilidade;
+- Microsoft Fabric pode fornecer parte dessa plataforma compartilhada, por exemplo com OneLake, Data Factory, Lakehouse, Warehouse e modelos semânticos.
 
-```mermaid
-graph LR
-    subgraph Domínio de Vendas
-        DB1[SQL Database / Fabric SQL] --> DAB1[Data API Builder]
-        DAB1 --> DP1[Data Product: Order API]
-    end
+Os **domains** do Microsoft Fabric podem organizar workspaces e itens por área de negócio e apoiar a descoberta e a delegação de governança. Eles não criam sozinhos ownership, contratos, qualidade ou produtos de dados completos.
 
-    subgraph Domínio de Clientes
-        DB2[Azure SQL MI] --> DAB2[REST / GraphQL]
-        DAB2 --> DP2[Data Product: Customer API]
-    end
+## Limites e decisões
 
-    subgraph Governança Federada
-        Purview[Microsoft Purview / Microsoft Fabric Catalog]
-    end
+| Situação | Direção inicial |
+| --- | --- |
+| Um sistema operacional de um único domínio | Comece com um modelo relacional e interfaces bem definidas; Data Mesh pode ser desnecessário |
+| Vários domínios com consumidores independentes | Avalie produtos de dados, contratos e ownership por domínio |
+| Necessidade de integração compartilhada | Combine produtos de domínio com catálogo, linhagem e plataforma federada |
+| Consumidores acoplados às tabelas internas | Crie views, tabelas curadas ou APIs versionadas antes de ampliar o acesso |
+| Dados mestres compartilhados | Combine Data Mesh com MDM, regras de identidade e governança federada |
 
-    DP1 --> Purview
-    DP2 --> Purview
-    Consumer[Consumidores: BI, Web Apps, LLM / RAG] --> DP1
-    Consumer --> DP2
-```
+Data Mesh não elimina a necessidade de modelagem relacional, normalização, dimensionalização, qualidade ou administração operacional. Ele define como a responsabilidade e a publicação podem ser distribuídas.
 
-### 2.1 Como o SQL Server Atua em um Data Mesh
+## Laboratório relacionado
 
-Em uma arquitetura Data Mesh, cada equipe de domínio (ex: Vendas, Estoque, RH) é proprietária do seu próprio produto de dados. O SQL Server se encaixa como a engine de persistência e repositório operacional do domínio através dos seguintes recursos:
+O [laboratório de arquiteturas, EAV e Data Mesh](../../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql) mantém uma demonstração integrada. A primeira parte compara EAV com JSON híbrido; a segunda simula metadados de um produto de dados; e a terceira demonstra isolamento por tenant. Use as seções de modelagem JSON para estudar a primeira parte e este guia para interpretar a parte arquitetural.
 
-1. **Schema-Driven Data Products via JSON Metadados**:
-   * Conforme demonstrado nos laboratórios, tabelas de metadados geram consultas dinâmicas T-SQL via `sp_executesql`, permitindo que o Produto de Dados exponha novas propriedades do JSON sem precisar quebrar contratos ou exigir redesplegues do banco.
-2. **Data API Builder (DAB)**:
-   * Ferramenta nativa da Microsoft que encapsula o SQL Server e expõe automaticamente endpoints **REST e GraphQL** seguros com suporte a JWT/Azure AD, sem necessidade de escrever código de API intermediário.
-3. **Event-Driven Data Mesh (CDC + Change Tracking)**:
-   * Através do **Change Data Capture (CDC)** ou **Change Tracking**, o SQL Server publica eventos de alteração diretamente para o Event Grid ou Azure Functions, alimentando outros domínios de dados em tempo real.
+## Documentação oficial
+
+- [Domínios no Microsoft Fabric](https://learn.microsoft.com/pt-br/fabric/governance/domains)
+- [Data API Builder](https://learn.microsoft.com/pt-br/azure/data-api-builder/overview)
+- [Change Data Capture](https://learn.microsoft.com/pt-br/sql/relational-databases/track-changes/about-change-data-capture-sql-server)
+- [Change Tracking](https://learn.microsoft.com/pt-br/sql/relational-databases/track-changes/about-change-tracking-sql-server)
 
 ---
 
-## 3. SQL Server nos Ambientes On-Premises, Nuvem e Híbrido
-
-```mermaid
-graph TB
-    subgraph Ambientes de Implantação do SQL Server
-        OnPrem["ON-PREMISES<br/>SQL Server 2022 / 2025<br/>(Bare Metal / VM / Kubernetes)"]
-        Hybrid["HÍBRIDO / MULTI-CLOUD<br/>Azure Arc-enabled SQL Server<br/>(Gestão e Segurança Unificada)"]
-        Cloud["CLOUD NATIVE (AZURE & FABRIC)<br/>- Azure SQL Database<br/>- Azure SQL Managed Instance<br/>- Fabric SQL Database"]
-    end
-
-    OnPrem <-->|Sincronização / Disaster Recovery| Hybrid
-    Hybrid <-->|Links de Dados / Mirroring| Cloud
-```
-
----
-
-### 3.1 Arquitetura On-Premises (SQL Server 2022 / 2025)
-
-No ambiente local/datacenter corporativo, o SQL Server atua como um hub relacional resiliente de altíssima performance.
-
-* **Recursos de Modernização no SQL Server 2022/2025**:
-  * **S3-Compatible Object Storage**: Permite realizar backups ou ler dados externos em formato Parquet/Delta Lake diretamente no MinIO, Dell ECS ou Pure Storage.
-  * **REST Endpoints (`sp_invoke_external_rest_endpoint`)**: O próprio banco de dados executa chamadas HTTP para microsserviços locais ou APIs de Inteligência Artificial.
-  * **Motor JSON Otimizado**: Suporte nativo a parsing binário e novas funções de agregação (`JSON_ARRAYAGG`, `JSON_OBJECTAGG`).
-
----
-
-### 3.2 Arquitetura Cloud Native (Azure SQL & Microsoft Fabric SQL Database)
-
-Na nuvem Azure, o SQL Server se transforma em serviços PaaS (Plataforma como Serviço) e SaaS totalmente gerenciados.
-
-* **Azure SQL Database & Managed Instance**:
-  * **Escala Automática (Serverless)**: Pausa e retoma recursos computacionais dinamicamente com base na demanda.
-  * **Integração com Azure OpenAI & Vector Search**: Suporte nativo ao tipo de dados `VECTOR`, cálculo de distância de embeddings (`VECTOR_DISTANCE`) e indexação `DiskANN` para motores RAG.
-  * **Private Endpoints & VNet Integration**: Isolamento de tráfego de rede corporativa sem exposição à internet pública.
-
-* **Microsoft Fabric SQL Database (SaaS)**:
-  * **Mirroring Automático para OneLake**: Todas as tabelas gravadas no Fabric SQL são espelhadas em tempo real em formato **Delta Lake / Parquet** no OneLake central, sem necessidade de pipelines ETL manuais (**Zero-ETL**).
-  * **Zero-ETL Analytics**: O time de engenharia de dados lê os dados do banco operacional diretamente no Synapse Data Analytics / Databricks via leitura direta do OneLake.
-
----
-
-### 3.3 Arquitetura Híbrida e Multi-Cloud (Azure Arc + Hybrid Data Pipelines)
-
-Para empresas que não podem migrar 100% dos dados para a nuvem devido a regulações (LGPD, BACEN, HIPAA), adota-se a arquitetura híbrida.
-
-```mermaid
-sequenceDiagram
-    participant App as Aplicação On-Premises
-    participant LocalDB as SQL Server On-Prem (Azure Arc)
-    participant Arc as Azure Arc Control Plane
-    participant CloudDB as Azure SQL / Fabric OneLake
-    participant AI as Azure OpenAI
-
-    App->>LocalDB: Grava Pedido com JSON de Atributos
-    LocalDB->>LocalDB: CDC / Change Tracking captura evento
-    LocalDB->>Arc: Monitoramento de Telemetria e Políticas de Segurança
-    LocalDB->>CloudDB: Replicação Reativa (Azure Data Factory / Fabric Link)
-    CloudDB->>AI: Consulta Vetorial e RAG na Nuvem
-```
-
-#### 🛡️ Pilares do SQL Server Híbrido com Azure Arc:
-
-1. **Governança e Patching Unificado**: Gerenciamento centralizado de licenças, backups e vulnerabilidades pelo portal do Azure, mesmo para instâncias rodando no datacenter local.
-2. **Microsoft Purview Integration**: Mapeamento e linhagem automática de dados (Data Lineage) cobrindo tanto tabelas locais quanto bancos na nuvem.
-3. **Disaster Recovery Híbrido**: Uso de Managed Instances na nuvem como réplicas de leitura/disaster recovery (*Managed Instance Link*) de bancos locais.
-
----
-
-## 4. Matriz de Decisão Arquitetural
-
-| Requisito do Projeto | Arquitetura Recomendada | Recurso do SQL Server a Utilizar |
-| :--- | :--- | :--- |
-| **Atributos de produtos dinâmicos e imprevisíveis** | Esquema Híbrido Relacional + JSON | `NVARCHAR(MAX)` / `JSON` + `PERSISTED Computed Columns` |
-| **Descentralização de equipes de dados (Data Mesh)** | Data Product isolado por Domínio | Data API Builder (DAB) + CDC + Event Grid |
-| **Análise em tempo real sem pipelines ETL (Zero-ETL)** | Cloud SaaS (Microsoft Fabric) | Fabric SQL Database com Fabric Mirroring no OneLake |
-| **Busca semântica / IA sobre dados de negócio** | RAG / Vetorial Nativo | Azure SQL + `VECTOR` + `VECTOR_DISTANCE` + Azure OpenAI |
-| **Datacenter local com exigência de governança na nuvem** | Híbrido com Azure Arc | Azure Arc-enabled SQL Server + Microsoft Purview |
-
----
-
-## 🏁 Conclusão
-
-A evolução do SQL Server transformou o banco de dados de um mero motor relacional tradicional em uma plataforma de dados completa, capaz de processar dados não-estruturados (JSON, Vetores), atuar em arquiteturas modernas descentralizadas (Data Mesh) e operar de forma transparente em ambientes locais, híbridos e multicloud.
-
----
-
-**[↑ Voltar para a Certificação](../dp-800-overview.md) | [Lab: Arquiteturas, EAV e Data Mesh](../../practice/labs/12-other-topics/01-architectures-eav-datamesh-lab.sql)**
+**[↑ Voltar à Seção](./other-topics.md)**
